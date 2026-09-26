@@ -61,19 +61,6 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 
 > **Fn キーを使う場合**: システム設定 › キーボード の「🌐キーを押して」を「何もしない」にしてください。
 
-## ビルド済みアプリを共有する
-
-```sh
-scripts/package.sh    # build/HibiVo-<version>-arm64.zip を作成
-```
-
-- zip は `ditto` で作るため、署名が壊れません。
-- 共有する側は `create-signing-cert.sh` の証明書で署名しておくと、相手もアップデート後に許可をやり直さずに済みます（**毎回同じ証明書で署名すること**）。
-- 公証（notarization）していないため、受け取った側では初回に Gatekeeper に止められます。どちらかの方法で開きます。
-  - 一度起動を試してから、システム設定 › プライバシーとセキュリティ の「このまま開く」を押す
-  - または `xattr -dr com.apple.quarantine /Applications/HibiVo.app` を実行する
-- Apple Silicon 専用です。API Key は各自で設定します。
-
 ## 使い方
 
 | 操作 | 動作 |
