@@ -5,9 +5,9 @@ import Foundation
 public struct DictationContext: Sendable {
     public struct Cleanup: Sendable {
         public var mode: CleanupMode
+        /// nil when cleanup is off or the selected provider has no credentials.
         public var provider: (any TextCleanupProvider)?
         public var model: String
-        public var apiKey: String?
     }
 
     public var target: TargetApplication?
@@ -59,21 +59,41 @@ public struct DictationContextBuilder {
     }
 
     public func cleanup(for target: TargetApplication?) -> DictationContext.Cleanup {
-        let provider = settings.cleanupEnabled ? makeCleanupProvider() : nil
+        let kind = CleanupProviderKind(rawValue: settings.cleanupProviderID) ?? .anthropic
         return DictationContext.Cleanup(
             mode: settings.cleanupEnabled ? settings.cleanupMode(for: target?.bundleID) : .raw,
-            provider: provider,
-            model: settings.cleanupModel.isEmpty ? (provider?.defaultModel ?? "") : settings.cleanupModel,
-            apiKey: provider.flatMap { secrets.secret(for: $0.id) })
+            provider: settings.cleanupEnabled ? makeCleanupProvider(kind) : nil,
+            model: settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel)
     }
 
-    private func makeCleanupProvider() -> (any TextCleanupProvider)? {
-        switch settings.cleanupProviderID {
-        case "openai-compatible":
-            guard let url = URL(string: settings.openAIBaseURL) else { return nil }
-            return OpenAICompatibleCleanupProvider(baseURL: url)
-        default:
-            return AnthropicCleanupProvider()
+    private func makeCleanupProvider(_ kind: CleanupProviderKind) -> (any TextCleanupProvider)? {
+        func secret(_ account: String) -> String? {
+            guard let value = secrets.secret(for: account), !value.isEmpty else { return nil }
+            return value
+        }
+        switch kind {
+        case .anthropic:
+            return secret(SecretAccount.anthropic).map { AnthropicCleanupProvider(apiKey: $0) }
+        case .openAICompatible:
+            guard let url = URL(string: settings.openAIBaseURL), let key = secret(SecretAccount.openAICompatible)
+            else { return nil }
+            return OpenAICompatibleCleanupProvider(baseURL: url, apiKey: key)
+        case .bedrock:
+            let region = settings.bedrockRegion.isEmpty ? BedrockCleanupProvider.defaultRegion : settings.bedrockRegion
+            switch settings.bedrockAuth {
+            case .apiKey:
+                return secret(SecretAccount.bedrockAPIKey).map {
+                    BedrockCleanupProvider(region: region, authentication: .apiKey($0))
+                }
+            case .iam:
+                guard let keyID = secret(SecretAccount.awsAccessKeyID),
+                    let secretKey = secret(SecretAccount.awsSecretAccessKey)
+                else { return nil }
+                let credentials = AWSCredentials(
+                    accessKeyID: keyID, secretAccessKey: secretKey,
+                    sessionToken: secret(SecretAccount.awsSessionToken))
+                return BedrockCleanupProvider(region: region, authentication: .iam(credentials))
+            }
         }
     }
 }

@@ -10,7 +10,7 @@ struct MockCleanupProvider: TextCleanupProvider {
     var result: Result<String, CleanupError>
     var delay: Duration = .zero
 
-    func complete(system: String, user: String, model: String, apiKey: String) async throws -> String {
+    func complete(system: String, user: String, model: String) async throws -> String {
         if delay > .zero { try await Task.sleep(for: delay) }
         return try result.get()
     }
@@ -89,13 +89,13 @@ struct MockCleanupProvider: TextCleanupProvider {
 
     @Test func returnsCleanedText() async {
         let provider = MockCleanupProvider(result: .success("今日の15時から、AWSのAppSyncについて打ち合わせをします。"))
-        let out = await CleanupCoordinator().run(request(), provider: provider, model: "m", apiKey: "k")
+        let out = await CleanupCoordinator().run(request(), provider: provider, model: "m")
         #expect(out == .init(text: "今日の15時から、AWSのAppSyncについて打ち合わせをします。", didCleanup: true, failure: nil))
     }
 
     @Test func rawModeSkipsProvider() async {
         let provider = MockCleanupProvider(result: .failure(.http(500)))
-        let out = await CleanupCoordinator().run(request(.raw), provider: provider, model: "m", apiKey: "k")
+        let out = await CleanupCoordinator().run(request(.raw), provider: provider, model: "m")
         #expect(out.text == request().raw)
         #expect(out.failure == nil)
     }
@@ -103,7 +103,7 @@ struct MockCleanupProvider: TextCleanupProvider {
     @Test(arguments: [CleanupError.http(500), .unauthorized, .refused, .invalidResponse])
     func providerErrorFallsBackToRaw(error: CleanupError) async {
         let out = await CleanupCoordinator().run(
-            request(), provider: MockCleanupProvider(result: .failure(error)), model: "m", apiKey: "k")
+            request(), provider: MockCleanupProvider(result: .failure(error)), model: "m")
         #expect(out == .init(text: request().raw, didCleanup: false, failure: error))
     }
 
@@ -111,22 +111,22 @@ struct MockCleanupProvider: TextCleanupProvider {
         let provider = MockCleanupProvider(result: .success("遅い"), delay: .seconds(5))
         let clock = ContinuousClock()
         let start = clock.now
-        let out = await CleanupCoordinator(timeout: .milliseconds(100)).run(request(), provider: provider, model: "m", apiKey: "k")
+        let out = await CleanupCoordinator(timeout: .milliseconds(100)).run(request(), provider: provider, model: "m")
         #expect(out.failure == .timedOut)
         #expect(out.text == request().raw)
         #expect(clock.now - start < .seconds(1))
     }
 
-    @Test func missingKeyFallsBackToRaw() async {
-        let out = await CleanupCoordinator().run(
-            request(), provider: MockCleanupProvider(result: .success("x")), model: "m", apiKey: nil)
+    @Test func missingProviderFallsBackToRaw() async {
+        let out = await CleanupCoordinator().run(request(), provider: nil, model: "m")
         #expect(out.failure == .missingAPIKey)
+        #expect(out.text == request().raw)
     }
 
     @Test func guardRejectionFallsBackToRaw() async {
         let out = await CleanupCoordinator().run(
             request(), provider: MockCleanupProvider(result: .success(String(repeating: "あ", count: 500))),
-            model: "m", apiKey: "k")
+            model: "m")
         #expect(out.failure == .rejectedByGuard)
     }
 }

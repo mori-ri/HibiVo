@@ -151,16 +151,21 @@ struct CleanupSettingsView: View {
             }
             Section("LLM") {
                 Picker("Provider", selection: $settings.cleanupProviderID) {
-                    Text("Anthropic (Claude)").tag("anthropic")
-                    Text("OpenAI 互換").tag("openai-compatible")
+                    ForEach(CleanupProviderKind.allCases) { Text($0.displayName).tag($0.rawValue) }
                 }
-                if settings.cleanupProviderID == "openai-compatible" {
+                // Model names differ per provider, so go back to the new provider's default.
+                .onChange(of: settings.cleanupProviderID) { settings.cleanupModel = "" }
+
+                switch CleanupProviderKind(rawValue: settings.cleanupProviderID) ?? .anthropic {
+                case .anthropic:
+                    TextField("モデル", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.anthropic.defaultModel)"))
+                    APIKeyField(secrets: env.secrets, account: SecretAccount.anthropic, label: "Anthropic API Key")
+                case .openAICompatible:
                     TextField("Base URL", text: $settings.openAIBaseURL, prompt: Text(OpenAICompatibleCleanupProvider.defaultBaseURL))
                     TextField("モデル", text: $settings.cleanupModel, prompt: Text("例: gpt-4.1-mini"))
-                    APIKeyField(secrets: env.secrets, account: "openai-compatible", label: "API Key")
-                } else {
-                    TextField("モデル", text: $settings.cleanupModel, prompt: Text("既定: claude-opus-5"))
-                    APIKeyField(secrets: env.secrets, account: "anthropic", label: "Anthropic API Key")
+                    APIKeyField(secrets: env.secrets, account: SecretAccount.openAICompatible, label: "API Key")
+                case .bedrock:
+                    BedrockSettingsFields(env: env)
                 }
             }
         }
@@ -198,5 +203,30 @@ struct APIKeyField: View {
         try? secrets.setSecret(trimmed.isEmpty ? nil : trimmed, for: account)
         value = trimmed
         saved = true
+    }
+}
+
+private struct BedrockSettingsFields: View {
+    let env: AppEnvironment
+
+    var body: some View {
+        @Bindable var settings = env.settings
+        TextField("リージョン", text: $settings.bedrockRegion, prompt: Text(BedrockCleanupProvider.defaultRegion))
+        TextField("モデル ID", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.bedrock.defaultModel)"))
+        Text("モデル ID または推論プロファイル ID（例: global.anthropic.claude-haiku-4-5-20251001-v1:0）を指定します。")
+            .font(.caption).foregroundStyle(.secondary)
+        Picker("認証", selection: $settings.bedrockAuth) {
+            ForEach(BedrockAuthMethod.allCases) { Text($0.displayName).tag($0) }
+        }
+        switch settings.bedrockAuth {
+        case .apiKey:
+            APIKeyField(secrets: env.secrets, account: SecretAccount.bedrockAPIKey, label: "Bedrock API キー")
+        case .iam:
+            APIKeyField(secrets: env.secrets, account: SecretAccount.awsAccessKeyID, label: "アクセスキー ID")
+            APIKeyField(secrets: env.secrets, account: SecretAccount.awsSecretAccessKey, label: "シークレットアクセスキー")
+            APIKeyField(secrets: env.secrets, account: SecretAccount.awsSessionToken, label: "セッショントークン（一時認証情報のみ）")
+            Text("必要な権限: bedrock:InvokeModel。認証情報は Keychain に保存されます。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

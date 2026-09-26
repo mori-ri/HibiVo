@@ -191,7 +191,7 @@ public final class DictationController {
             .init(
                 raw: raw, mode: context.cleanup.mode,
                 vocabulary: context.vocabulary.map(\.promptTerm), appName: context.target?.name),
-            provider: context.cleanup.provider, model: context.cleanup.model, apiKey: context.cleanup.apiKey)
+            provider: context.cleanup.provider, model: context.cleanup.model)
         let cleanupDone = clock.now
 
         let outcome = await inserter.insert(cleaned.text, into: context.target)

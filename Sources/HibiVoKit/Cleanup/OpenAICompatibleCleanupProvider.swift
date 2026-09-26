@@ -7,12 +7,14 @@ public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
     public let defaultModel = ""
 
     private let baseURL: URL
+    private let apiKey: String
     private let urlSession: URLSession
 
     public static let defaultBaseURL = "https://api.openai.com/v1"
 
-    public init(baseURL: URL, urlSession: URLSession = .shared) {
+    public init(baseURL: URL, apiKey: String, urlSession: URLSession = .shared) {
         self.baseURL = baseURL
+        self.apiKey = apiKey
         self.urlSession = urlSession
     }
 
@@ -34,7 +36,7 @@ public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
         var choices: [Choice]
     }
 
-    public func complete(system: String, user: String, model: String, apiKey: String) async throws -> String {
+    public func complete(system: String, user: String, model: String) async throws -> String {
         let body = Request(
             model: model,
             messages: [.init(role: "system", content: system), .init(role: "user", content: user)])

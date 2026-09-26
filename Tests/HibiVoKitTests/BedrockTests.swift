@@ -1,0 +1,98 @@
+import Foundation
+import Testing
+
+@testable import HibiVoKit
+
+@Suite struct AWSSigV4Tests {
+    /// "get-vanilla" from the AWS Signature Version 4 test suite.
+    @Test func matchesAWSTestSuiteVector() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.amazonaws.com/")))
+        request.httpMethod = "GET"
+        let credentials = AWSCredentials(
+            accessKeyID: "AKIDEXAMPLE", secretAccessKey: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
+        AWSSigV4.sign(
+            &request, credentials: credentials, region: "us-east-1", service: "service",
+            date: Date(timeIntervalSince1970: 1_440_938_160))  // 2015-08-30T12:36:00Z
+
+        #expect(request.value(forHTTPHeaderField: "X-Amz-Date") == "20150830T123600Z")
+        #expect(
+            request.value(forHTTPHeaderField: "Authorization")
+                == "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/service/aws4_request, "
+                + "SignedHeaders=host;x-amz-date, "
+                + "Signature=5fa00fa31553b73ebf1942676e86291e8372ff2a2260956d9b8aae1d763fbf31")
+    }
+
+    @Test func sessionTokenIsSentAndSigned() throws {
+        var request = URLRequest(url: try #require(URL(string: "https://example.amazonaws.com/")))
+        AWSSigV4.sign(
+            &request, credentials: AWSCredentials(accessKeyID: "AK", secretAccessKey: "SK", sessionToken: "TOKEN"),
+            region: "us-east-1", service: "service")
+        #expect(request.value(forHTTPHeaderField: "X-Amz-Security-Token") == "TOKEN")
+        #expect(request.value(forHTTPHeaderField: "Authorization")?.contains("x-amz-security-token") == true)
+    }
+}
+
+@Suite struct BedrockCleanupProviderTests {
+    let date = Date(timeIntervalSince1970: 1_790_000_000)
+
+    @Test func apiKeyRequestTargetsInvokeModelWithBearerToken() throws {
+        let sut = BedrockCleanupProvider(region: "ap-northeast-1", authentication: .apiKey("BEDROCK-KEY"))
+        let request = try sut.makeURLRequest(system: "sys", user: "usr", model: "global.anthropic.claude-opus-4-6-v1")
+        #expect(
+            request.url?.absoluteString
+                == "https://bedrock-runtime.ap-northeast-1.amazonaws.com/model/global.anthropic.claude-opus-4-6-v1/invoke")
+        #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer BEDROCK-KEY")
+        #expect(request.value(forHTTPHeaderField: "X-Amz-Date") == nil)
+    }
+
+    @Test func modelIDWithColonIsPercentEncoded() throws {
+        let sut = BedrockCleanupProvider(region: "us-east-1", authentication: .apiKey("k"))
+        let url = try #require(sut.endpoint(model: "jp.anthropic.claude-sonnet-4-5-20250929-v1:0"))
+        #expect(url.absoluteString.hasSuffix("/model/jp.anthropic.claude-sonnet-4-5-20250929-v1%3A0/invoke"))
+    }
+
+    @Test func iamRequestIsSignedForBedrockService() throws {
+        let sut = BedrockCleanupProvider(
+            region: "ap-northeast-1",
+            authentication: .iam(AWSCredentials(accessKeyID: "AKIAEXAMPLE", secretAccessKey: "secret")))
+        let request = try sut.makeURLRequest(system: "s", user: "u", model: "anthropic.claude-opus-5", date: date)
+        let auth = try #require(request.value(forHTTPHeaderField: "Authorization"))
+        #expect(auth.hasPrefix("AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE/"))
+        #expect(auth.contains("/ap-northeast-1/bedrock/aws4_request"))
+        #expect(auth.contains("SignedHeaders=accept;content-type;host;x-amz-date"))
+    }
+
+    @Test func bodyUsesBedrockAnthropicVersionWithoutModelOrFallbacks() throws {
+        let body = BedrockCleanupProvider.makeBody(system: "sys", user: "usr", model: "anthropic.claude-opus-5")
+        let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
+        #expect(json["anthropic_version"] as? String == "bedrock-2023-05-31")
+        #expect(json["model"] == nil)
+        #expect(json["fallbacks"] == nil)
+        #expect(json["system"] as? String == "sys")
+        #expect((json["output_config"] as? [String: Any])?["effort"] as? String == "low")
+    }
+
+    @Test func haikuInferenceProfileOmitsEffort() {
+        let body = BedrockCleanupProvider.makeBody(
+            system: "s", user: "u", model: "global.anthropic.claude-haiku-4-5-20251001-v1:0")
+        #expect(body.outputConfig == nil)
+    }
+
+    @MainActor @Test func builderUsesBedrockCredentialsFromKeychain() {
+        let defaults = UserDefaults(suiteName: "BedrockTests-\(UUID())")!
+        let settings = SettingsStore(defaults: defaults)
+        settings.cleanupProviderID = CleanupProviderKind.bedrock.rawValue
+        settings.bedrockAuth = .iam
+        let builder = { (values: [String: String]) in
+            DictationContextBuilder(
+                settings: settings, secrets: MockSecrets(values: values), transcriptionProviders: [])
+        }
+        // Missing secret key → no provider → cleanup falls back to raw.
+        #expect(builder([SecretAccount.awsAccessKeyID: "AK"]).cleanup(for: nil).provider == nil)
+        let cleanup = builder([SecretAccount.awsAccessKeyID: "AK", SecretAccount.awsSecretAccessKey: "SK"])
+            .cleanup(for: nil)
+        #expect(cleanup.provider?.id == "bedrock")
+        #expect(cleanup.model == "anthropic.claude-opus-5")
+    }
+}
