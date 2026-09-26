@@ -12,12 +12,49 @@ public enum CleanupError: Error, Equatable, Sendable {
 }
 
 /// An LLM that rewrites text. It only knows how to send one system + user message and return text.
+/// Each provider is created with its own credentials, since they differ by provider
+/// (a single API key, or an AWS access key pair).
 public protocol TextCleanupProvider: Sendable {
     var id: String { get }
     var displayName: String { get }
     var defaultModel: String { get }
 
-    func complete(system: String, user: String, model: String, apiKey: String) async throws -> String
+    func complete(system: String, user: String, model: String) async throws -> String
+}
+
+/// The cleanup providers users can pick in Settings.
+public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
+    case anthropic
+    case openAICompatible = "openai-compatible"
+    case bedrock
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .anthropic: "Anthropic (Claude)"
+        case .openAICompatible: "OpenAI 互換"
+        case .bedrock: "Amazon Bedrock"
+        }
+    }
+
+    public var defaultModel: String {
+        switch self {
+        case .anthropic: "claude-opus-5"
+        case .openAICompatible: ""
+        case .bedrock: "anthropic.claude-opus-5"
+        }
+    }
+}
+
+/// Keychain account names for cleanup credentials.
+public enum SecretAccount {
+    public static let anthropic = "anthropic"
+    public static let openAICompatible = "openai-compatible"
+    public static let bedrockAPIKey = "bedrock-api-key"  // Bedrock API key (bearer token)
+    public static let awsAccessKeyID = "aws-access-key-id"
+    public static let awsSecretAccessKey = "aws-secret-access-key"
+    public static let awsSessionToken = "aws-session-token"
 }
 
 enum HTTPJSON {

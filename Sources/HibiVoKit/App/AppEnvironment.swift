@@ -93,7 +93,7 @@ public final class AppEnvironment {
             .init(
                 raw: record.rawTranscript, mode: mode,
                 vocabulary: vocabulary.activeEntries.map(\.promptTerm), appName: record.appName),
-            provider: cleanup.provider, model: cleanup.model, apiKey: cleanup.apiKey)
+            provider: cleanup.provider, model: cleanup.model)
         guard outcome.didCleanup else { return false }
         var updated = record
         updated.cleanedTranscript = outcome.text

@@ -41,7 +41,7 @@ UI（`AppState` を観測）:
 | `TranscriptionSession` | protocol (actor 実装) | 1発話分のストリーミング接続 |
 | `SonioxProvider` | struct + actor | MVP の STT |
 | `TextCleanupProvider` | protocol | `system` + `user` を送ってテキストを返すだけ |
-| `OpenAICompatibleCleanupProvider` / `AnthropicCleanupProvider` | struct | LLM 呼び出し |
+| `AnthropicCleanupProvider` / `BedrockCleanupProvider` / `OpenAICompatibleCleanupProvider` | struct | LLM 呼び出し。各 Provider が自分の認証情報を持つ（Bedrock は API キーか SigV4） |
 | `CleanupPromptBuilder` | 純粋関数 | Mode + 辞書 + アプリ名からシステムプロンプトを生成 |
 | `CleanupOutputGuard` | 純粋関数 | 前置き・`<think>` 除去、長さ比チェック、不正なら nil |
 | `CleanupCoordinator` | struct | Mode 決定 → タイムアウト付き LLM 呼び出し → ガード → Raw フォールバック |

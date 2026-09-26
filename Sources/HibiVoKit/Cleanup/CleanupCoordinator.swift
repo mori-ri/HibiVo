@@ -26,14 +26,11 @@ public struct CleanupCoordinator: Sendable {
         self.timeout = timeout
     }
 
-    public func run(
-        _ request: Request, provider: (any TextCleanupProvider)?, model: String, apiKey: String?
-    ) async -> CleanupOutcome {
+    /// - Parameter provider: nil when the selected provider has no credentials configured.
+    public func run(_ request: Request, provider: (any TextCleanupProvider)?, model: String) async -> CleanupOutcome {
         let raw = request.raw
-        guard request.mode != .raw, let provider else {
-            return CleanupOutcome(text: raw, didCleanup: false, failure: nil)
-        }
-        guard let apiKey, !apiKey.isEmpty else { return fallback(raw, .missingAPIKey) }
+        guard request.mode != .raw else { return CleanupOutcome(text: raw, didCleanup: false, failure: nil) }
+        guard let provider else { return fallback(raw, .missingAPIKey) }
         guard !model.isEmpty else { return fallback(raw, .missingModel) }
 
         let system = CleanupPromptBuilder.systemPrompt(
@@ -42,7 +39,7 @@ public struct CleanupCoordinator: Sendable {
 
         do {
             let output = try await withTimeout(timeout) {
-                try await provider.complete(system: system, user: user, model: model, apiKey: apiKey)
+                try await provider.complete(system: system, user: user, model: model)
             }
             guard let text = CleanupOutputGuard.validate(output, raw: raw, mode: request.mode) else {
                 return fallback(raw, .rejectedByGuard)

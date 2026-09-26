@@ -6,10 +6,12 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
     public let displayName = "Anthropic (Claude)"
     public let defaultModel = "claude-opus-5"
 
+    private let apiKey: String
     private let urlSession: URLSession
     private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
-    public init(urlSession: URLSession = .shared) {
+    public init(apiKey: String, urlSession: URLSession = .shared) {
+        self.apiKey = apiKey
         self.urlSession = urlSession
     }
 
@@ -47,9 +49,12 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         enum CodingKeys: String, CodingKey { case content, stopReason = "stop_reason" }
     }
 
-    static func makeRequest(system: String, user: String, model: String) -> Request {
-        let supportsEffort = !model.hasPrefix("claude-haiku")
-        let supportsFallbacks = model.hasPrefix("claude-opus-5") || model.hasPrefix("claude-fable-5")
+    /// Shared with Bedrock, whose model IDs look like `anthropic.claude-…` or `global.anthropic.claude-…`.
+    static func makeRequest(system: String, user: String, model: String, allowFallbacks: Bool = true) -> Request {
+        let name = model.range(of: "anthropic.").map { String(model[$0.upperBound...]) } ?? model
+        let supportsEffort = !name.hasPrefix("claude-haiku")
+        let supportsFallbacks =
+            allowFallbacks && (name.hasPrefix("claude-opus-5") || name.hasPrefix("claude-fable-5"))
         return Request(
             model: model,
             system: system,
@@ -58,7 +63,7 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
             fallbacks: supportsFallbacks ? "default" : nil)
     }
 
-    public func complete(system: String, user: String, model: String, apiKey: String) async throws -> String {
+    public func complete(system: String, user: String, model: String) async throws -> String {
         let body = Self.makeRequest(system: system, user: user, model: model)
         var headers = ["x-api-key": apiKey, "anthropic-version": "2023-06-01"]
         if body.fallbacks != nil { headers["anthropic-beta"] = "server-side-fallback-2026-07-01" }

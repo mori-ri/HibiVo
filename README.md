@@ -14,7 +14,7 @@
 - macOS 14 以降、Apple Silicon
 - Command Line Tools（`xcode-select --install`）または Xcode
 - [Soniox](https://soniox.com) の API Key（文字起こし）
-- Anthropic または OpenAI 互換 API の Key（AI 整形。なくても Raw で使えます）
+- AI 整形用の LLM（なくても Raw で使えます）: Anthropic API、Amazon Bedrock、または OpenAI 互換 API
 
 ## インストール（ソースからビルド）
 
@@ -54,7 +54,8 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 2. **アクセシビリティ** を許可します（システム設定 › プライバシーとセキュリティ › アクセシビリティ）。ホットキーと貼り付けに必要です。
 3. **マイク** を許可します。
 4. メニュー › 設定… › 文字起こし で Soniox の API Key を保存します。
-5. AI 整形 タブで LLM の Provider・API Key を設定します（既定は Anthropic `claude-opus-5`）。
+5. AI 整形 タブで LLM の Provider と認証情報を設定します（既定は Anthropic `claude-opus-5`）。
+   Amazon Bedrock の場合はリージョン・モデル ID（または推論プロファイル ID）と、Bedrock API キーか IAM アクセスキー（`bedrock:InvokeModel` 権限）を設定します。
 6. 右 Option を押しながら話し、離します。
 
 > **Fn キーを使う場合**: システム設定 › キーボード の「🌐キーを押して」を「何もしない」にしてください。
@@ -89,7 +90,7 @@ scripts/package.sh    # build/HibiVo-<version>-arm64.zip を作成
 - **テキスト**: 文字起こしは STT Provider（Soniox）へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
 - **履歴**: 文字起こし原文と整形結果を `~/Library/Application Support/HibiVo/history.json` に平文で最大 200 件保存します。設定 › 一般 › 「履歴を保存する」で無効にでき、履歴画面から全件削除できます。
 - **辞書**: `~/Library/Application Support/HibiVo/vocabulary.json` に保存します。
-- **API Key**: macOS の Keychain に保存します。設定ファイルには書き込みません。
+- **API Key / AWS 認証情報**: macOS の Keychain に保存します。設定ファイルには書き込みません。
 - 解析・テレメトリの送信はありません。
 
 ## 現状と制約（v0.1）
@@ -97,6 +98,7 @@ scripts/package.sh    # build/HibiVo-<version>-arm64.zip を作成
 開発者の環境で、Push-to-Talk → 文字起こし → 整形 → 貼り付けの一連の流れを確認済みです。
 
 - STT は Soniox のみ（Provider は差し替え可能な設計）
+- Amazon Bedrock は Claude モデル（InvokeModel）に対応。AWS プロファイル / SSO の認証情報の自動読み込みは未対応
 - ホットキーはプリセット（右 Option / Fn / 右 Command / ⌃Space）から選択。任意のキーの登録は未対応
 - アプリごとの整形モードは bundle id で判定するため、ブラウザ内の Web アプリ（Gmail など）はブラウザの設定に従う
 - パスワード入力中（Secure Input）は貼り付けず、クリップボードにコピーのみ

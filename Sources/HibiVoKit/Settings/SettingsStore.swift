@@ -22,6 +22,8 @@ public final class SettingsStore {
     /// Empty means the provider's default model.
     public var cleanupModel: String { didSet { defaults.set(cleanupModel, forKey: "cleanupModel") } }
     public var openAIBaseURL: String { didSet { defaults.set(openAIBaseURL, forKey: "openAIBaseURL") } }
+    public var bedrockRegion: String { didSet { defaults.set(bedrockRegion, forKey: "bedrockRegion") } }
+    public var bedrockAuth: BedrockAuthMethod { didSet { save(bedrockAuth, "bedrockAuth") } }
     public var defaultCleanupMode: CleanupMode { didSet { save(defaultCleanupMode, "defaultCleanupMode") } }
     /// Whether dictation results are kept in the local history.
     public var historyEnabled: Bool { didSet { defaults.set(historyEnabled, forKey: "historyEnabled") } }
@@ -37,6 +39,8 @@ public final class SettingsStore {
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
         cleanupProviderID = defaults.string(forKey: "cleanupProviderID") ?? "anthropic"
         cleanupModel = defaults.string(forKey: "cleanupModel") ?? ""
+        bedrockRegion = defaults.string(forKey: "bedrockRegion") ?? BedrockCleanupProvider.defaultRegion
+        bedrockAuth = Self.load("bedrockAuth", from: defaults) ?? .apiKey
         openAIBaseURL = defaults.string(forKey: "openAIBaseURL") ?? OpenAICompatibleCleanupProvider.defaultBaseURL
         defaultCleanupMode = Self.load("defaultCleanupMode", from: defaults) ?? .natural
         historyEnabled = defaults.object(forKey: "historyEnabled") as? Bool ?? true
@@ -60,5 +64,19 @@ public final class SettingsStore {
     private static func load<T: Decodable>(_ key: String, from defaults: UserDefaults) -> T? {
         guard let data = defaults.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
+    }
+}
+
+public enum BedrockAuthMethod: String, Codable, CaseIterable, Identifiable, Sendable {
+    case apiKey
+    case iam
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .apiKey: "Bedrock API キー"
+        case .iam: "IAM アクセスキー"
+        }
     }
 }
