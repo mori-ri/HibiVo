@@ -27,4 +27,5 @@
 | 21 | 未知のアプリの既定モードは Natural | 要件 12 の「その他 → Natural」に従う |
 | 22 | Gmail などブラウザ内のアプリは bundle id で区別できないため、ブラウザの既定モードに従う | URL の取得は AX 依存で不安定。MVP では扱わない |
 | 23 | 配布はソース公開＋各自ビルドを基本とし、仲間内には `scripts/package.sh` の zip を渡す。署名は自己署名証明書（`create-signing-cert.sh`） | ローカルビルドは quarantine が付かず Gatekeeper の警告が出ない。自己署名でも証明書が固定ならアクセシビリティ許可がアップデート後も保たれる。Developer ID ＋公証（年 $99）は利用者が増えてから検討 |
-| 24 | Amazon Bedrock は `bedrock-runtime` の InvokeModel（Anthropic Messages 形式）で接続。認証は Bedrock API キー（Bearer）か IAM アクセスキー（自前の SigV4 実装）。 | 既存の Bedrock の IAM 権限（`bedrock:InvokeModel`）・運用に合わせる。AWS SDK を入れずに済むよう SigV4 は CryptoKit で実装し、AWS 公式テストベクタで検証。Converse API は Claude 以外のモデル向けで、最新 Claude モデルは InvokeModel で提供されるため採用しない |
+| 24 | Amazon Bedrock は `bedrock-runtime` の InvokeModel（Anthropic Messages 形式）で接続。認証は Bedrock API キー（Bearer）か IAM アクセスキー（自前の SigV4 実装）。 | 既存の Bedrock の IAM 権限（`bedrock:InvokeModel`）・運用に合わせる。AWS SDK を入れずに済むよう SigV4 は CryptoKit で実装し、AWS 公式テストベクタで検証。最新 Claude モデルは InvokeModel で提供されるため Claude は InvokeModel のまま |
+| 25 | Bedrock の Claude 以外のモデル（GLM、MiniMax、GPT など）は Converse API で呼ぶ。モデル ID に `anthropic.` を含むかで InvokeModel / Converse を切り替える | Converse は AWS ネイティブで SigV4・API キーの両方が使え、推論過程（`reasoningContent`）が本文と別ブロックで返るため整形結果に混ざらない。temperature は一部推論モデルが拒否するため送らない |

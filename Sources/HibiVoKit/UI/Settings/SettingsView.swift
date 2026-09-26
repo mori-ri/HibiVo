@@ -212,8 +212,16 @@ private struct BedrockSettingsFields: View {
     var body: some View {
         @Bindable var settings = env.settings
         TextField("リージョン", text: $settings.bedrockRegion, prompt: Text(BedrockCleanupProvider.defaultRegion))
-        TextField("モデル ID", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.bedrock.defaultModel)"))
-        Text("モデル ID または推論プロファイル ID（例: global.anthropic.claude-haiku-4-5-20251001-v1:0）を指定します。")
+        HStack {
+            TextField("モデル ID", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.bedrock.defaultModel)"))
+            Menu("候補") {
+                ForEach(BedrockCleanupProvider.suggestedModels, id: \.self) { model in
+                    Button(model) { settings.cleanupModel = model }
+                }
+            }
+            .fixedSize()
+        }
+        Text("モデル ID または推論プロファイル ID を指定します。Claude は InvokeModel、それ以外（GLM、MiniMax、GPT など）は Converse API で呼び出します。")
             .font(.caption).foregroundStyle(.secondary)
         Picker("認証", selection: $settings.bedrockAuth) {
             ForEach(BedrockAuthMethod.allCases) { Text($0.displayName).tag($0) }
@@ -225,7 +233,7 @@ private struct BedrockSettingsFields: View {
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsAccessKeyID, label: "アクセスキー ID")
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsSecretAccessKey, label: "シークレットアクセスキー")
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsSessionToken, label: "セッショントークン（一時認証情報のみ）")
-            Text("必要な権限: bedrock:InvokeModel。認証情報は Keychain に保存されます。")
+            Text("必要な権限: bedrock:InvokeModel（Converse も同じ権限です）。認証情報は Keychain に保存されます。")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

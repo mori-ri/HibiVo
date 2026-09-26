@@ -56,6 +56,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 4. メニュー › 設定… › 文字起こし で Soniox の API Key を保存します。
 5. AI 整形 タブで LLM の Provider と認証情報を設定します（既定は Anthropic `claude-opus-5`）。
    Amazon Bedrock の場合はリージョン・モデル ID（または推論プロファイル ID）と、Bedrock API キーか IAM アクセスキー（`bedrock:InvokeModel` 権限）を設定します。
+   Claude のほか `zai.glm-4.7-flash`、`zai.glm-4.7`、`minimax.minimax-m2.5`、`global.openai.gpt-6-luna` なども指定できます（設定画面の「候補」から選択可）。
 6. 右 Option を押しながら話し、離します。
 
 > **Fn キーを使う場合**: システム設定 › キーボード の「🌐キーを押して」を「何もしない」にしてください。
@@ -98,7 +99,7 @@ scripts/package.sh    # build/HibiVo-<version>-arm64.zip を作成
 開発者の環境で、Push-to-Talk → 文字起こし → 整形 → 貼り付けの一連の流れを確認済みです。
 
 - STT は Soniox のみ（Provider は差し替え可能な設計）
-- Amazon Bedrock は Claude モデル（InvokeModel）に対応。AWS プロファイル / SSO の認証情報の自動読み込みは未対応
+- Amazon Bedrock は Claude（InvokeModel）と、GLM・MiniMax・GPT など Converse API 対応モデルに対応。AWS プロファイル / SSO の認証情報の自動読み込みは未対応
 - ホットキーはプリセット（右 Option / Fn / 右 Command / ⌃Space）から選択。任意のキーの登録は未対応
 - アプリごとの整形モードは bundle id で判定するため、ブラウザ内の Web アプリ（Gmail など）はブラウザの設定に従う
 - パスワード入力中（Secure Input）は貼り付けず、クリップボードにコピーのみ
