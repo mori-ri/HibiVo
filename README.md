@@ -105,6 +105,18 @@ scripts/package.sh    # build/HibiVo-<version>-arm64.zip を作成
 - パスワード入力中（Secure Input）は貼り付けず、クリップボードにコピーのみ
 - 署名済みバイナリは配布していません。ソースからビルドしてください
 
+## フィードバック
+
+「ここが使いにくい」「こうなったら便利」など、小さなことでも歓迎です。
+
+- 💬 [フィードバックを送る](https://github.com/mori-ri/HibiVo/discussions/new?category=feedback) — 良かった点・使いづらかった点
+- 💡 [アイデア・要望](https://github.com/mori-ri/HibiVo/discussions/new?category=ideas) — 「こうなったら便利」
+- 🙋 [質問・使い方](https://github.com/mori-ri/HibiVo/discussions/new?category=q-a) — ビルドや設定で困ったとき
+- 📣 [お知らせ](https://github.com/mori-ri/HibiVo/discussions/categories/announcements) — アップデート情報
+
+アプリのメニュー › 「フィードバック・要望を送る…」からも開けます。
+再現手順がはっきりしている不具合は [Issue](https://github.com/mori-ri/HibiVo/issues/new/choose) へどうぞ。
+
 ## 開発
 
 ```sh

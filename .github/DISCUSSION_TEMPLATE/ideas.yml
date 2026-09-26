@@ -1,0 +1,14 @@
+labels: [idea]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 困っていること・やりたいこと
+      placeholder: 例）会議のメモを取るとき、話し終わるまでキーを押し続けるのが疲れる
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: こうなったら便利（任意）
+      placeholder: 例）ホットキーを 2 回押したら、もう一度押すまで録音し続けるモード

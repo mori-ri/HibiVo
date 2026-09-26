@@ -1,0 +1,13 @@
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 質問
+      description: 試したこと、表示されたメッセージがあれば書いてください。**API Key は貼り付けないでください。**
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS のバージョン（任意）
+      placeholder: 例 macOS 26.1

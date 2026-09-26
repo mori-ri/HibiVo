@@ -46,6 +46,7 @@ public struct MenuBarContent: View {
             .keyboardShortcut("y")
         Button("設定…") { open(.general) }
             .keyboardShortcut(",")
+        Button("フィードバック・要望を送る…") { ProjectLinks.open(ProjectLinks.newFeedback) }
 
         Divider()
 
