@@ -13,27 +13,29 @@ struct HistoryView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            VStack(spacing: 0) {
-                Theme.separator.frame(height: 1).padding(.top, 12)
-                HStack(spacing: 0) {
-                    List(env.history.records, selection: $selection) { record in
-                        HistoryRow(record: record)
-                    }
-                    .scrollContentBackground(.hidden)
-                    .frame(width: 280)
-                    Theme.separator.frame(width: 1)
-                    Group {
-                        if let record = env.history.records.first(where: { $0.id == selection }) {
-                            HistoryDetail(env: env, record: record)
-                        } else {
-                            Text("項目を選択してください")
-                                .foregroundStyle(.tertiary)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
+            HStack(spacing: 0) {
+                List(env.history.records, selection: $selection) { record in
+                    HistoryRow(record: record)
                 }
+                .scrollContentBackground(.hidden)
+                .frame(width: 280)
+                Theme.separator.frame(width: 1)
+                Group {
+                    if let record = env.history.records.first(where: { $0.id == selection }) {
+                        HistoryDetail(env: env, record: record)
+                    } else {
+                        Text("項目を選択してください")
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .glassPanel(cornerRadius: 14)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 20)
         }
     }
 }

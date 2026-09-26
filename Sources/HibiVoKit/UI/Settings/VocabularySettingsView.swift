@@ -31,8 +31,8 @@ struct VocabularySettingsView: View {
                     Text("まだ登録されていません").foregroundStyle(.tertiary)
                 }
             }
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.separator))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .glassPanel(cornerRadius: 14)
 
             HStack {
                 TextField("正しい表記", text: $preferred)

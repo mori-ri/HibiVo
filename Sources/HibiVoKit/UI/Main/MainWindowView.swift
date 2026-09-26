@@ -56,13 +56,16 @@ public struct MainWindowView: View {
 
     public var body: some View {
         HStack(spacing: 0) {
+            // Floating glass sidebar; the traffic lights sit inside its top edge.
             Sidebar(env: env)
-                .frame(width: 208)
-            Theme.separator.frame(width: 1)
+                .frame(width: 212)
+                .glassPanel(cornerRadius: 18)
+                .padding(8)
             page(env.state.mainSection)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Theme.background)
+        .background(GlassBackdrop())
+        .background(WindowButtonsInset(dx: 8, dy: 6))
         .ignoresSafeArea()
         .frame(minWidth: 780, minHeight: 520)
     }
@@ -100,9 +103,9 @@ private struct Sidebar: View {
                     .font(.system(size: 17, weight: .semibold))
                     .tracking(-0.2)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 16)
             // The hidden title bar puts the traffic lights over the top of the sidebar.
-            .padding(.top, 48)
+            .padding(.top, 44)
             .padding(.bottom, 24)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -127,8 +130,8 @@ private struct Sidebar: View {
             }
             .font(.system(size: 11))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 18)
+            .padding(.horizontal, 18)
+            .padding(.bottom, 16)
         }
         .frame(maxHeight: .infinity, alignment: .top)
     }
@@ -160,10 +163,16 @@ private struct SidebarItem: View {
             }
             .padding(.horizontal, 10)
             .frame(height: 30)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(isSelected ? Theme.selection : isHovered ? Theme.hover : .clear)
-            )
+            .background {
+                let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+                if isSelected {
+                    shape.fill(Theme.selection)
+                        .overlay(shape.strokeBorder(Theme.rim, lineWidth: 0.5))
+                        .shadow(color: Theme.selectionShadow, radius: 3, y: 1)
+                } else if isHovered {
+                    shape.fill(Theme.hover)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -191,7 +200,7 @@ private struct PageHeader<Actions: View>: View {
             Spacer()
             actions
         }
-        .padding(.horizontal, 28)
+        .padding(.horizontal, 24)
         .padding(.top, 40)
         .padding(.bottom, 8)
     }

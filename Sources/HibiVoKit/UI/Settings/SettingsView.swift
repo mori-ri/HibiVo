@@ -10,36 +10,34 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         @Bindable var settings = env.settings
-        Form {
-            Section {
-                Toggle("ログイン時に起動", isOn: $launchAtLogin)
+        SettingsPage {
+            SettingsSection {
+                ToggleRow("ログイン時に起動", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
-                if let launchError { Text(launchError).font(.caption).foregroundStyle(.red) }
+                if let launchError { NoteRow(launchError, color: .red) }
             }
-            Section("操作") {
-                Picker("ホットキー（押している間だけ録音）", selection: hotkeyBinding) {
+            SettingsSection(title: "操作") {
+                PickerRow("ホットキー（押している間だけ録音）", selection: hotkeyBinding) {
                     ForEach(HotkeyTrigger.presets, id: \.self) { Text($0.displayName).tag($0) }
                 }
                 if env.settings.hotkey == .fn {
-                    Text("システム設定 › キーボード の「🌐キーを押して」を「何もしない」にしてください。")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NoteRow("システム設定 › キーボード の「🌐キーを押して」を「何もしない」にしてください。")
                 }
-                Text("Esc で録音を取り消せます。").font(.caption).foregroundStyle(.secondary)
+                NoteRow("Esc で録音を取り消せます。")
             }
-            Section("音声") {
-                Picker("マイク", selection: $settings.microphoneUID) {
+            SettingsSection(title: "音声") {
+                PickerRow("マイク", selection: $settings.microphoneUID) {
                     Text("システム既定").tag(String?.none)
                     ForEach(AudioDeviceCatalog.inputDevices()) { Text($0.name).tag(Optional($0.uid)) }
                 }
             }
-            Section {
-                Toggle("履歴を保存する", isOn: $settings.historyEnabled)
-            } header: {
-                Text("履歴")
-            } footer: {
-                FormFooter("文字起こしと整形結果のテキストを、この Mac の中に最大 \(HistoryStore.limit) 件保存します。音声は保存しません。")
+            SettingsSection(
+                title: "履歴",
+                footer: "文字起こしと整形結果のテキストを、この Mac の中に最大 \(HistoryStore.limit) 件保存します。音声は保存しません。"
+            ) {
+                ToggleRow("履歴を保存する", isOn: $settings.historyEnabled)
             }
-            Section("権限") {
+            SettingsSection(title: "権限") {
                 PermissionRow(title: "アクセシビリティ（ホットキー・貼り付け）", granted: env.state.hasAccessibilityPermission) {
                     Permissions.openAccessibilitySettings()
                 }
@@ -48,7 +46,6 @@ struct GeneralSettingsView: View {
                 }
             }
         }
-        .pageForm()
     }
 
     private var hotkeyBinding: Binding<HotkeyTrigger> {
@@ -72,12 +69,18 @@ private struct PermissionRow: View {
     let open: () -> Void
 
     var body: some View {
-        HStack {
-            Image(systemName: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .foregroundStyle(granted ? .green : .orange)
-            Text(title)
-            Spacer()
-            if !granted { Button("許可する…", action: open) }
+        LabeledRow {
+            HStack(spacing: 8) {
+                Image(systemName: granted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(granted ? .green : .orange)
+                Text(title)
+            }
+        } control: {
+            if granted {
+                Text("許可済み").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Button("許可する…", action: open)
+            }
         }
     }
 }
@@ -90,27 +93,24 @@ struct TranscriptionSettingsView: View {
     var body: some View {
         @Bindable var settings = env.settings
         let provider = env.transcriptionProviders.first { $0.id == settings.transcriptionProviderID }
-        Form {
-            Section {
-                Picker("STT Provider", selection: $settings.transcriptionProviderID) {
+        SettingsPage {
+            SettingsSection(footer: "話している間にストリーミングで文字起こしします。音声は保存されません。") {
+                PickerRow("STT Provider", selection: $settings.transcriptionProviderID) {
                     ForEach(env.transcriptionProviders, id: \.id) { Text($0.displayName).tag($0.id) }
                 }
                 if let provider {
                     APIKeyField(secrets: env.secrets, account: provider.id, label: "\(provider.displayName) API Key")
-                    Picker("モデル", selection: $settings.transcriptionModel) {
+                    PickerRow("モデル", selection: $settings.transcriptionModel) {
                         Text("既定（\(provider.defaultModel)）").tag("")
                         ForEach(provider.models, id: \.self) { Text($0).tag($0) }
                     }
                 }
-                Picker("言語", selection: $settings.language) {
+                PickerRow("言語", selection: $settings.language) {
                     Text("日本語").tag("ja")
                     Text("English").tag("en")
                 }
-            } footer: {
-                FormFooter("話している間にストリーミングで文字起こしします。音声は保存されません。")
             }
         }
-        .pageForm()
     }
 }
 
@@ -121,17 +121,15 @@ struct CleanupSettingsView: View {
 
     var body: some View {
         @Bindable var settings = env.settings
-        Form {
-            Section {
-                Toggle("AI で文章を整える", isOn: $settings.cleanupEnabled)
-                Picker("既定のモード", selection: $settings.defaultCleanupMode) {
+        SettingsPage {
+            SettingsSection(footer: "整形に失敗したときは、文字起こし結果をそのまま入力します。") {
+                ToggleRow("AI で文章を整える", isOn: $settings.cleanupEnabled)
+                PickerRow("既定のモード", selection: $settings.defaultCleanupMode) {
                     ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
                 }
-            } footer: {
-                FormFooter("整形に失敗したときは、文字起こし結果をそのまま入力します。")
             }
-            Section("LLM") {
-                Picker("Provider", selection: $settings.cleanupProviderID) {
+            SettingsSection(title: "LLM") {
+                PickerRow("Provider", selection: $settings.cleanupProviderID) {
                     ForEach(CleanupProviderKind.allCases) { Text($0.displayName).tag($0.rawValue) }
                 }
                 // Model names differ per provider, so go back to the new provider's default.
@@ -139,18 +137,17 @@ struct CleanupSettingsView: View {
 
                 switch CleanupProviderKind(rawValue: settings.cleanupProviderID) ?? .anthropic {
                 case .anthropic:
-                    TextField("モデル", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.anthropic.defaultModel)"))
+                    TextFieldRow("モデル", text: $settings.cleanupModel, prompt: "既定: \(CleanupProviderKind.anthropic.defaultModel)")
                     APIKeyField(secrets: env.secrets, account: SecretAccount.anthropic, label: "Anthropic API Key")
                 case .openAICompatible:
-                    TextField("Base URL", text: $settings.openAIBaseURL, prompt: Text(OpenAICompatibleCleanupProvider.defaultBaseURL))
-                    TextField("モデル", text: $settings.cleanupModel, prompt: Text("例: gpt-4.1-mini"))
+                    TextFieldRow("Base URL", text: $settings.openAIBaseURL, prompt: OpenAICompatibleCleanupProvider.defaultBaseURL)
+                    TextFieldRow("モデル", text: $settings.cleanupModel, prompt: "例: gpt-4.1-mini")
                     APIKeyField(secrets: env.secrets, account: SecretAccount.openAICompatible, label: "API Key")
                 case .bedrock:
                     BedrockSettingsFields(env: env)
                 }
             }
         }
-        .pageForm()
     }
 }
 
@@ -163,8 +160,11 @@ struct APIKeyField: View {
     @State private var saved = false
 
     var body: some View {
-        HStack {
+        LabeledRow(label) {
             SecureField(label, text: $value)
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 340)
                 .onSubmit(save)
             Button(saved ? "保存済み" : "保存", action: save)
                 .disabled(saved)
@@ -192,9 +192,12 @@ private struct BedrockSettingsFields: View {
 
     var body: some View {
         @Bindable var settings = env.settings
-        TextField("リージョン", text: $settings.bedrockRegion, prompt: Text(BedrockCleanupProvider.defaultRegion))
-        HStack {
+        TextFieldRow("リージョン", text: $settings.bedrockRegion, prompt: BedrockCleanupProvider.defaultRegion)
+        LabeledRow("モデル ID") {
             TextField("モデル ID", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.bedrock.defaultModel)"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 340)
             Menu("候補") {
                 ForEach(BedrockCleanupProvider.suggestedModels, id: \.self) { model in
                     Button(model) { settings.cleanupModel = model }
@@ -202,9 +205,8 @@ private struct BedrockSettingsFields: View {
             }
             .fixedSize()
         }
-        Text("モデル ID または推論プロファイル ID を指定します。Claude は InvokeModel、それ以外（GLM、MiniMax、GPT など）は Converse API で呼び出します。")
-            .font(.caption).foregroundStyle(.secondary)
-        Picker("認証", selection: $settings.bedrockAuth) {
+        NoteRow("モデル ID または推論プロファイル ID を指定します。Claude は InvokeModel、それ以外（GLM、MiniMax、GPT など）は Converse API で呼び出します。")
+        PickerRow("認証", selection: $settings.bedrockAuth) {
             ForEach(BedrockAuthMethod.allCases) { Text($0.displayName).tag($0) }
         }
         switch settings.bedrockAuth {
@@ -214,8 +216,7 @@ private struct BedrockSettingsFields: View {
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsAccessKeyID, label: "アクセスキー ID")
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsSecretAccessKey, label: "シークレットアクセスキー")
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsSessionToken, label: "セッショントークン（一時認証情報のみ）")
-            Text("必要な権限: bedrock:InvokeModel（Converse も同じ権限です）。認証情報は Keychain に保存されます。")
-                .font(.caption).foregroundStyle(.secondary)
+            NoteRow("必要な権限: bedrock:InvokeModel（Converse も同じ権限です）。認証情報は Keychain に保存されます。")
         }
     }
 }
