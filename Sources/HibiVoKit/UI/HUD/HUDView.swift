@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HUDView: View {
     let state: AppState
+    let settings: SettingsStore
 
     var body: some View {
         HStack(spacing: 8) {
@@ -37,7 +38,8 @@ struct HUDView: View {
 
     private var label: String? {
         switch state.phase {
-        case .recording: state.partialTranscript.isEmpty ? nil : state.partialTranscript
+        case .recording:
+            settings.showLiveTranscript && !state.partialTranscript.isEmpty ? state.partialTranscript : nil
         case .processing: nil
         case .error(let message): message
         case .idle: nil
@@ -47,23 +49,39 @@ struct HUDView: View {
 
 private struct LevelBars: View {
     let level: Float
-    private let weights: [Float] = [0.55, 0.85, 1.0, 0.75, 0.5]
+    /// Centre-heavy envelope: the middle bars reach full height, the edges stay small.
+    private let weights: [Float] = [0.3, 0.5, 0.8, 1.0, 0.8, 0.5, 0.3]
+    private static let minHeight: CGFloat = 4
+    private static let maxHeight: CGFloat = 30
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(weights.indices, id: \.self) { i in
-                Capsule()
-                    .fill(.red)
-                    .frame(width: 3, height: height(for: weights[i]))
+        TimelineView(.animation) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            // Bars act as a mask over the logo gradient, so the colours sweep across the whole wave.
+            LinearGradient(
+                colors: [Theme.glowBlue, Theme.glowMagenta, Theme.glowOrange],
+                startPoint: .leading, endPoint: .trailing
+            )
+            .mask {
+                HStack(spacing: 2) {
+                    ForEach(weights.indices, id: \.self) { i in
+                        Capsule().frame(width: 3, height: height(for: i, time: time))
+                    }
+                }
             }
         }
-        .frame(height: 18)
+        .frame(width: CGFloat(weights.count) * 5 - 2, height: Self.maxHeight)
         .animation(.linear(duration: 0.08), value: level)
     }
 
-    private func height(for weight: Float) -> CGFloat {
-        // Speech RMS is usually < 0.3, so scale up and clamp.
-        let normalized = min(1, level * 5)
-        return CGFloat(4 + 14 * normalized * weight)
+    private func height(for index: Int, time: TimeInterval) -> CGFloat {
+        // Speech RMS is usually < 0.3; boost it and take the square root so quiet speech still
+        // moves the bars noticeably, then clamp.
+        let normalized = min(1, (level * 8).squareRoot())
+        // Each bar wobbles at its own speed while there is sound; the centre wobbles hardest.
+        let centreness = 1 - abs(Float(index) - Float(weights.count - 1) / 2) / (Float(weights.count) / 2)
+        let wobble = Float(sin(time * (9 + Double(index) * 2.3) + Double(index) * 1.7))
+        let amplitude = normalized * weights[index] * (1 + 0.45 * centreness * wobble)
+        return Self.minHeight + (Self.maxHeight - Self.minHeight) * CGFloat(min(1, max(0, amplitude)))
     }
 }

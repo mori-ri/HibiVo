@@ -9,6 +9,7 @@ import Testing
     let settings: SettingsStore
     let audio = MockAudio()
     let inserter = MockInserter()
+    let ducker = MockDucker()
 
     init() {
         let defaults = UserDefaults(suiteName: "DictationControllerTests-\(UUID())")!
@@ -26,7 +27,35 @@ import Testing
             state: state, audio: audio,
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: secrets, transcriptionProviders: [provider]),
-            activeApp: MockActiveApp(), inserter: inserter, minimumHold: minimumHold)
+            activeApp: MockActiveApp(), inserter: inserter, ducker: ducker,
+            duckingEnabled: { settings.duckOutputWhileRecording }, minimumHold: minimumHold)
+    }
+
+    @Test func speakersAreDuckedOnlyWhileRecording() async {
+        let sut = makeController()
+        sut.handle(.pressed)
+        #expect(ducker.isDucked)
+        audio.speak()
+        sut.handle(.released)
+        #expect(!ducker.isDucked)
+        await sut.waitUntilIdle()
+    }
+
+    @Test func cancelRestoresSpeakers() async {
+        let sut = makeController()
+        sut.handle(.pressed)
+        sut.handle(.escape)
+        #expect(!ducker.isDucked)
+        await sut.waitUntilIdle()
+    }
+
+    @Test func duckingCanBeTurnedOff() async {
+        settings.duckOutputWhileRecording = false
+        let sut = makeController()
+        sut.handle(.pressed)
+        #expect(ducker.duckCount == 0)
+        sut.handle(.escape)
+        await sut.waitUntilIdle()
     }
 
     @Test func pressStartsRecordingAndReleaseTranscribes() async throws {

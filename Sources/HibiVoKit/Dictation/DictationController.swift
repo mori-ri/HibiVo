@@ -29,6 +29,8 @@ public final class DictationController {
     private let history: HistoryStore?
     private let historyEnabled: @MainActor () -> Bool
     private let microphoneUID: @MainActor () -> String?
+    private let ducker: (any OutputDucking)?
+    private let duckingEnabled: @MainActor () -> Bool
     /// Releases shorter than this are treated as accidental taps.
     private let minimumHold: Duration
     private let clock = ContinuousClock()
@@ -48,6 +50,8 @@ public final class DictationController {
         history: HistoryStore? = nil,
         historyEnabled: @escaping @MainActor () -> Bool = { true },
         microphoneUID: @escaping @MainActor () -> String? = { nil },
+        ducker: (any OutputDucking)? = nil,
+        duckingEnabled: @escaping @MainActor () -> Bool = { true },
         minimumHold: Duration = .milliseconds(250)
     ) {
         self.state = state
@@ -59,6 +63,8 @@ public final class DictationController {
         self.history = history
         self.historyEnabled = historyEnabled
         self.microphoneUID = microphoneUID
+        self.ducker = ducker
+        self.duckingEnabled = duckingEnabled
         self.minimumHold = minimumHold
     }
 
@@ -101,6 +107,7 @@ public final class DictationController {
 
         let session = context.transcriptionProvider.makeSession(context.transcriptionConfig)
         Task { await session.start() }
+        if duckingEnabled() { ducker?.duck() }
 
         state.phase = .recording
         state.audioLevel = 0
@@ -140,6 +147,7 @@ public final class DictationController {
         self.recording = nil
         recording.watchdog.cancel()
         audio.stop()  // Finishes the audio stream, which lets `pump` drain and return.
+        ducker?.restore()
         state.phase = .processing
         let releasedAt = clock.now
         processing = Task { await process(recording, releasedAt: releasedAt) }
@@ -150,6 +158,7 @@ public final class DictationController {
         self.recording = nil
         recording.watchdog.cancel()
         audio.stop()
+        ducker?.restore()
         recording.pump.cancel()
         recording.partials.cancel()
         processing = Task { await recording.session.cancel() }

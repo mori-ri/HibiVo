@@ -91,3 +91,16 @@ final class MockInserter: TextInserting {
         return outcome
     }
 }
+
+@MainActor
+final class MockDucker: OutputDucking {
+    var isDucked = false
+    var duckCount = 0
+
+    func duck() {
+        isDucked = true
+        duckCount += 1
+    }
+
+    func restore() { isDucked = false }
+}

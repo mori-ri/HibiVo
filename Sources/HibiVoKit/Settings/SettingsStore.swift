@@ -27,6 +27,12 @@ public final class SettingsStore {
     public var defaultCleanupMode: CleanupMode { didSet { save(defaultCleanupMode, "defaultCleanupMode") } }
     /// Whether dictation results are kept in the local history.
     public var historyEnabled: Bool { didSet { defaults.set(historyEnabled, forKey: "historyEnabled") } }
+    /// Whether speaker volume is lowered while recording.
+    public var duckOutputWhileRecording: Bool {
+        didSet { defaults.set(duckOutputWhileRecording, forKey: "duckOutputWhileRecording") }
+    }
+    /// Whether the HUD shows the streaming transcript while recording.
+    public var showLiveTranscript: Bool { didSet { defaults.set(showLiveTranscript, forKey: "showLiveTranscript") } }
     public var appModeOverrides: [AppModeOverride] { didSet { save(appModeOverrides, "appModeOverrides") } }
 
     public init(defaults: UserDefaults = .standard) {
@@ -44,6 +50,8 @@ public final class SettingsStore {
         openAIBaseURL = defaults.string(forKey: "openAIBaseURL") ?? OpenAICompatibleCleanupProvider.defaultBaseURL
         defaultCleanupMode = Self.load("defaultCleanupMode", from: defaults) ?? .natural
         historyEnabled = defaults.object(forKey: "historyEnabled") as? Bool ?? true
+        duckOutputWhileRecording = defaults.object(forKey: "duckOutputWhileRecording") as? Bool ?? true
+        showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
     }
 
