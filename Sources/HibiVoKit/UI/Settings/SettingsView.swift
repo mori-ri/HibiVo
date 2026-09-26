@@ -30,6 +30,8 @@ struct GeneralSettingsView: View {
                     Text("システム既定").tag(String?.none)
                     ForEach(AudioDeviceCatalog.inputDevices()) { Text($0.name).tag(Optional($0.uid)) }
                 }
+                ToggleRow("録音中はスピーカーの音量を下げる", isOn: $settings.duckOutputWhileRecording)
+                ToggleRow("話している内容をリアルタイムで表示", isOn: $settings.showLiveTranscript)
             }
             SettingsSection(
                 title: "履歴",

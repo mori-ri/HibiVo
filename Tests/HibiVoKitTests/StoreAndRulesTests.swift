@@ -130,6 +130,14 @@ import Testing
         #expect(history.records.first?.appName == "Slack")
     }
 
+    @Test func liveTranscriptIsHiddenByDefaultAndPersists() {
+        let defaults = UserDefaults(suiteName: "StoreTests-\(UUID())")!
+        let settings = SettingsStore(defaults: defaults)
+        #expect(settings.showLiveTranscript == false)
+        settings.showLiveTranscript = true
+        #expect(SettingsStore(defaults: defaults).showLiveTranscript == true)
+    }
+
     @Test func disabledHistoryRecordsNothing() async {
         let defaults = UserDefaults(suiteName: "StoreTests-\(UUID())")!
         let settings = SettingsStore(defaults: defaults)

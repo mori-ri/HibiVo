@@ -8,9 +8,12 @@ public final class HUDController {
     private let panel: NSPanel
     private let hostingView: NSHostingView<HUDView>
 
-    public init(state: AppState) {
+    private let settings: SettingsStore
+
+    public init(state: AppState, settings: SettingsStore) {
         self.state = state
-        hostingView = NSHostingView(rootView: HUDView(state: state))
+        self.settings = settings
+        hostingView = NSHostingView(rootView: HUDView(state: state, settings: settings))
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 80, height: 34),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -31,6 +34,7 @@ public final class HUDController {
         withObservationTracking {
             _ = state.phase
             _ = state.partialTranscript
+            _ = settings.showLiveTranscript
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.update()

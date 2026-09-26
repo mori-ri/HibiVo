@@ -34,8 +34,10 @@ public final class AppEnvironment {
             inserter: inserter,
             history: history,
             historyEnabled: { settings.historyEnabled },
-            microphoneUID: { settings.microphoneUID })
-        hud = HUDController(state: state)
+            microphoneUID: { settings.microphoneUID },
+            ducker: SystemVolumeDucker(),
+            duckingEnabled: { settings.duckOutputWhileRecording })
+        hud = HUDController(state: state, settings: settings)
 
         hotkey.onAction = { [weak self] action in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth
