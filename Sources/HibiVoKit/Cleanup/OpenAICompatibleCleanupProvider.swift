@@ -1,0 +1,56 @@
+import Foundation
+
+/// Any `/chat/completions` endpoint: OpenAI, Groq, OpenRouter, an in-house gateway, etc.
+public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
+    public let id = "openai-compatible"
+    public let displayName = "OpenAI 互換"
+    public let defaultModel = ""
+
+    private let baseURL: URL
+    private let urlSession: URLSession
+
+    public static let defaultBaseURL = "https://api.openai.com/v1"
+
+    public init(baseURL: URL, urlSession: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.urlSession = urlSession
+    }
+
+    struct Request: Encodable {
+        struct Message: Encodable {
+            var role: String
+            var content: String
+        }
+        var model: String
+        var messages: [Message]
+        var temperature: Double = 0
+    }
+
+    struct Response: Decodable {
+        struct Choice: Decodable {
+            struct Message: Decodable { var content: String? }
+            var message: Message
+        }
+        var choices: [Choice]
+    }
+
+    public func complete(system: String, user: String, model: String, apiKey: String) async throws -> String {
+        let body = Request(
+            model: model,
+            messages: [.init(role: "system", content: system), .init(role: "user", content: user)])
+        let request = try HTTPJSON.post(
+            baseURL.appending(path: "chat/completions"),
+            headers: ["Authorization": "Bearer \(apiKey)"], body: body, timeout: 15)
+        let (data, response) = try await urlSession.data(for: request)
+        try HTTPJSON.checkStatus(response)
+        return try Self.parse(data)
+    }
+
+    static func parse(_ data: Data) throws -> String {
+        let response = try JSONDecoder().decode(Response.self, from: data)
+        guard let text = response.choices.first?.message.content, !text.isEmpty else {
+            throw CleanupError.invalidResponse
+        }
+        return text
+    }
+}
