@@ -64,7 +64,7 @@ import Testing
     }
 
     @Test func bodyUsesBedrockAnthropicVersionWithoutModelOrFallbacks() throws {
-        let body = BedrockCleanupProvider.makeBody(system: "sys", user: "usr", model: "anthropic.claude-opus-5")
+        let body = BedrockCleanupProvider.makeInvokeBody(system: "sys", user: "usr", model: "anthropic.claude-opus-5")
         let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
         #expect(json["anthropic_version"] as? String == "bedrock-2023-05-31")
         #expect(json["model"] == nil)
@@ -74,7 +74,7 @@ import Testing
     }
 
     @Test func haikuInferenceProfileOmitsEffort() {
-        let body = BedrockCleanupProvider.makeBody(
+        let body = BedrockCleanupProvider.makeInvokeBody(
             system: "s", user: "u", model: "global.anthropic.claude-haiku-4-5-20251001-v1:0")
         #expect(body.outputConfig == nil)
     }
@@ -94,5 +94,45 @@ import Testing
             .cleanup(for: nil)
         #expect(cleanup.provider?.id == "bedrock")
         #expect(cleanup.model == "anthropic.claude-opus-5")
+    }
+
+    @Test(arguments: ["minimax.minimax-m2.5", "zai.glm-4.7-flash", "zai.glm-4.7", "global.openai.gpt-6-luna"])
+    func nonClaudeModelsUseConverse(model: String) throws {
+        let sut = BedrockCleanupProvider(region: "ap-northeast-1", authentication: .apiKey("k"))
+        let request = try sut.makeURLRequest(system: "sys", user: "usr", model: model)
+        #expect(
+            request.url?.absoluteString
+                == "https://bedrock-runtime.ap-northeast-1.amazonaws.com/model/\(model)/converse")
+        let body = try #require(request.httpBody)
+        let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect((json["system"] as? [[String: String]])?.first?["text"] == "sys")
+        let message = try #require((json["messages"] as? [[String: Any]])?.first)
+        #expect(message["role"] as? String == "user")
+        #expect((message["content"] as? [[String: String]])?.first?["text"] == "usr")
+        #expect((json["inferenceConfig"] as? [String: Int])?["maxTokens"] == BedrockCleanupProvider.maxTokens)
+        #expect(json["anthropic_version"] == nil)
+    }
+
+    @Test func claudeModelsUseInvokeModel() {
+        #expect(BedrockCleanupProvider.API(model: "anthropic.claude-opus-5") == .invokeModel)
+        #expect(BedrockCleanupProvider.API(model: "jp.anthropic.claude-sonnet-4-5-20250929-v1:0") == .invokeModel)
+        #expect(BedrockCleanupProvider.API(model: "zai.glm-4.7") == .converse)
+    }
+
+    @Test func converseResponseSkipsReasoningBlocks() throws {
+        let data = Data(
+            #"{"output":{"message":{"role":"assistant","content":[{"reasoningContent":{"reasoningText":{"text":"考え中"}}},{"text":"整形済みの文章です。"}]}},"stopReason":"end_turn","usage":{"inputTokens":10,"outputTokens":5}}"#
+                .utf8)
+        #expect(try BedrockCleanupProvider.parseConverse(data) == "整形済みの文章です。")
+    }
+
+    @Test func converseGuardrailStopIsRefusal() {
+        let data = Data(#"{"output":{"message":{"role":"assistant","content":[{"text":"blocked"}]}},"stopReason":"guardrail_intervened"}"#.utf8)
+        #expect(throws: CleanupError.refused) { try BedrockCleanupProvider.parseConverse(data) }
+    }
+
+    @Test func converseEmptyOutputIsInvalid() {
+        let data = Data(#"{"output":{"message":{"role":"assistant","content":[]}},"stopReason":"end_turn"}"#.utf8)
+        #expect(throws: CleanupError.invalidResponse) { try BedrockCleanupProvider.parseConverse(data) }
     }
 }
