@@ -50,6 +50,8 @@ public struct MenuBarContent: View {
 
         Divider()
 
+        Button("HibiVo を再起動") { AppRelauncher.relaunch() }
+            .keyboardShortcut("r")
         Button("HibiVo を終了") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
