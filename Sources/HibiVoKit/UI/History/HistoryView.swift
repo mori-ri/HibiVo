@@ -1,36 +1,56 @@
 import SwiftUI
 
-public struct HistoryView: View {
+struct HistoryView: View {
     let env: AppEnvironment
     @State private var selection: HistoryRecord.ID? = nil
 
-    public init(env: AppEnvironment) {
-        self.env = env
-    }
-
-    public var body: some View {
-        NavigationSplitView {
-            List(env.history.records, selection: $selection) { record in
-                HistoryRow(record: record)
+    var body: some View {
+        if env.history.records.isEmpty {
+            ContentUnavailableView {
+                Label("履歴はまだありません", systemImage: "clock")
+            } description: {
+                Text("\(env.settings.hotkey.displayName) を押しながら話すと、ここに記録されます。")
             }
-            .navigationSplitViewColumnWidth(min: 240, ideal: 280)
-            .overlay {
-                if env.history.records.isEmpty {
-                    ContentUnavailableView("履歴はまだありません", systemImage: "clock")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VStack(spacing: 0) {
+                Theme.separator.frame(height: 1).padding(.top, 12)
+                HStack(spacing: 0) {
+                    List(env.history.records, selection: $selection) { record in
+                        HistoryRow(record: record)
+                    }
+                    .scrollContentBackground(.hidden)
+                    .frame(width: 280)
+                    Theme.separator.frame(width: 1)
+                    Group {
+                        if let record = env.history.records.first(where: { $0.id == selection }) {
+                            HistoryDetail(env: env, record: record)
+                        } else {
+                            Text("項目を選択してください")
+                                .foregroundStyle(.tertiary)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
-        } detail: {
-            if let record = env.history.records.first(where: { $0.id == selection }) {
-                HistoryDetail(env: env, record: record)
-            } else {
-                Text("項目を選択してください").foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Shown in the page header next to the title.
+struct HistoryHeaderActions: View {
+    let history: HistoryStore
+    @State private var confirming = false
+
+    var body: some View {
+        Button("すべて削除", role: .destructive) { confirming = true }
+            .disabled(history.records.isEmpty)
+            .confirmationDialog("履歴をすべて削除しますか？", isPresented: $confirming) {
+                Button("すべて削除", role: .destructive) { history.removeAll() }
+            } message: {
+                Text("この操作は取り消せません。")
             }
-        }
-        .frame(minWidth: 680, minHeight: 420)
-        .toolbar {
-            Button("すべて削除", role: .destructive) { env.history.removeAll() }
-                .disabled(env.history.records.isEmpty)
-        }
     }
 }
 
@@ -49,7 +69,7 @@ private struct HistoryRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }
 
@@ -74,7 +94,7 @@ private struct HistoryDetail: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 20) {
                 section("入力されたテキスト", text: record.finalText)
                 if record.cleanedTranscript != nil {
                     section("文字起こし（原文）", text: record.rawTranscript)
@@ -104,15 +124,15 @@ private struct HistoryDetail: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            .padding()
+            .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private func section(_ title: String, text: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(text).textSelection(.enabled)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+            Text(text).font(.system(size: 14)).lineSpacing(3).textSelection(.enabled)
         }
     }
 

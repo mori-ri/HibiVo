@@ -1,25 +1,6 @@
 import ServiceManagement
 import SwiftUI
 
-public struct SettingsView: View {
-    let env: AppEnvironment
-
-    public init(env: AppEnvironment) {
-        self.env = env
-    }
-
-    public var body: some View {
-        TabView {
-            GeneralSettingsView(env: env).tabItem { Label("一般", systemImage: "gearshape") }
-            TranscriptionSettingsView(env: env).tabItem { Label("文字起こし", systemImage: "waveform") }
-            CleanupSettingsView(env: env).tabItem { Label("AI 整形", systemImage: "sparkles") }
-            VocabularySettingsView(store: env.vocabulary).tabItem { Label("辞書", systemImage: "character.book.closed") }
-            ApplicationSettingsView(settings: env.settings).tabItem { Label("アプリ", systemImage: "square.grid.2x2") }
-        }
-        .frame(width: 560, height: 440)
-    }
-}
-
 // MARK: - General
 
 struct GeneralSettingsView: View {
@@ -56,7 +37,7 @@ struct GeneralSettingsView: View {
             } header: {
                 Text("履歴")
             } footer: {
-                Text("文字起こしと整形結果のテキストを、この Mac の中に最大 \(HistoryStore.limit) 件保存します。音声は保存しません。")
+                FormFooter("文字起こしと整形結果のテキストを、この Mac の中に最大 \(HistoryStore.limit) 件保存します。音声は保存しません。")
             }
             Section("権限") {
                 PermissionRow(title: "アクセシビリティ（ホットキー・貼り付け）", granted: env.state.hasAccessibilityPermission) {
@@ -67,7 +48,7 @@ struct GeneralSettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
+        .pageForm()
     }
 
     private var hotkeyBinding: Binding<HotkeyTrigger> {
@@ -126,10 +107,10 @@ struct TranscriptionSettingsView: View {
                     Text("English").tag("en")
                 }
             } footer: {
-                Text("話している間にストリーミングで文字起こしします。音声は保存されません。")
+                FormFooter("話している間にストリーミングで文字起こしします。音声は保存されません。")
             }
         }
-        .formStyle(.grouped)
+        .pageForm()
     }
 }
 
@@ -147,7 +128,7 @@ struct CleanupSettingsView: View {
                     ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
                 }
             } footer: {
-                Text("整形に失敗したときは、文字起こし結果をそのまま入力します。")
+                FormFooter("整形に失敗したときは、文字起こし結果をそのまま入力します。")
             }
             Section("LLM") {
                 Picker("Provider", selection: $settings.cleanupProviderID) {
@@ -169,7 +150,7 @@ struct CleanupSettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
+        .pageForm()
     }
 }
 

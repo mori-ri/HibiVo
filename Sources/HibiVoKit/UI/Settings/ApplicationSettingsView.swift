@@ -34,7 +34,7 @@ struct ApplicationSettingsView: View {
             } header: {
                 Text("アプリごとの整形モード")
             } footer: {
-                Text("一覧にないアプリは「既定のモード」（AI 整形タブ）を使います。右クリックで既定に戻せます。")
+                FormFooter("一覧にないアプリは「既定のモード」（AI 整形ページ）を使います。右クリックで既定に戻せます。")
             }
             Section("アプリを追加") {
                 Picker("起動中のアプリ", selection: $newApp) {
@@ -48,7 +48,7 @@ struct ApplicationSettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
+        .pageForm()
     }
 
     private var rows: [Row] {

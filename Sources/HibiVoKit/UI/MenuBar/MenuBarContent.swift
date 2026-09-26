@@ -1,8 +1,7 @@
 import SwiftUI
 
 public enum WindowID {
-    public static let settings = "settings"
-    public static let history = "history"
+    public static let main = "main"
 }
 
 public struct MenuBarContent: View {
@@ -43,22 +42,23 @@ public struct MenuBarContent: View {
 
         Divider()
 
-        Button("履歴…") { open(WindowID.history) }
+        Button("履歴…") { open(.history) }
             .keyboardShortcut("y")
-        Button("設定…") { open(WindowID.settings) }
+        Button("設定…") { open(.general) }
             .keyboardShortcut(",")
 
         Divider()
 
-        Button("HibiVo を再起動") { AppRelauncher.relaunch() }
+        Button("再起動") { AppRelauncher.relaunch() }
             .keyboardShortcut("r")
         Button("HibiVo を終了") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
 
     /// A menu-bar-only app has to activate itself or the window opens behind the frontmost app.
-    private func open(_ id: String) {
-        openWindow(id: id)
+    private func open(_ section: MainSection) {
+        env.state.mainSection = section
+        openWindow(id: WindowID.main)
         NSApp.activate()
     }
 
