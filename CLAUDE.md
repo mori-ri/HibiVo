@@ -18,7 +18,7 @@ scripts/run.sh                          # debug ビルド → build/HibiVo.app �
 CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署名
 scripts/package.sh                      # release ビルド → build/HibiVo-<ver>-<arch>.zip (ditto で署名を保持)
 scripts/create-signing-cert.sh          # 初回のみ: ログインキーチェーンに自己署名証明書 "HibiVo Self-Signed" を作成
-swift scripts/make-icons.swift          # Resources/AppIconSource.png から AppIcon.icns と MenuBarIcon*.png を再生成
+swift scripts/make-icons.swift          # Resources/AppIconSource.png から AppIcon.icns、Logo*.png、MenuBarIcon*.png を再生成
 ```
 
 リンターやフォーマッターは設定されていない。

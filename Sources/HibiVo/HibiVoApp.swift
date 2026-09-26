@@ -12,14 +12,11 @@ struct HibiVoApp: App {
             MenuBarLabel(state: appDelegate.env.state)
         }
 
-        Window("HibiVo 設定", id: WindowID.settings) {
-            SettingsView(env: appDelegate.env)
+        Window("HibiVo", id: WindowID.main) {
+            MainWindowView(env: appDelegate.env)
         }
-        .windowResizability(.contentSize)
-
-        Window("HibiVo 履歴", id: WindowID.history) {
-            HistoryView(env: appDelegate.env)
-        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 880, height: 600)
     }
 }
 

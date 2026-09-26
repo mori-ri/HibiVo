@@ -8,7 +8,7 @@ struct VocabularySettingsView: View {
     @State private var aliases = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("正しい表記と、誤認識されやすい読み方を登録します。STT のヒントと AI 整形の両方に使われます。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -24,6 +24,15 @@ struct VocabularySettingsView: View {
                     TextField("", text: aliasBinding(entry))
                 }
             }
+            .alternatingRowBackgrounds(.disabled)
+            .scrollContentBackground(.hidden)
+            .overlay {
+                if store.entries.isEmpty {
+                    Text("まだ登録されていません").foregroundStyle(.tertiary)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .glassPanel(cornerRadius: 14)
 
             HStack {
                 TextField("正しい表記", text: $preferred)
@@ -34,8 +43,11 @@ struct VocabularySettingsView: View {
                 Button("削除") { store.remove(ids: selection) }
                     .disabled(selection.isEmpty)
             }
+            .textFieldStyle(.roundedBorder)
         }
-        .padding()
+        .padding(.horizontal, 28)
+        .padding(.top, 12)
+        .padding(.bottom, 20)
     }
 
     private func add() {

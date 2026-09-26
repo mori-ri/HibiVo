@@ -14,30 +14,34 @@ struct ApplicationSettingsView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
+        SettingsPage {
+            SettingsSection(
+                title: "アプリごとの整形モード",
+                footer: "一覧にないアプリは「既定のモード」（AI 整形ページ）を使います。右クリックで既定に戻せます。"
+            ) {
                 ForEach(rows) { row in
-                    Picker(selection: modeBinding(row)) {
-                        ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
-                    } label: {
+                    LabeledRow {
                         HStack {
                             Text(row.name)
                             if row.isCustom { Text("変更済み").font(.caption).foregroundStyle(.secondary) }
                         }
+                    } control: {
+                        Picker(row.name, selection: modeBinding(row)) {
+                            ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
                     }
+                    .contentShape(Rectangle())
                     .contextMenu {
                         if row.isCustom {
                             Button("既定に戻す") { settings.setMode(nil, bundleID: row.bundleID, name: row.name) }
                         }
                     }
                 }
-            } header: {
-                Text("アプリごとの整形モード")
-            } footer: {
-                Text("一覧にないアプリは「既定のモード」（AI 整形タブ）を使います。右クリックで既定に戻せます。")
             }
-            Section("アプリを追加") {
-                Picker("起動中のアプリ", selection: $newApp) {
+            SettingsSection(title: "アプリを追加") {
+                PickerRow("起動中のアプリ", selection: $newApp) {
                     Text("選択…").tag(String?.none)
                     ForEach(runningApps, id: \.bundleID) { Text($0.name).tag(Optional($0.bundleID)) }
                 }
@@ -48,7 +52,6 @@ struct ApplicationSettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
     }
 
     private var rows: [Row] {

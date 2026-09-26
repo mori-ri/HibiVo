@@ -5,6 +5,7 @@
 // Outputs:
 //   Resources/AppIcon.icns          logo on a white rounded square (macOS app icon grid)
 //   Resources/MenuBarIcon.png/@2x   monochrome template silhouette for the menu bar
+//   Resources/Logo.png/@2x          colour logo cropped to its content, for the main window sidebar
 import AppKit
 
 let root = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().deletingLastPathComponent()
@@ -106,4 +107,15 @@ for scale in [1, 2] {
     writePNG(rep, to: resources.appending(path: scale == 1 ? "MenuBarIcon.png" : "MenuBarIcon@2x.png"))
 }
 
-print("Wrote AppIcon.icns and MenuBarIcon.png (\(Int(menuBarWidth))x\(Int(menuBarHeight)) pt)")
+// MARK: Window logo (full colour, transparent background)
+
+let logoHeight: CGFloat = 40
+let logoWidth = (crop.width / crop.height * logoHeight).rounded(.up)
+for scale in [1, 2] {
+    let pixels = NSSize(width: logoWidth * CGFloat(scale), height: logoHeight * CGFloat(scale))
+    let rep = render(pixels: pixels) { canvas in drawLogo(fitting: canvas) }
+    rep.size = NSSize(width: logoWidth, height: logoHeight)
+    writePNG(rep, to: resources.appending(path: scale == 1 ? "Logo.png" : "Logo@2x.png"))
+}
+
+print("Wrote AppIcon.icns, Logo.png and MenuBarIcon.png (\(Int(menuBarWidth))x\(Int(menuBarHeight)) pt)")
