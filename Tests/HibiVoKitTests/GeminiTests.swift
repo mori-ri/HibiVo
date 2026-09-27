@@ -42,10 +42,13 @@ import Testing
         #expect(terms?.count == GeminiLiveProtocol.vocabularyLimit)
     }
 
-    @Test func urlCarriesKeyAsQuery() {
-        let url = GeminiLiveProtocol.url(apiKey: "abc")
-        #expect(url.absoluteString.hasPrefix("wss://generativelanguage.googleapis.com/ws/"))
-        #expect(url.absoluteString.hasSuffix("BidiGenerateContent?key=abc"))
+    @Test func requestCarriesKeyAsHeaderNotQuery() {
+        let request = GeminiLiveProtocol.request(apiKey: "abc")
+        let url = request.url?.absoluteString ?? ""
+        #expect(url.hasPrefix("wss://generativelanguage.googleapis.com/ws/"))
+        #expect(url.hasSuffix("BidiGenerateContent"))
+        #expect(!url.contains("abc"))
+        #expect(request.value(forHTTPHeaderField: "x-goog-api-key") == "abc")
     }
 
     @Test func audioMessageIsBase64PCM() throws {

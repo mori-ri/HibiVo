@@ -62,7 +62,7 @@ actor GeminiLiveSession: TranscriptionSession {
 
     func start() async {
         guard socket == nil, !isClosed else { return }
-        let socket = urlSession.webSocketTask(with: GeminiLiveProtocol.url(apiKey: config.apiKey))
+        let socket = urlSession.webSocketTask(with: GeminiLiveProtocol.request(apiKey: config.apiKey))
         self.socket = socket
         socket.resume()
         receiveTask = Task { await self.receiveLoop(socket) }

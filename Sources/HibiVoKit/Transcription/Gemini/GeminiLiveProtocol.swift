@@ -14,8 +14,12 @@ enum GeminiLiveProtocol {
     /// Best results are reported with up to ~100 terms (the hard limit is 1,000).
     static let vocabularyLimit = 100
 
-    static func url(apiKey: String) -> URL {
-        endpoint.appending(queryItems: [URLQueryItem(name: "key", value: apiKey)])
+    /// The key goes in a header rather than the `?key=` query so it never lands in URLs that
+    /// errors, proxies, or server access logs tend to record.
+    static func request(apiKey: String) -> URLRequest {
+        var request = URLRequest(url: endpoint)
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+        return request
     }
 
     struct Setup: Encodable {
