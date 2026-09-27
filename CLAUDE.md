@@ -18,6 +18,8 @@ HIBIVO_INTEGRATION=1 scripts/test.sh --filter GeminiIntegration           # 実�
 scripts/run.sh                          # debug ビルド → build/HibiVo.app → 起動 (起動中のアプリは終了させる)
 CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署名
 scripts/package.sh                      # release ビルド → build/HibiVo-<ver>-<arch>.zip (ditto で署名を保持)
+scripts/release.sh prepare 0.3.0        # リリース準備: Info.plist のバージョンと build 番号を上げて PR を作る (release/* 上では直接コミット)
+scripts/release.sh publish              # マージ後の main (か release/*) でタグを push し、ノート自動生成付きのリリース下書きを作る
 scripts/create-signing-cert.sh          # 初回のみ: ログインキーチェーンに自己署名証明書 "HibiVo Self-Signed" を作成
 swift scripts/make-icons.swift          # Resources/AppIconSource.png から AppIcon.icns、Logo*.png、MenuBarIcon*.png を再生成
 scripts/format.sh                       # swift-format で整形 (その場で書き換え)
