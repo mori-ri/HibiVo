@@ -9,6 +9,13 @@ set -uo pipefail
 base="${1:-origin/main}"
 status=0
 
+# Without a valid base the committed changes would silently go unscanned and the check
+# would still report OK.
+if ! git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+  echo "Base ref '$base' not found; run 'git fetch' or pass a valid base." >&2
+  exit 2
+fi
+
 files=$(
   {
     git diff --name-only "$base"...HEAD

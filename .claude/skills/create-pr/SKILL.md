@@ -59,6 +59,8 @@ origin/main からの全コミットと、作業ツリーの変更を調べる�
 - **ファイル**: `notes/`(ローカル専用)、`build/`、`.build/`、`.env`、`*.secret`、証明書・鍵、`.DS_Store`、`xcuserdata/`
 - **追加した行**: Anthropic / OpenAI / AWS / Bedrock のキー、秘密鍵、`apiKey = "..."` のような代入
 
+終了コードが 2 のときは基準のブランチが見つかっていないので、`git fetch origin` してからやり直す。
+
 終了コードが 1 のときは、出力の 1 件ずつを判断する。
 
 - **テスト用の公開サンプル値は問題ない。** `AKIDEXAMPLE` や `wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY` は AWS SigV4 テストスイートの値。`Mocks.swift` のダミー値も同様。
