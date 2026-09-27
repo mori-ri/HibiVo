@@ -12,15 +12,22 @@ let root = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathCompon
 let resources = root.appending(path: "Resources")
 
 guard let source = NSImage(contentsOf: resources.appending(path: "AppIconSource.png")),
-    let sourceRep = source.representations.first as? NSBitmapImageRep ?? NSBitmapImageRep(data: source.tiffRepresentation!)
+    let sourceRep = source.representations.first as? NSBitmapImageRep
+        ?? NSBitmapImageRep(data: source.tiffRepresentation!)
 else { fatalError("Resources/AppIconSource.png not found") }
 
 /// Bounding box of non-transparent pixels, in image coordinates (origin bottom-left).
 func contentBounds(_ rep: NSBitmapImageRep) -> NSRect {
-    var minX = rep.pixelsWide, minY = rep.pixelsHigh, maxX = 0, maxY = 0
+    var minX = rep.pixelsWide
+    var minY = rep.pixelsHigh
+    var maxX = 0
+    var maxY = 0
     for y in 0..<rep.pixelsHigh {
         for x in 0..<rep.pixelsWide where (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.05 {
-            minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+            minX = min(minX, x)
+            maxX = max(maxX, x)
+            minY = min(minY, y)
+            maxY = max(maxY, y)
         }
     }
     // colorAt uses top-left origin; convert to bottom-left for drawing.
@@ -47,7 +54,8 @@ func render(pixels: NSSize, _ draw: (NSRect) -> Void) -> NSBitmapImageRep {
 func drawLogo(fitting box: NSRect) {
     let scale = min(box.width / crop.width, box.height / crop.height)
     let size = NSSize(width: crop.width * scale, height: crop.height * scale)
-    let dest = NSRect(x: box.midX - size.width / 2, y: box.midY - size.height / 2, width: size.width, height: size.height)
+    let dest = NSRect(
+        x: box.midX - size.width / 2, y: box.midY - size.height / 2, width: size.width, height: size.height)
     source.draw(in: dest, from: crop, operation: .sourceOver, fraction: 1)
 }
 

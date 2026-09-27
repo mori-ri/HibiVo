@@ -7,7 +7,8 @@ public enum AppRelauncher {
         // A detached shell waits for this process to exit, then starts the app again. Launching
         // first would hand the new copy a second instance fighting over the hotkey tap.
         let bundleURL = Bundle.main.bundleURL
-        let launch = bundleURL.pathExtension == "app"
+        let launch =
+            bundleURL.pathExtension == "app"
             ? "/usr/bin/open -n \(shellQuoted(bundleURL.path))"
             // `swift run` has no bundle; start the bare executable instead.
             : "\(shellQuoted(Bundle.main.executablePath ?? CommandLine.arguments[0])) >/dev/null 2>&1 &"

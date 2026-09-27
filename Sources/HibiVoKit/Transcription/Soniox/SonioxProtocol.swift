@@ -21,8 +21,13 @@ enum SonioxProtocol {
         var context: Context?
 
         enum CodingKeys: String, CodingKey {
-            case apiKey = "api_key", model, audioFormat = "audio_format", sampleRate = "sample_rate"
-            case numChannels = "num_channels", languageHints = "language_hints", context
+            case apiKey = "api_key"
+            case model
+            case audioFormat = "audio_format"
+            case sampleRate = "sample_rate"
+            case numChannels = "num_channels"
+            case languageHints = "language_hints"
+            case context
         }
     }
 
@@ -30,7 +35,10 @@ enum SonioxProtocol {
         struct Token: Decodable {
             var text: String
             var isFinal: Bool
-            enum CodingKeys: String, CodingKey { case text, isFinal = "is_final" }
+            enum CodingKeys: String, CodingKey {
+                case text
+                case isFinal = "is_final"
+            }
         }
 
         var tokens: [Token]?
@@ -39,7 +47,9 @@ enum SonioxProtocol {
         var errorMessage: String?
 
         enum CodingKeys: String, CodingKey {
-            case tokens, finished, errorCode = "error_code", errorMessage = "error_message"
+            case tokens, finished
+            case errorCode = "error_code"
+            case errorMessage = "error_message"
         }
     }
 

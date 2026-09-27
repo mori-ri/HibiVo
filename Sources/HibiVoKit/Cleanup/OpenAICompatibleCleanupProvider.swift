@@ -38,7 +38,8 @@ public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
             var completionTokens: Int
 
             enum CodingKeys: String, CodingKey {
-                case promptTokens = "prompt_tokens", completionTokens = "completion_tokens"
+                case promptTokens = "prompt_tokens"
+                case completionTokens = "completion_tokens"
             }
         }
         var choices: [Choice]

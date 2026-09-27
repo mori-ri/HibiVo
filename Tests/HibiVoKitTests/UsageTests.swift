@@ -13,7 +13,8 @@ import Testing
 
     func makeStore() -> UsageStore {
         UsageStore(
-            file: JSONFileStore(url: FileManager.default.temporaryDirectory.appending(path: "hibivo-usage-\(UUID()).json")),
+            file: JSONFileStore(
+                url: FileManager.default.temporaryDirectory.appending(path: "hibivo-usage-\(UUID()).json")),
             calendar: calendar)
     }
 
@@ -38,7 +39,10 @@ import Testing
         #expect(day.dictations == 2)
         #expect(day.characters == 20)
         #expect(day.audioSeconds == 10)
-        #expect(day.cleanup == [.init(provider: "anthropic", model: "claude-opus-5", requests: 2, tokens: .init(input: 150, output: 30))])
+        #expect(
+            day.cleanup == [
+                .init(provider: "anthropic", model: "claude-opus-5", requests: 2, tokens: .init(input: 150, output: 30))
+            ])
     }
 
     @Test func differentModelsAreKeptApart() {
@@ -47,7 +51,8 @@ import Testing
         store.record(
             UsageEvent(
                 date: date(2026, 9, 27),
-                cleanup: .init(provider: "bedrock", model: "zai.glm-4.7", requests: 1, tokens: .init(input: 2, output: 2))))
+                cleanup: .init(
+                    provider: "bedrock", model: "zai.glm-4.7", requests: 1, tokens: .init(input: 2, output: 2))))
         #expect(store.days[0].cleanup.count == 2)
         #expect(store.days[0].dictations == 1)
     }
@@ -59,7 +64,8 @@ import Testing
             store.record(
                 UsageEvent(
                     date: date(2026, 9, 27),
-                    cleanup: .init(provider: "bedrock", model: "zai.glm-4.7", region: region, requests: 1, tokens: tokens)))
+                    cleanup: .init(
+                        provider: "bedrock", model: "zai.glm-4.7", region: region, requests: 1, tokens: tokens)))
         }
         #expect(store.days[0].cleanup.map(\.region) == ["ap-northeast-1", "us-east-1"])
         #expect(store.days[0].cleanup.map(\.requests) == [2, 1])
@@ -68,7 +74,8 @@ import Testing
     @Test func cleanupUsageTakesTheRegionFromBedrock() {
         let bedrock = BedrockCleanupProvider(region: "ap-northeast-1", authentication: .apiKey("k"))
         #expect(CleanupUsage(bedrock, model: "zai.glm-4.7", tokens: .zero).region == "ap-northeast-1")
-        #expect(CleanupUsage(AnthropicCleanupProvider(apiKey: "k"), model: "claude-opus-5", tokens: .zero).region == nil)
+        #expect(
+            CleanupUsage(AnthropicCleanupProvider(apiKey: "k"), model: "claude-opus-5", tokens: .zero).region == nil)
     }
 
     @Test func seriesFillsEmptyDaysOldestFirst() {
@@ -105,18 +112,21 @@ import Testing
         #expect(UsagePricing.rate(provider: "anthropic", model: "claude-opus-5") == .init(input: 5, output: 25))
         #expect(UsagePricing.rate(provider: "anthropic", model: "claude-opus-5-5") == .init(input: 4, output: 20))
         #expect(UsagePricing.rate(provider: "anthropic", model: "claude-fable-5-1") == .init(input: 10, output: 50))
-        #expect(UsagePricing.rate(provider: "anthropic", model: "claude-haiku-4-5-20251001") == .init(input: 1, output: 5))
+        #expect(
+            UsagePricing.rate(provider: "anthropic", model: "claude-haiku-4-5-20251001") == .init(input: 1, output: 5))
     }
 
     func expectRate(
-        _ rate: UsagePricing.TokenRate?, _ input: Double, _ output: Double, sourceLocation: SourceLocation = #_sourceLocation
+        _ rate: UsagePricing.TokenRate?, _ input: Double, _ output: Double,
+        sourceLocation: SourceLocation = #_sourceLocation
     ) {
         #expect(abs((rate?.input ?? -1) - input) < 1e-9, sourceLocation: sourceLocation)
         #expect(abs((rate?.output ?? -1) - output) < 1e-9, sourceLocation: sourceLocation)
     }
 
     @Test func bedrockClaudeCostsTenPercentMoreOutsideGlobalProfiles() {
-        expectRate(UsagePricing.rate(provider: "bedrock", model: "global.anthropic.claude-haiku-4-5-20251001-v1:0"), 1, 5)
+        expectRate(
+            UsagePricing.rate(provider: "bedrock", model: "global.anthropic.claude-haiku-4-5-20251001-v1:0"), 1, 5)
         expectRate(UsagePricing.rate(provider: "bedrock", model: "anthropic.claude-opus-5"), 5.5, 27.5)
         expectRate(UsagePricing.rate(provider: "bedrock", model: "jp.anthropic.claude-sonnet-5"), 2.2, 11)
     }
@@ -124,14 +134,20 @@ import Testing
     @Test func bedrockThirdPartyModelsArePricedByRegion() {
         expectRate(UsagePricing.rate(provider: "bedrock", model: "zai.glm-4.7", region: "us-east-1"), 0.60, 2.20)
         expectRate(UsagePricing.rate(provider: "bedrock", model: "zai.glm-4.7", region: "ap-northeast-1"), 0.72, 2.64)
-        expectRate(UsagePricing.rate(provider: "bedrock", model: "zai.glm-4.7-flash", region: "ap-northeast-1"), 0.08, 0.48)
-        expectRate(UsagePricing.rate(provider: "bedrock", model: "minimax.minimax-m2.5", region: "ap-northeast-1"), 0.36, 1.44)
-        expectRate(UsagePricing.rate(provider: "bedrock", model: "minimax.minimax-m2.5", region: "us-west-2"), 0.30, 1.20)
+        expectRate(
+            UsagePricing.rate(provider: "bedrock", model: "zai.glm-4.7-flash", region: "ap-northeast-1"), 0.08, 0.48)
+        expectRate(
+            UsagePricing.rate(provider: "bedrock", model: "minimax.minimax-m2.5", region: "ap-northeast-1"), 0.36, 1.44)
+        expectRate(
+            UsagePricing.rate(provider: "bedrock", model: "minimax.minimax-m2.5", region: "us-west-2"), 0.30, 1.20)
     }
 
     @Test func bedrockGPTUsesTheInferenceProfilePrice() {
-        expectRate(UsagePricing.rate(provider: "bedrock", model: "global.openai.gpt-6-luna", region: "ap-northeast-1"), 0.10, 0.50)
-        expectRate(UsagePricing.rate(provider: "bedrock", model: "us.openai.gpt-6-luna", region: "us-east-1"), 0.11, 0.55)
+        expectRate(
+            UsagePricing.rate(provider: "bedrock", model: "global.openai.gpt-6-luna", region: "ap-northeast-1"), 0.10,
+            0.50)
+        expectRate(
+            UsagePricing.rate(provider: "bedrock", model: "us.openai.gpt-6-luna", region: "us-east-1"), 0.11, 0.55)
     }
 
     @Test func unknownModelsHaveNoPrice() {
@@ -157,7 +173,9 @@ import Testing
         var day = DailyUsage(day: "2026-09-27")
         day.transcription = [.init(provider: "soniox", model: "stt-rt-v5", seconds: 1800)]
         day.cleanup = [
-            .init(provider: "anthropic", model: "claude-opus-5", requests: 10, tokens: .init(input: 1_000_000, output: 100_000)),
+            .init(
+                provider: "anthropic", model: "claude-opus-5", requests: 10,
+                tokens: .init(input: 1_000_000, output: 100_000)),
             .init(provider: "openai-compatible", model: "gpt-6", requests: 1, tokens: .init(input: 10, output: 10)),
         ]
         let estimate = UsagePricing.estimate([day])

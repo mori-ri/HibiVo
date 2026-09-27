@@ -134,7 +134,9 @@ private struct Sidebar: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 SidebarLink(title: "フィードバック・要望", symbol: "bubble.left", url: ProjectLinks.newFeedback)
-                SidebarLink(title: "GitHub リポジトリ", symbol: "chevron.left.forwardslash.chevron.right", url: ProjectLinks.repository)
+                SidebarLink(
+                    title: "GitHub リポジトリ", symbol: "chevron.left.forwardslash.chevron.right",
+                    url: ProjectLinks.repository)
             }
             .padding(.horizontal, 10)
             .padding(.bottom, 12)
@@ -206,7 +208,9 @@ private struct SidebarLink: View {
     @State private var isHovered = false
 
     var body: some View {
-        Button { ProjectLinks.open(url) } label: {
+        Button {
+            ProjectLinks.open(url)
+        } label: {
             HStack(spacing: 10) {
                 Image(systemName: symbol)
                     .font(.system(size: 12))
