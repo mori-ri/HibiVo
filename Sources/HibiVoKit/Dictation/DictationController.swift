@@ -84,6 +84,14 @@ public final class DictationController {
         }
     }
 
+    /// Flips AI cleanup from the HUD while recording. The HUD reflects the new setting at once,
+    /// so the utterance in progress switches too instead of keeping the value frozen at key-down.
+    public func toggleCleanup() {
+        guard state.phase == .recording, let recording else { return }
+        contextBuilder.settings.cleanupEnabled.toggle()
+        self.recording?.context.cleanup = contextBuilder.cleanup(for: recording.context.target)
+    }
+
     /// Waits for the current utterance to be fully processed. Used by tests.
     func waitUntilIdle() async {
         await processing?.value

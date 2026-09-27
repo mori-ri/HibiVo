@@ -130,6 +130,31 @@ import Testing
         #expect(history.records.first?.appName == "Slack")
     }
 
+    @Test func togglingCleanupWhileRecordingAppliesToThatUtterance() async {
+        let defaults = UserDefaults(suiteName: "StoreTests-\(UUID())")!
+        let settings = SettingsStore(defaults: defaults)
+        settings.transcriptionProviderID = "mock"
+        settings.cleanupEnabled = false
+        let history = HistoryStore(file: tempFile([HistoryRecord].self))
+        let audio = MockAudio()
+        let sut = DictationController(
+            state: AppState(), audio: audio,
+            contextBuilder: DictationContextBuilder(
+                settings: settings, secrets: MockSecrets(), transcriptionProviders: [MockTranscriptionProvider()]),
+            activeApp: MockActiveApp(), inserter: MockInserter(), history: history, minimumHold: .zero)
+        sut.toggleCleanup()  // Ignored while idle.
+        #expect(settings.cleanupEnabled == false)
+
+        sut.handle(.pressed)
+        sut.toggleCleanup()
+        audio.speak()
+        sut.handle(.released)
+        sut.toggleCleanup()  // Ignored once processing.
+        await sut.waitUntilIdle()
+        #expect(settings.cleanupEnabled == true)
+        #expect(history.records.first?.cleanupMode == .natural)
+    }
+
     @Test func liveTranscriptIsHiddenByDefaultAndPersists() {
         let defaults = UserDefaults(suiteName: "StoreTests-\(UUID())")!
         let settings = SettingsStore(defaults: defaults)

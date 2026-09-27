@@ -17,7 +17,7 @@ struct HUDView: View {
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6.4)
         .background(Capsule().fill(.black.opacity(0.78)))
         .fixedSize()
     }
@@ -26,7 +26,7 @@ struct HUDView: View {
     private var indicator: some View {
         switch state.phase {
         case .recording:
-            LevelBars(level: state.audioLevel)
+            LevelBars(level: state.audioLevel, colorful: settings.cleanupEnabled)
         case .processing:
             ProgressView().controlSize(.small).tint(.white)
         case .error:
@@ -49,17 +49,19 @@ struct HUDView: View {
 
 private struct LevelBars: View {
     let level: Float
+    /// Logo colours when AI cleanup is on, plain white when the raw transcript will be pasted.
+    let colorful: Bool
     /// Centre-heavy envelope: the middle bars reach full height, the edges stay small.
     private let weights: [Float] = [0.3, 0.5, 0.8, 1.0, 0.8, 0.5, 0.3]
     private static let minHeight: CGFloat = 4
-    private static let maxHeight: CGFloat = 30
+    private static let maxHeight: CGFloat = 24
 
     var body: some View {
         TimelineView(.animation) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
             // Bars act as a mask over the logo gradient, so the colours sweep across the whole wave.
             LinearGradient(
-                colors: [Theme.glowBlue, Theme.glowMagenta, Theme.glowOrange],
+                colors: colorful ? [Theme.glowBlue, Theme.glowMagenta, Theme.glowOrange] : [.white],
                 startPoint: .leading, endPoint: .trailing
             )
             .mask {
@@ -72,6 +74,7 @@ private struct LevelBars: View {
         }
         .frame(width: CGFloat(weights.count) * 5 - 2, height: Self.maxHeight)
         .animation(.linear(duration: 0.08), value: level)
+        .animation(.easeInOut(duration: 0.2), value: colorful)
     }
 
     private func height(for index: Int, time: TimeInterval) -> CGFloat {
