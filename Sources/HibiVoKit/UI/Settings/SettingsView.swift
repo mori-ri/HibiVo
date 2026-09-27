@@ -49,13 +49,16 @@ struct GeneralSettingsView: View {
             }
             SettingsSection(
                 title: "フィードバック",
-                footer: "使いにくいところ、欲しい機能、質問など、小さなことでも気軽に送ってください。GitHub Discussions が開きます。"
+                footer: "使いにくいところ、欲しい機能、質問など、小さなことでも気軽に送ってください。ブラウザで GitHub Discussions が開きます。"
             ) {
                 LabeledRow("感想・要望を送る") {
                     Button("開く…") { ProjectLinks.open(ProjectLinks.newFeedback) }
                 }
                 LabeledRow("みんなの投稿を見る") {
                     Button("開く…") { ProjectLinks.open(ProjectLinks.discussions) }
+                }
+                LabeledRow("GitHub リポジトリ") {
+                    Button("開く…") { ProjectLinks.open(ProjectLinks.repository) }
                 }
             }
         }
