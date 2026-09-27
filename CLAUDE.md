@@ -19,9 +19,11 @@ CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署
 scripts/package.sh                      # release ビルド → build/HibiVo-<ver>-<arch>.zip (ditto で署名を保持)
 scripts/create-signing-cert.sh          # 初回のみ: ログインキーチェーンに自己署名証明書 "HibiVo Self-Signed" を作成
 swift scripts/make-icons.swift          # Resources/AppIconSource.png から AppIcon.icns、Logo*.png、MenuBarIcon*.png を再生成
+scripts/format.sh                       # swift-format で整形 (その場で書き換え)
+scripts/lint.sh                         # swift-format lint --strict (CI でも実行)
 ```
 
-リンターやフォーマッターは設定されていない。
+フォーマッタ・リンタは toolchain 同梱の swift-format(`swift format`)のみ。設定は `.swift-format`(4 スペース・120 桁)。Swift ファイルを変更したら `scripts/format.sh` をかけ、`scripts/lint.sh` が通ることを確認する。
 
 ## この環境特有の注意点
 
