@@ -61,19 +61,6 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 
 > **Fn キーを使う場合**: システム設定 › キーボード の「🌐キーを押して」を「何もしない」にしてください。
 
-## ビルド済みアプリを共有する
-
-```sh
-scripts/package.sh    # build/HibiVo-<version>-arm64.zip を作成
-```
-
-- zip は `ditto` で作るため、署名が壊れません。
-- 共有する側は `create-signing-cert.sh` の証明書で署名しておくと、相手もアップデート後に許可をやり直さずに済みます（**毎回同じ証明書で署名すること**）。
-- 公証（notarization）していないため、受け取った側では初回に Gatekeeper に止められます。どちらかの方法で開きます。
-  - 一度起動を試してから、システム設定 › プライバシーとセキュリティ の「このまま開く」を押す
-  - または `xattr -dr com.apple.quarantine /Applications/HibiVo.app` を実行する
-- Apple Silicon 専用です。API Key は各自で設定します。
-
 ## 使い方
 
 | 操作 | 動作 |
@@ -104,6 +91,18 @@ scripts/package.sh    # build/HibiVo-<version>-arm64.zip を作成
 - アプリごとの整形モードは bundle id で判定するため、ブラウザ内の Web アプリ（Gmail など）はブラウザの設定に従う
 - パスワード入力中（Secure Input）は貼り付けず、クリップボードにコピーのみ
 - 署名済みバイナリは配布していません。ソースからビルドしてください
+
+## フィードバック
+
+「ここが使いにくい」「こうなったら便利」など、小さなことでも歓迎です。
+
+- 💬 [フィードバックを送る](https://github.com/mori-ri/HibiVo/discussions/new?category=feedback) — 良かった点・使いづらかった点
+- 💡 [アイデア・要望](https://github.com/mori-ri/HibiVo/discussions/new?category=ideas) — 「こうなったら便利」
+- 🙋 [質問・使い方](https://github.com/mori-ri/HibiVo/discussions/new?category=q-a) — ビルドや設定で困ったとき
+- 📣 [お知らせ](https://github.com/mori-ri/HibiVo/discussions/categories/announcements) — アップデート情報
+
+アプリのメニュー › 「フィードバック・要望を送る…」からも開けます。
+再現手順がはっきりしている不具合は [Issue](https://github.com/mori-ri/HibiVo/issues/new/choose) へどうぞ。
 
 ## 開発
 

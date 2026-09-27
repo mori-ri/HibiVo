@@ -122,6 +122,13 @@ private struct Sidebar: View {
 
             Spacer(minLength: 16)
 
+            VStack(alignment: .leading, spacing: 2) {
+                SidebarLink(title: "フィードバック・要望", symbol: "bubble.left", url: ProjectLinks.newFeedback)
+                SidebarLink(title: "GitHub リポジトリ", symbol: "chevron.left.forwardslash.chevron.right", url: ProjectLinks.repository)
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 12)
+
             VStack(alignment: .leading, spacing: 4) {
                 Label("\(env.settings.hotkey.displayName) を押しながら話す", systemImage: "mic")
                 if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
@@ -178,6 +185,40 @@ private struct SidebarItem: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Opens a project page in the browser; quieter than `SidebarItem` so it doesn't read as a page.
+private struct SidebarLink: View {
+    let title: String
+    let symbol: String
+    let url: URL
+    @State private var isHovered = false
+
+    var body: some View {
+        Button { ProjectLinks.open(url) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12))
+                    .frame(width: 18)
+                Text(title)
+                    .font(.system(size: 12))
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .opacity(isHovered ? 1 : 0)
+            }
+            .foregroundStyle(isHovered ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background {
+                if isHovered { RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.hover) }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(url.absoluteString)
     }
 }
 

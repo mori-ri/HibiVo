@@ -1,0 +1,18 @@
+labels: [feedback]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        使ってみた感想を教えてください。良かった点も、使いづらかった点も、小さなことでも歓迎です。
+  - type: textarea
+    id: feedback
+    attributes:
+      label: 感想
+      placeholder: 例）Slack で使うと句読点が多すぎる気がする / ホットキーを離してから入力されるまでが速くて良い
+    validations:
+      required: true
+  - type: input
+    id: usage
+    attributes:
+      label: どんな場面で使っていますか？（任意）
+      placeholder: 例）チャット、メール、Claude Code へのプロンプト入力

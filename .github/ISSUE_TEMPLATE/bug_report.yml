@@ -1,0 +1,56 @@
+name: 🐛 バグ報告
+description: 再現できる不具合を報告する（質問や要望は Discussions へ）
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        再現手順がはっきりしている不具合用です。「なんとなくおかしい」「使い方がわからない」は [Discussions](https://github.com/mori-ri/HibiVo/discussions) で気軽にどうぞ。
+        **API Key や認証情報は貼り付けないでください。**
+  - type: textarea
+    id: what
+    attributes:
+      label: 何が起きたか
+      description: 期待した動作と、実際の動作
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      placeholder: |
+        1. Slack の入力欄にカーソルを置く
+        2. 右 Option を押しながら話す
+        3. 離すと…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: HibiVo のバージョン / コミット
+      placeholder: 例 v0.1 / eb103b7
+  - type: input
+    id: macos
+    attributes:
+      label: macOS のバージョン
+      placeholder: 例 macOS 26.1
+  - type: dropdown
+    id: cleanup
+    attributes:
+      label: 整形 Provider
+      options:
+        - 使っていない（Raw）
+        - Anthropic
+        - Amazon Bedrock
+        - OpenAI 互換
+  - type: input
+    id: target
+    attributes:
+      label: 入力先のアプリ
+      placeholder: 例 Slack、VS Code、Chrome
+  - type: textarea
+    id: logs
+    attributes:
+      label: ログ（任意）
+      description: "`log show --last 5m --predicate 'subsystem == \"io.github.mori-ri.hibivo\"'` の出力など。文字起こし内容が含まれる場合は伏せてください。"
+      render: text

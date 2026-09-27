@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 フィードバック（良かった点・使いづらかった点）
+    url: https://github.com/mori-ri/HibiVo/discussions/new?category=feedback
+    about: 感想や「ここが使いにくい」はこちらへ。小さなことでも歓迎です。
+  - name: 💡 アイデア・機能要望
+    url: https://github.com/mori-ri/HibiVo/discussions/new?category=ideas
+    about: 「こうなったら便利」はこちらへ。まとまったら Issue にします。
+  - name: 🙋 質問・使い方
+    url: https://github.com/mori-ri/HibiVo/discussions/new?category=q-a
+    about: ビルド、権限、API Key の設定などで困ったらこちらへ。
