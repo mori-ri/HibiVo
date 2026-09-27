@@ -1,0 +1,21 @@
+# Categories for `gh release create --generate-notes` (used by scripts/release.sh).
+# The generated notes are a starting point; rewrite them as user-facing Japanese before publishing.
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+  categories:
+    - title: 新機能
+      labels:
+        - enhancement
+    - title: 不具合の修正
+      labels:
+        - bug
+    - title: ドキュメント
+      labels:
+        - documentation
+    - title: その他
+      labels:
+        - "*"
