@@ -39,7 +39,8 @@ public final class AppEnvironment {
             microphoneUID: { settings.microphoneUID },
             ducker: SystemVolumeDucker(),
             duckingEnabled: { settings.duckOutputWhileRecording })
-        hud = HUDController(state: state, settings: settings)
+        let dictation = dictation
+        hud = HUDController(state: state, settings: settings, onClick: { dictation.toggleCleanup() })
 
         hotkey.onAction = { [weak self] action in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth
