@@ -55,6 +55,7 @@ public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
     case anthropic
     case openAICompatible = "openai-compatible"
     case bedrock
+    case gemini
 
     public var id: String { rawValue }
 
@@ -63,6 +64,7 @@ public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
         case .anthropic: "Anthropic (Claude)"
         case .openAICompatible: "OpenAI 互換"
         case .bedrock: "Amazon Bedrock"
+        case .gemini: "Google Gemini"
         }
     }
 
@@ -71,6 +73,7 @@ public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
         case .anthropic: "claude-opus-5"
         case .openAICompatible: ""
         case .bedrock: "anthropic.claude-opus-5"
+        case .gemini: "gemini-3.8-flash"
         }
     }
 }
@@ -83,6 +86,8 @@ public enum SecretAccount {
     public static let awsAccessKeyID = "aws-access-key-id"
     public static let awsSecretAccessKey = "aws-secret-access-key"
     public static let awsSessionToken = "aws-session-token"
+    /// Same account as the Gemini transcription provider's ID, so one key serves both.
+    public static let gemini = "gemini"
 }
 
 enum HTTPJSON {

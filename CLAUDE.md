@@ -13,6 +13,7 @@ scripts/test.sh                                        # 全テスト (Swift Tes
 scripts/test.sh --filter HotkeyInterpreterTests        # 1 スイートのみ
 scripts/test.sh --filter "DictationControllerTests/shortTapIsCancelled"   # 1 テストのみ
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter SonioxIntegration           # 実際の Soniox エンドポイントに接続 (オプトイン)
+HIBIVO_INTEGRATION=1 scripts/test.sh --filter GeminiIntegration           # 実際の Gemini エンドポイントに接続 (オプトイン、GEMINI_API_KEY)
 
 scripts/run.sh                          # debug ビルド → build/HibiVo.app → 起動 (起動中のアプリは終了させる)
 CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署名
@@ -44,7 +45,9 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 3. `AudioCaptureService`(録音ごとに新しい AVAudioEngine)が PCM16 モノラルのチャンクを `AsyncStream<AudioChunk>` として流す。ポンプタスクが発話中にそれを STT セッションへ転送する。
 4. 離したとき: 短いタップ(< 250 ms)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
 
-**STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションはソケット接続前の `send` を受け付けてバッファする。実装は Soniox(`stt-rt-v5`)のみ: `finalize` → `<fin>` トークンを待ち、タイムアウトや切断時は例外を投げずに途中までのテキストを返す。
+**STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションはソケット接続前の `send` を受け付けてバッファする。実装は 2 つ。どちらもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
+- Soniox(`stt-rt-v5`): `finalize` → `<fin>` トークンを待つ。
+- Gemini(`gemini-3.5-transcribe-live`、Live API): 手動 VAD。`setupComplete` まで音声をバッファし、`activityStart` → 音声 → `activityEnd` を送る。確定した `inputTranscription` のセグメントを連結し、`turnComplete` と最後のセグメント(順序は保証されない)が揃うか、少し待って終了する。不正なキーはソケットの close 理由で届く。API キー(Keychain の `gemini`)は整形の Gemini と共通。
 
 **整形 (Cleanup)**(`Cleanup/`):
 - `TextCleanupProvider.complete(system:user:model:)`。Bedrock はキーペアが必要なため、各プロバイダは自身の認証情報を持って生成される。
@@ -53,6 +56,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - プロバイダ:
   - Anthropic Messages(`output_config.effort: low`、Opus 5 / Fable 5 向けにサーバー側 `fallbacks`)。
   - OpenAI 互換の chat completions。
+  - Gemini Interactions API(`thinking_level: low`、`store: false`)。既定は `gemini-3.8-flash`。
   - `BedrockCleanupProvider`: `anthropic.` を含むモデル ID は Anthropic のリクエストボディで InvokeModel を使う。それ以外のモデル(GLM、MiniMax、GPT など)は Converse API を使う。認証は Bedrock API キー(Bearer)か、自前の `AWSSigV4`(CryptoKit 実装、AWS テストスイートのベクタで検証済み)で署名する IAM キー。
 - プロバイダ種別、デフォルトモデル、Keychain のアカウント名は `CleanupProviderKind` / `SecretAccount`(`TextCleanupProvider.swift`)に集約されている。
 
