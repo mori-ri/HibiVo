@@ -114,11 +114,16 @@ struct TranscriptionSettingsView: View {
                 PickerRow("STT Provider", selection: $settings.transcriptionProviderID) {
                     ForEach(env.transcriptionProviders, id: \.id) { Text($0.displayName).tag($0.id) }
                 }
+                // Model names differ per provider, so go back to the new provider's default.
+                .onChange(of: settings.transcriptionProviderID) { settings.transcriptionModel = "" }
                 if let provider {
                     APIKeyField(secrets: env.secrets, account: provider.id, label: "\(provider.displayName) API Key")
                     PickerRow("モデル", selection: $settings.transcriptionModel) {
                         Text("既定（\(provider.defaultModel)）").tag("")
                         ForEach(provider.models, id: \.self) { Text($0).tag($0) }
+                    }
+                    if provider.id == SecretAccount.gemini {
+                        NoteRow("Google AI Studio の API キーを使います。AI 整形の Google Gemini と共通です。")
                     }
                 }
                 PickerRow("言語", selection: $settings.language) {
@@ -165,6 +170,8 @@ struct CleanupSettingsView: View {
                     APIKeyField(secrets: env.secrets, account: SecretAccount.openAICompatible, label: "API Key")
                 case .bedrock:
                     BedrockSettingsFields(env: env)
+                case .gemini:
+                    GeminiSettingsFields(env: env)
                 }
             }
         }
@@ -204,6 +211,30 @@ struct APIKeyField: View {
         try? secrets.setSecret(trimmed.isEmpty ? nil : trimmed, for: account)
         value = trimmed
         saved = true
+    }
+}
+
+private struct GeminiSettingsFields: View {
+    let env: AppEnvironment
+
+    var body: some View {
+        @Bindable var settings = env.settings
+        LabeledRow("モデル") {
+            TextField(
+                "モデル", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.gemini.defaultModel)")
+            )
+            .labelsHidden()
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 340)
+            Menu("候補") {
+                ForEach(GeminiCleanupProvider.suggestedModels, id: \.self) { model in
+                    Button(model) { settings.cleanupModel = model }
+                }
+            }
+            .fixedSize()
+        }
+        APIKeyField(secrets: env.secrets, account: SecretAccount.gemini, label: "Google Gemini API Key")
+        NoteRow("Google AI Studio の API キーを使います。文字起こしの Google Gemini と共通です。")
     }
 }
 

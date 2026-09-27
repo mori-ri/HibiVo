@@ -3,7 +3,7 @@
 押す → 話す → 離す → 文章が入る。macOS 向けの日本語音声入力アプリです。
 
 - Push-to-Talk（既定は右 Option。Fn / 右 Command / ⌃Space も選べます）
-- 話している間にストリーミングで文字起こし（Soniox）するので、キーを離したらすぐ入力されます
+- 話している間にストリーミングで文字起こし（Soniox または Google Gemini）するので、キーを離したらすぐ入力されます
 - LLM で整形（Raw / Natural / Business / Prompt）。アプリごとにモードを自動で切り替えます
 - 元のアプリのカーソル位置へ貼り付け、クリップボードは元に戻します
 - ユーザー辞書、履歴（コピー / もう一度入力 / 整形やり直し）
@@ -13,8 +13,8 @@
 
 - macOS 14 以降、Apple Silicon
 - Command Line Tools（`xcode-select --install`）または Xcode
-- [Soniox](https://soniox.com) の API Key（文字起こし）
-- AI 整形用の LLM（なくても Raw で使えます）: Anthropic API、Amazon Bedrock、または OpenAI 互換 API
+- 文字起こし用の API Key: [Soniox](https://soniox.com) または [Google AI Studio](https://aistudio.google.com)（Gemini 3.5 Transcribe）
+- AI 整形用の LLM（なくても Raw で使えます）: Anthropic API、Amazon Bedrock、Google Gemini API、または OpenAI 互換 API
 
 ## インストール（ソースからビルド）
 
@@ -53,7 +53,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 1. 起動するとメニューバーに HibiVo のアイコンが出ます。
 2. **アクセシビリティ** を許可します（システム設定 › プライバシーとセキュリティ › アクセシビリティ）。ホットキーと貼り付けに必要です。
 3. **マイク** を許可します。
-4. メニュー › 設定… › 文字起こし で Soniox の API Key を保存します。
+4. メニュー › 設定… › 文字起こし で STT Provider（Soniox / Google Gemini）を選び、API Key を保存します。Gemini の API Key は AI 整形の Google Gemini と共通です。
 5. AI 整形 タブで LLM の Provider と認証情報を設定します（既定は Anthropic `claude-opus-5`）。
    Amazon Bedrock の場合はリージョン・モデル ID（または推論プロファイル ID）と、Bedrock API キーか IAM アクセスキー（`bedrock:InvokeModel` 権限）を設定します。
    Claude のほか `zai.glm-4.7-flash`、`zai.glm-4.7`、`minimax.minimax-m2.5`、`global.openai.gpt-6-luna` なども指定できます（設定画面の「候補」から選択可）。
@@ -75,7 +75,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 ## プライバシー
 
 - **音声**: メモリ上で STT へ送るだけで、ディスクには保存しません。
-- **テキスト**: 文字起こしは STT Provider（Soniox）へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
+- **テキスト**: 文字起こしは STT Provider（Soniox / Google Gemini）へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
 - **履歴**: 文字起こし原文と整形結果を `~/Library/Application Support/HibiVo/history.json` に平文で最大 200 件保存します。設定 › 一般 › 「履歴を保存する」で無効にでき、履歴画面から全件削除できます。
 - **辞書**: `~/Library/Application Support/HibiVo/vocabulary.json` に保存します。
 - **API Key / AWS 認証情報**: macOS の Keychain に保存します。設定ファイルには書き込みません。
@@ -85,7 +85,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 
 開発者の環境で、Push-to-Talk → 文字起こし → 整形 → 貼り付けの一連の流れを確認済みです。
 
-- STT は Soniox のみ（Provider は差し替え可能な設計）
+- STT は Soniox と Google Gemini（`gemini-3.5-transcribe-live`、Live API でストリーミング）
 - Amazon Bedrock は Claude（InvokeModel）と、GLM・MiniMax・GPT など Converse API 対応モデルに対応。AWS プロファイル / SSO の認証情報の自動読み込みは未対応
 - ホットキーはプリセット（右 Option / Fn / 右 Command / ⌃Space）から選択。任意のキーの登録は未対応
 - アプリごとの整形モードは bundle id で判定するため、ブラウザ内の Web アプリ（Gmail など）はブラウザの設定に従う

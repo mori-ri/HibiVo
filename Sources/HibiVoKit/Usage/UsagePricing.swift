@@ -20,6 +20,9 @@ public enum UsagePricing {
 
     /// Soniox real-time: $0.12 per hour of audio.
     static let sonioxRealtimePerHour = 0.12
+    /// Gemini 3.5 Transcribe Live: Google's blended estimate of $0.009 per minute of audio
+    /// (audio input tokens plus transcript output tokens).
+    static let geminiLiveTranscribePerMinute = 0.009
 
     /// Anthropic list prices. Checked in order, so longer IDs come before their prefixes.
     static let claudeRates: [(prefix: String, rate: TokenRate)] = [
@@ -73,27 +76,52 @@ public enum UsagePricing {
         ]
     }()
 
+    /// A Gemini API model. `intro` applies through `introEndsOn` (a `yyyy-MM-dd` day), `standard` after.
+    struct GeminiModel {
+        var id: String
+        var standard: TokenRate
+        var intro: TokenRate? = nil
+    }
+
+    static let geminiIntroEndsOn = "2026-12-31"
+
+    /// Gemini API list prices. Longer IDs come before their prefixes.
+    static let geminiModels: [GeminiModel] = [
+        GeminiModel(
+            id: "gemini-3.8-flash", standard: .init(input: 1.50, output: 7.50), intro: .init(input: 0.75, output: 3.75)),
+        GeminiModel(id: "gemini-3.5-flash-lite", standard: .init(input: 0.30, output: 2.50)),
+    ]
+
     /// Leading inference-profile scopes on Bedrock model IDs.
     static let inferenceProfileScopes: Set<String> = ["global", "us", "us-gov", "eu", "apac", "jp", "au", "ca"]
 
     public static func transcriptionUSD(_ usage: TranscriptionUsage) -> Double? {
         switch usage.provider {
         case "soniox": usage.seconds / 3600 * sonioxRealtimePerHour
+        case "gemini": usage.seconds / 60 * geminiLiveTranscribePerMinute
         default: nil
         }
     }
 
     /// nil for models without a built-in price (OpenAI-compatible endpoints, unlisted Bedrock models).
-    public static func rate(provider: String, model: String, region: String? = nil) -> TokenRate? {
+    /// `day` (`yyyy-MM-dd`) picks time-limited prices; nil means today.
+    public static func rate(provider: String, model: String, region: String? = nil, day: String? = nil) -> TokenRate? {
         switch CleanupProviderKind(rawValue: provider) {
         case .anthropic: claudeRate(model)
         case .bedrock: bedrockRate(model: model, region: region)
+        case .gemini: geminiRate(model, day: day ?? Date().formatted(.iso8601.year().month().day()))
         case .openAICompatible, nil: nil
         }
     }
 
     static func claudeRate(_ name: String) -> TokenRate? {
         claudeRates.first { name.hasPrefix($0.prefix) }?.rate
+    }
+
+    static func geminiRate(_ model: String, day: String) -> TokenRate? {
+        guard let entry = geminiModels.first(where: { model.hasPrefix($0.id) }) else { return nil }
+        if let intro = entry.intro, day <= geminiIntroEndsOn { return intro }
+        return entry.standard
     }
 
     static func bedrockRate(model: String, region: String?) -> TokenRate? {
@@ -111,8 +139,10 @@ public enum UsagePricing {
         return entry.standard
     }
 
-    public static func cleanupUSD(_ usage: CleanupUsage) -> Double? {
-        guard let rate = rate(provider: usage.provider, model: usage.model, region: usage.region) else { return nil }
+    public static func cleanupUSD(_ usage: CleanupUsage, day: String? = nil) -> Double? {
+        guard let rate = rate(provider: usage.provider, model: usage.model, region: usage.region, day: day) else {
+            return nil
+        }
         return (Double(usage.tokens.input) * rate.input + Double(usage.tokens.output) * rate.output) / 1_000_000
     }
 
@@ -137,7 +167,11 @@ public enum UsagePricing {
                 }
             }
             for llm in day.cleanup {
-                if let usd = cleanupUSD(llm) { estimate.cleanupUSD += usd } else { unpriced.insert(llm.model) }
+                if let usd = cleanupUSD(llm, day: day.day) {
+                    estimate.cleanupUSD += usd
+                } else {
+                    unpriced.insert(llm.model)
+                }
             }
         }
         estimate.unpricedModels = unpriced.sorted()

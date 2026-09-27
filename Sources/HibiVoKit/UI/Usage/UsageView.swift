@@ -311,12 +311,24 @@ private struct CostBreakdown: View {
                     title: "AI 整形", model: usage.region.map { "\(usage.model)（\($0)）" } ?? usage.model,
                     detail:
                         "\(usage.requests.formatted()) 回・入力 \(usage.tokens.input.formatted()) / 出力 \(usage.tokens.output.formatted()) トークン",
-                    cost: UsagePricing.cleanupUSD(usage).map { $0 * rate })
+                    cost: Self.cleanupUSD(usage, in: days).map { $0 * rate })
             }
             if !estimate.unpricedModels.isEmpty {
                 NoteRow("料金が登録されていないモデルは合計に含めていません。トークン数を各サービスの料金表と照らし合わせてください。")
             }
         }
+    }
+
+    /// Priced day by day, since some prices are time-limited.
+    static func cleanupUSD(_ usage: CleanupUsage, in days: [DailyUsage]) -> Double? {
+        var total = 0.0
+        for day in days {
+            for item in day.cleanup where item.isSameModel(as: usage) {
+                guard let usd = UsagePricing.cleanupUSD(item, day: day.day) else { return nil }
+                total += usd
+            }
+        }
+        return total
     }
 
     /// Sums entries for the same provider and model across days.

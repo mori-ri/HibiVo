@@ -49,7 +49,9 @@ public struct DictationContextBuilder {
         let entries = vocabulary()
         let config = TranscriptionConfig(
             apiKey: apiKey,
-            model: settings.transcriptionModel.isEmpty ? provider.defaultModel : settings.transcriptionModel,
+            // A model saved for another provider falls back to this one's default.
+            model: provider.models.contains(settings.transcriptionModel)
+                ? settings.transcriptionModel : provider.defaultModel,
             language: settings.language,
             vocabulary: entries.map(\.preferred))
 
@@ -94,6 +96,8 @@ public struct DictationContextBuilder {
                     sessionToken: secret(SecretAccount.awsSessionToken))
                 return BedrockCleanupProvider(region: region, authentication: .iam(credentials))
             }
+        case .gemini:
+            return secret(SecretAccount.gemini).map { GeminiCleanupProvider(apiKey: $0) }
         }
     }
 }
