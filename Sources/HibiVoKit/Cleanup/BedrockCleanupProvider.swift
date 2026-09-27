@@ -49,7 +49,7 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
     /// Cleanup output is short; this also stays under GLM 4.7's 4K output limit.
     static let maxTokens = 2_000
 
-    private let region: String
+    let region: String
     private let authentication: Authentication
     private let urlSession: URLSession
 
@@ -109,8 +109,13 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
             }
             var message: Message?
         }
+        struct Usage: Decodable {
+            var inputTokens: Int
+            var outputTokens: Int
+        }
         var output: Output
         var stopReason: String?
+        var usage: Usage?
     }
 
     static func makeConverseBody(system: String, user: String) -> ConverseBody {
@@ -120,14 +125,15 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
             inferenceConfig: .init(maxTokens: maxTokens))
     }
 
-    static func parseConverse(_ data: Data) throws -> String {
+    static func parseConverse(_ data: Data) throws -> CleanupCompletion {
         let response = try JSONDecoder().decode(ConverseResponse.self, from: data)
         if response.stopReason == "guardrail_intervened" || response.stopReason == "content_filtered" {
             throw CleanupError.refused
         }
         let text = (response.output.message?.content ?? []).compactMap(\.text).joined()
         guard !text.isEmpty else { throw CleanupError.invalidResponse }
-        return text
+        return CleanupCompletion(
+            text: text, usage: response.usage.map { TokenUsage(input: $0.inputTokens, output: $0.outputTokens) })
     }
 
     // MARK: - Request
@@ -160,7 +166,7 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         return request
     }
 
-    public func complete(system: String, user: String, model: String) async throws -> String {
+    public func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
         let request = try makeURLRequest(system: system, user: user, model: model)
         let (data, response) = try await urlSession.data(for: request)
         try HTTPJSON.checkStatus(response)

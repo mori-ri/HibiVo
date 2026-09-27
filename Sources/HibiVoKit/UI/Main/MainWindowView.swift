@@ -2,6 +2,7 @@ import SwiftUI
 
 public enum MainSection: String, CaseIterable, Identifiable, Sendable {
     case history
+    case usage
     case general
     case transcription
     case cleanup
@@ -13,6 +14,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .history: "履歴"
+        case .usage: "利用状況"
         case .general: "一般"
         case .transcription: "文字起こし"
         case .cleanup: "AI 整形"
@@ -24,6 +26,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
     var subtitle: String {
         switch self {
         case .history: "これまでに入力したテキスト"
+        case .usage: "利用回数、話した時間、API 料金の目安"
         case .general: "起動、ホットキー、マイク、権限"
         case .transcription: "音声をテキストにするサービス"
         case .cleanup: "LLM で文章を読みやすく整える"
@@ -35,6 +38,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
     var symbol: String {
         switch self {
         case .history: "clock"
+        case .usage: "chart.bar"
         case .general: "gearshape"
         case .transcription: "waveform"
         case .cleanup: "sparkles"
@@ -74,10 +78,15 @@ public struct MainWindowView: View {
     private func page(_ section: MainSection) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             PageHeader(section: section) {
-                if section == .history { HistoryHeaderActions(history: env.history) }
+                switch section {
+                case .history: HistoryHeaderActions(history: env.history)
+                case .usage: UsageHeaderActions(usage: env.usage)
+                default: EmptyView()
+                }
             }
             switch section {
             case .history: HistoryView(env: env)
+            case .usage: UsageView(env: env)
             case .general: GeneralSettingsView(env: env)
             case .transcription: TranscriptionSettingsView(env: env)
             case .cleanup: CleanupSettingsView(env: env)
@@ -110,6 +119,7 @@ private struct Sidebar: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 item(.history)
+                item(.usage)
                 Text("設定")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.tertiary)

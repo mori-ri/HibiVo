@@ -43,10 +43,29 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
             var type: String
             var text: String?
         }
+        struct Usage: Decodable {
+            var inputTokens: Int
+            var outputTokens: Int
+            var cacheCreationInputTokens: Int?
+            var cacheReadInputTokens: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case inputTokens = "input_tokens", outputTokens = "output_tokens"
+                case cacheCreationInputTokens = "cache_creation_input_tokens"
+                case cacheReadInputTokens = "cache_read_input_tokens"
+            }
+
+            var tokens: TokenUsage {
+                TokenUsage(
+                    input: inputTokens + (cacheCreationInputTokens ?? 0) + (cacheReadInputTokens ?? 0),
+                    output: outputTokens)
+            }
+        }
         var content: [Block]
         var stopReason: String?
+        var usage: Usage?
 
-        enum CodingKeys: String, CodingKey { case content, stopReason = "stop_reason" }
+        enum CodingKeys: String, CodingKey { case content, stopReason = "stop_reason", usage }
     }
 
     /// Shared with Bedrock, whose model IDs look like `anthropic.claude-…` or `global.anthropic.claude-…`.
@@ -63,7 +82,7 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
             fallbacks: supportsFallbacks ? "default" : nil)
     }
 
-    public func complete(system: String, user: String, model: String) async throws -> String {
+    public func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
         let body = Self.makeRequest(system: system, user: user, model: model)
         var headers = ["x-api-key": apiKey, "anthropic-version": "2023-06-01"]
         if body.fallbacks != nil { headers["anthropic-beta"] = "server-side-fallback-2026-07-01" }
@@ -73,11 +92,11 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         return try Self.parse(data)
     }
 
-    static func parse(_ data: Data) throws -> String {
+    static func parse(_ data: Data) throws -> CleanupCompletion {
         let response = try JSONDecoder().decode(Response.self, from: data)
         if response.stopReason == "refusal" { throw CleanupError.refused }
         let text = response.content.filter { $0.type == "text" }.compactMap(\.text).joined()
         guard !text.isEmpty else { throw CleanupError.invalidResponse }
-        return text
+        return CleanupCompletion(text: text, usage: response.usage?.tokens)
     }
 }

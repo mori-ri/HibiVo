@@ -33,10 +33,19 @@ public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
             struct Message: Decodable { var content: String? }
             var message: Message
         }
+        struct Usage: Decodable {
+            var promptTokens: Int
+            var completionTokens: Int
+
+            enum CodingKeys: String, CodingKey {
+                case promptTokens = "prompt_tokens", completionTokens = "completion_tokens"
+            }
+        }
         var choices: [Choice]
+        var usage: Usage?
     }
 
-    public func complete(system: String, user: String, model: String) async throws -> String {
+    public func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
         let body = Request(
             model: model,
             messages: [.init(role: "system", content: system), .init(role: "user", content: user)])
@@ -48,11 +57,12 @@ public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
         return try Self.parse(data)
     }
 
-    static func parse(_ data: Data) throws -> String {
+    static func parse(_ data: Data) throws -> CleanupCompletion {
         let response = try JSONDecoder().decode(Response.self, from: data)
         guard let text = response.choices.first?.message.content, !text.isEmpty else {
             throw CleanupError.invalidResponse
         }
-        return text
+        return CleanupCompletion(
+            text: text, usage: response.usage.map { TokenUsage(input: $0.promptTokens, output: $0.completionTokens) })
     }
 }

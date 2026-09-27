@@ -7,6 +7,9 @@ public struct CleanupOutcome: Equatable, Sendable {
     public var didCleanup: Bool
     /// Set when cleanup was attempted and failed; the raw transcript is used instead.
     public var failure: CleanupError?
+    /// Tokens billed for the request, even when its output was rejected. nil when no request was made
+    /// or the provider did not report usage.
+    public var usage: TokenUsage?
 }
 
 /// Runs one cleanup with a hard timeout and falls back to the raw transcript on any problem.
@@ -41,10 +44,10 @@ public struct CleanupCoordinator: Sendable {
             let output = try await withTimeout(timeout) {
                 try await provider.complete(system: system, user: user, model: model)
             }
-            guard let text = CleanupOutputGuard.validate(output, raw: raw, mode: request.mode) else {
-                return fallback(raw, .rejectedByGuard)
+            guard let text = CleanupOutputGuard.validate(output.text, raw: raw, mode: request.mode) else {
+                return fallback(raw, .rejectedByGuard, usage: output.usage)
             }
-            return CleanupOutcome(text: text, didCleanup: true, failure: nil)
+            return CleanupOutcome(text: text, didCleanup: true, failure: nil, usage: output.usage)
         } catch let error as CleanupError {
             return fallback(raw, error)
         } catch {
@@ -53,9 +56,9 @@ public struct CleanupCoordinator: Sendable {
         }
     }
 
-    private func fallback(_ raw: String, _ error: CleanupError) -> CleanupOutcome {
+    private func fallback(_ raw: String, _ error: CleanupError, usage: TokenUsage? = nil) -> CleanupOutcome {
         log.notice("Cleanup fell back to raw transcript: \(String(describing: error), privacy: .public)")
-        return CleanupOutcome(text: raw, didCleanup: false, failure: error)
+        return CleanupOutcome(text: raw, didCleanup: false, failure: error, usage: usage)
     }
 }
 

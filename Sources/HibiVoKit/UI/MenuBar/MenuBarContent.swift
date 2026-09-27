@@ -44,6 +44,7 @@ public struct MenuBarContent: View {
 
         Button("履歴…") { open(.history) }
             .keyboardShortcut("y")
+        Button("利用状況…") { open(.usage) }
         Button("設定…") { open(.general) }
             .keyboardShortcut(",")
 
