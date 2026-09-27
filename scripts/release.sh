@@ -25,6 +25,7 @@ usage() {
 }
 
 plist_get() { /usr/libexec/PlistBuddy -c "Print :$1" "$PLIST"; }
+plist_get_at() { git show "$1:$PLIST" | plutil -extract "$2" raw -o - -; }
 plist_set() { /usr/libexec/PlistBuddy -c "Set :$1 $2" "$PLIST"; }
 
 confirm() {
@@ -68,23 +69,30 @@ prepare() {
   git fetch -q origin --tags
   require_tag_absent "v$version"
 
-  local old_version old_build new_build
-  old_version="$(plist_get CFBundleShortVersionString)"
-  old_build="$(plist_get CFBundleVersion)"
-  [[ "$old_build" =~ ^[0-9]+$ ]] || die "CFBundleVersion が整数ではありません: $old_build"
-  [[ "$version" != "$old_version" ]] || die "Info.plist は既に $version です。"
-  new_build=$(($(max_released_build "$old_build") + 1))
-
-  local branch base_branch
+  local branch base_branch base_ref
   branch="$(current_branch)"
   if [[ "$branch" == release/* ]]; then
     base_branch=""
+    base_ref=HEAD
     [[ "$(git rev-parse HEAD)" == "$(git rev-parse "origin/$branch" 2>/dev/null)" ]] \
       || die "$branch が origin/$branch と一致しません。pull または push してから実行してください。"
   else
     base_branch=main
+    base_ref=origin/main
     branch="release-v$version"
-    git switch -c "$branch" origin/main
+  fi
+
+  # Read the version from the commit the bump will be based on, not the working copy (which may be a stale
+  # local main or an unrelated branch), so the "already at" check and the build number reflect origin/main.
+  local old_version old_build new_build
+  old_version="$(plist_get_at "$base_ref" CFBundleShortVersionString)"
+  old_build="$(plist_get_at "$base_ref" CFBundleVersion)"
+  [[ "$old_build" =~ ^[0-9]+$ ]] || die "CFBundleVersion が整数ではありません: $old_build"
+  [[ "$version" != "$old_version" ]] || die "Info.plist は既に $version です。"
+  new_build=$(($(max_released_build "$old_build") + 1))
+
+  if [[ -n "$base_branch" ]]; then
+    git switch -c "$branch" "$base_ref"
   fi
 
   plist_set CFBundleShortVersionString "$version"
@@ -148,7 +156,8 @@ publish() {
 
   git tag -a "$tag" -m "HibiVo $tag"
   git push -q origin "$tag"
-  gh release create "$tag" "${release_args[@]}" "${notes_args[@]}"
+  gh release create "$tag" "${release_args[@]}" "${notes_args[@]}" \
+    || die "タグ $tag は push 済みですが、リリースの作成に失敗しました。次のコマンドを手動で実行してください: $(printf "%q " gh release create "$tag" "${release_args[@]}" "${notes_args[@]}")"
   echo "下書きを作成しました。自動生成されたノートをユーザー向けの日本語に書き直してから公開してください。"
 }
 
