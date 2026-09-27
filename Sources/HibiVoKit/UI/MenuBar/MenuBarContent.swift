@@ -25,28 +25,25 @@ public struct MenuBarContent: View {
         if let last = env.history.records.first(where: { !$0.finalText.isEmpty }) {
             Button("直前の結果をもう一度入力") { env.pasteAgain(last.finalText) }
         }
+        Button("履歴…") { open(.history) }
+            .keyboardShortcut("y")
 
         Divider()
 
+        Toggle("AI で整形", isOn: cleanupBinding)
         Picker("整形モード", selection: modeBinding) {
             ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
         }
-        Toggle("AI で整形", isOn: cleanupBinding)
         Picker("マイク", selection: microphoneBinding) {
             Text("システム既定").tag(String?.none)
             ForEach(AudioDeviceCatalog.inputDevices()) { Text($0.name).tag(Optional($0.uid)) }
         }
-        Picker("STT Provider", selection: providerBinding) {
-            ForEach(env.transcriptionProviders, id: \.id) { Text($0.displayName).tag($0.id) }
-        }
+        Button("設定…") { open(.general) }
+            .keyboardShortcut(",")
 
         Divider()
 
-        Button("履歴…") { open(.history) }
-            .keyboardShortcut("y")
         Button("利用状況…") { open(.usage) }
-        Button("設定…") { open(.general) }
-            .keyboardShortcut(",")
         Button("フィードバック・要望を送る…") { ProjectLinks.open(ProjectLinks.newFeedback) }
 
         Divider()
@@ -74,10 +71,6 @@ public struct MenuBarContent: View {
 
     private var microphoneBinding: Binding<String?> {
         Binding(get: { env.settings.microphoneUID }, set: { env.settings.microphoneUID = $0 })
-    }
-
-    private var providerBinding: Binding<String> {
-        Binding(get: { env.settings.transcriptionProviderID }, set: { env.settings.transcriptionProviderID = $0 })
     }
 }
 

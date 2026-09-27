@@ -57,7 +57,7 @@ public final class HUDController {
         let size = hostingView.fittingSize
         let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
-        let origin = NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 48)
+        let origin = NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 24)
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
     }
 }

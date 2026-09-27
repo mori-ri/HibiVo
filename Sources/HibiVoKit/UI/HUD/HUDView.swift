@@ -17,7 +17,7 @@ struct HUDView: View {
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6.4)
         .background(Capsule().fill(.black.opacity(0.78)))
         .fixedSize()
     }
@@ -52,7 +52,7 @@ private struct LevelBars: View {
     /// Centre-heavy envelope: the middle bars reach full height, the edges stay small.
     private let weights: [Float] = [0.3, 0.5, 0.8, 1.0, 0.8, 0.5, 0.3]
     private static let minHeight: CGFloat = 4
-    private static let maxHeight: CGFloat = 30
+    private static let maxHeight: CGFloat = 24
 
     var body: some View {
         TimelineView(.animation) { timeline in
