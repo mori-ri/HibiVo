@@ -34,7 +34,11 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         var fallbacks: String?
 
         enum CodingKeys: String, CodingKey {
-            case model, maxTokens = "max_tokens", system, messages, outputConfig = "output_config", fallbacks
+            case model
+            case maxTokens = "max_tokens"
+            case system, messages
+            case outputConfig = "output_config"
+            case fallbacks
         }
     }
 
@@ -50,7 +54,8 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
             var cacheReadInputTokens: Int?
 
             enum CodingKeys: String, CodingKey {
-                case inputTokens = "input_tokens", outputTokens = "output_tokens"
+                case inputTokens = "input_tokens"
+                case outputTokens = "output_tokens"
                 case cacheCreationInputTokens = "cache_creation_input_tokens"
                 case cacheReadInputTokens = "cache_read_input_tokens"
             }
@@ -65,7 +70,11 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         var stopReason: String?
         var usage: Usage?
 
-        enum CodingKeys: String, CodingKey { case content, stopReason = "stop_reason", usage }
+        enum CodingKeys: String, CodingKey {
+            case content
+            case stopReason = "stop_reason"
+            case usage
+        }
     }
 
     /// Shared with Bedrock, whose model IDs look like `anthropic.claude-…` or `global.anthropic.claude-…`.

@@ -61,7 +61,9 @@ struct VocabularySettingsView: View {
         aliases = ""
     }
 
-    private func binding(_ entry: VocabularyEntry, _ keyPath: WritableKeyPath<VocabularyEntry, String>) -> Binding<String> {
+    private func binding(
+        _ entry: VocabularyEntry, _ keyPath: WritableKeyPath<VocabularyEntry, String>
+    ) -> Binding<String> {
         Binding(
             get: { entry[keyPath: keyPath] },
             set: { newValue in

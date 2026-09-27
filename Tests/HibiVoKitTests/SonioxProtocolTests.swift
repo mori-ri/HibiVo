@@ -13,7 +13,8 @@ import Testing
 
     @Test func configIncludesJapaneseAndEnglishHintsAndTerms() throws {
         let json = try SonioxProtocol.config(
-            for: TranscriptionConfig(apiKey: "k", model: "stt-rt-v5", language: "ja", vocabulary: ["AppSync", "Bedrock"]),
+            for: TranscriptionConfig(
+                apiKey: "k", model: "stt-rt-v5", language: "ja", vocabulary: ["AppSync", "Bedrock"]),
             sampleRate: 16_000)
         let object = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         #expect(object["api_key"] as? String == "k")

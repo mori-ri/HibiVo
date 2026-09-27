@@ -230,7 +230,8 @@ public final class DictationController {
         let outcome = await inserter.insert(cleaned.text, into: context.target)
         recordUsage(context, audio: pumped, inserted: cleaned.text, cleanup: cleaned)
         log.info(
-            "Release→STT \(sttDone - releasedAt), cleanup \(cleanupDone - sttDone), paste \(self.clock.now - cleanupDone)")
+            "Release→STT \(sttDone - releasedAt), cleanup \(cleanupDone - sttDone), paste \(self.clock.now - cleanupDone)"
+        )
 
         let status: HistoryRecord.Status =
             switch outcome {
@@ -263,7 +264,8 @@ public final class DictationController {
                 bundleID: context.target?.bundleID,
                 provider: context.transcriptionProvider.displayName,
                 cleanupMode: context.cleanup.mode,
-                latencyMs: Int(elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000),
+                latencyMs: Int(
+                    elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000),
                 status: status,
                 errorMessage: error))
     }

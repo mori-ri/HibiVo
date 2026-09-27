@@ -25,6 +25,9 @@ jobs:
           xcode-select -p
           swift --version
 
+      - name: Lint
+        run: scripts/lint.sh
+
       # Integration tests stay off (HIBIVO_INTEGRATION unset), so no secrets are needed.
       - name: Test
         run: scripts/test.sh

@@ -6,7 +6,8 @@ import Foundation
 /// "アップシンクAPI" style overlaps resolve to the most specific entry.
 public enum VocabularyReplacer {
     public static func apply(_ entries: [VocabularyEntry], to text: String) -> String {
-        let rules = entries
+        let rules =
+            entries
             .flatMap { entry in entry.spokenForms.map { (from: $0, to: entry.preferred) } }
             .sorted { $0.from.count > $1.from.count }
         guard !rules.isEmpty else { return text }

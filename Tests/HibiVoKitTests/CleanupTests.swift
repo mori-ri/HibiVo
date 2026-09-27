@@ -61,7 +61,8 @@ struct MockCleanupProvider: TextCleanupProvider {
     }
 
     @Test func stripsTranscriptTagsAndCodeFence() {
-        #expect(CleanupOutputGuard.validate("<transcript>\nこんにちは\n</transcript>", raw: "こんにちは", mode: .natural) == "こんにちは")
+        #expect(
+            CleanupOutputGuard.validate("<transcript>\nこんにちは\n</transcript>", raw: "こんにちは", mode: .natural) == "こんにちは")
         #expect(CleanupOutputGuard.validate("```\nこんにちは\n```", raw: "こんにちは", mode: .natural) == "こんにちは")
     }
 
@@ -190,8 +191,9 @@ struct MockCleanupProvider: TextCleanupProvider {
     ]
 
     @Test func replacesSpokenFormsAndAliases() {
-        #expect(VocabularyReplacer.apply(entries, to: "今日の15時からAWSのアップシンクについて打ち合わせ")
-            == "今日の15時からAWSのAppSyncについて打ち合わせ")
+        #expect(
+            VocabularyReplacer.apply(entries, to: "今日の15時からAWSのアップシンクについて打ち合わせ")
+                == "今日の15時からAWSのAppSyncについて打ち合わせ")
         #expect(VocabularyReplacer.apply(entries, to: "アップ シンクとクロードコード") == "AppSyncとClaude Code")
     }
 

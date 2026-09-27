@@ -130,7 +130,11 @@ public enum UsagePricing {
         var unpriced = Set<String>()
         for day in days {
             for stt in day.transcription {
-                if let usd = transcriptionUSD(stt) { estimate.transcriptionUSD += usd } else { unpriced.insert(stt.model) }
+                if let usd = transcriptionUSD(stt) {
+                    estimate.transcriptionUSD += usd
+                } else {
+                    unpriced.insert(stt.model)
+                }
             }
             for llm in day.cleanup {
                 if let usd = cleanupUSD(llm) { estimate.cleanupUSD += usd } else { unpriced.insert(llm.model) }

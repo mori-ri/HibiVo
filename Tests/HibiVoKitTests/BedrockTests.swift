@@ -40,7 +40,8 @@ import Testing
         let request = try sut.makeURLRequest(system: "sys", user: "usr", model: "global.anthropic.claude-opus-4-6-v1")
         #expect(
             request.url?.absoluteString
-                == "https://bedrock-runtime.ap-northeast-1.amazonaws.com/model/global.anthropic.claude-opus-4-6-v1/invoke")
+                == "https://bedrock-runtime.ap-northeast-1.amazonaws.com/model/global.anthropic.claude-opus-4-6-v1/invoke"
+        )
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer BEDROCK-KEY")
         #expect(request.value(forHTTPHeaderField: "X-Amz-Date") == nil)
@@ -129,7 +130,9 @@ import Testing
     }
 
     @Test func converseGuardrailStopIsRefusal() {
-        let data = Data(#"{"output":{"message":{"role":"assistant","content":[{"text":"blocked"}]}},"stopReason":"guardrail_intervened"}"#.utf8)
+        let data = Data(
+            #"{"output":{"message":{"role":"assistant","content":[{"text":"blocked"}]}},"stopReason":"guardrail_intervened"}"#
+                .utf8)
         #expect(throws: CleanupError.refused) { try BedrockCleanupProvider.parseConverse(data) }
     }
 

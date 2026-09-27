@@ -97,7 +97,9 @@ actor SonioxSession: TranscriptionSession {
         // keep whatever we have (including tentative text) rather than losing the utterance.
         let text = transcript.displayText.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.isEmpty, let error = failure ?? waitError { throw error }
-        if let error = failure ?? waitError { log.notice("Returning partial transcript after \(String(describing: error))") }
+        if let error = failure ?? waitError {
+            log.notice("Returning partial transcript after \(String(describing: error))")
+        }
         return text
     }
 

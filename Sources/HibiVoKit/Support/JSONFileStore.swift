@@ -18,7 +18,8 @@ final class JSONFileStore<Value: Codable & Sendable> {
 
     /// `~/Library/Application Support/HibiVo/<name>`
     static func appSupport(_ name: String) -> JSONFileStore {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let base =
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
         return JSONFileStore(url: base.appending(path: "HibiVo").appending(path: name))
     }
@@ -28,7 +29,9 @@ final class JSONFileStore<Value: Codable & Sendable> {
         do {
             return try JSONDecoder.iso.decode(Value.self, from: data)
         } catch {
-            Logger.storage.error("Could not decode \(self.url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            Logger.storage.error(
+                "Could not decode \(self.url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
             return nil
         }
     }
@@ -58,7 +61,9 @@ final class JSONFileStore<Value: Codable & Sendable> {
                     at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try JSONEncoder.iso.encode(value).write(to: url, options: [.atomic])
             } catch {
-                Logger.storage.error("Could not save \(self.url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                Logger.storage.error(
+                    "Could not save \(self.url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
             }
         }
     }

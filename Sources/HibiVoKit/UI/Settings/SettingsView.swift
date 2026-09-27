@@ -153,10 +153,14 @@ struct CleanupSettingsView: View {
 
                 switch CleanupProviderKind(rawValue: settings.cleanupProviderID) ?? .anthropic {
                 case .anthropic:
-                    TextFieldRow("モデル", text: $settings.cleanupModel, prompt: "既定: \(CleanupProviderKind.anthropic.defaultModel)")
+                    TextFieldRow(
+                        "モデル", text: $settings.cleanupModel, prompt: "既定: \(CleanupProviderKind.anthropic.defaultModel)"
+                    )
                     APIKeyField(secrets: env.secrets, account: SecretAccount.anthropic, label: "Anthropic API Key")
                 case .openAICompatible:
-                    TextFieldRow("Base URL", text: $settings.openAIBaseURL, prompt: OpenAICompatibleCleanupProvider.defaultBaseURL)
+                    TextFieldRow(
+                        "Base URL", text: $settings.openAIBaseURL,
+                        prompt: OpenAICompatibleCleanupProvider.defaultBaseURL)
                     TextFieldRow("モデル", text: $settings.cleanupModel, prompt: "例: gpt-4.1-mini")
                     APIKeyField(secrets: env.secrets, account: SecretAccount.openAICompatible, label: "API Key")
                 case .bedrock:
@@ -210,10 +214,12 @@ private struct BedrockSettingsFields: View {
         @Bindable var settings = env.settings
         TextFieldRow("リージョン", text: $settings.bedrockRegion, prompt: BedrockCleanupProvider.defaultRegion)
         LabeledRow("モデル ID") {
-            TextField("モデル ID", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.bedrock.defaultModel)"))
-                .labelsHidden()
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 340)
+            TextField(
+                "モデル ID", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.bedrock.defaultModel)")
+            )
+            .labelsHidden()
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 340)
             Menu("候補") {
                 ForEach(BedrockCleanupProvider.suggestedModels, id: \.self) { model in
                     Button(model) { settings.cleanupModel = model }

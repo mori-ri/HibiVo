@@ -211,7 +211,8 @@ private struct DailyChart: View {
                 BarMark(
                     x: .value("日付", point.date, unit: .day),
                     y: .value(metric.title, point.value),
-                    width: .ratio(0.7))
+                    width: .ratio(0.7)
+                )
                 .cornerRadius(4)
                 .foregroundStyle(.tint.opacity(selected == nil || selected?.date == point.date ? 1 : 0.45))
             }

@@ -59,16 +59,24 @@ import Testing
         var sut = HotkeyInterpreter(trigger: .rightOption)
         #expect(sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.escape, flags: 0)).action == nil)
         sut.isRecording = true
-        #expect(sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.escape, flags: 0)) == .init(action: .escape, consume: true))
+        #expect(
+            sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.escape, flags: 0))
+                == .init(action: .escape, consume: true))
     }
 
     @Test func shortcutPressRepeatRelease() {
         let control = CGEventFlags.maskControl.rawValue
         var sut = HotkeyInterpreter(trigger: .shortcut(keyCode: KeyCode.space, modifiers: [.control]))
-        #expect(sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.space, flags: control)) == .init(action: .pressed, consume: true))
+        #expect(
+            sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.space, flags: control))
+                == .init(action: .pressed, consume: true))
         // Auto-repeat is swallowed without a new action.
-        #expect(sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.space, flags: control, isRepeat: true)) == .init(action: nil, consume: true))
-        #expect(sut.handle(KeyEvent(kind: .keyUp, keyCode: KeyCode.space, flags: control)) == .init(action: .released, consume: true))
+        #expect(
+            sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.space, flags: control, isRepeat: true))
+                == .init(action: nil, consume: true))
+        #expect(
+            sut.handle(KeyEvent(kind: .keyUp, keyCode: KeyCode.space, flags: control))
+                == .init(action: .released, consume: true))
     }
 
     @Test func shortcutRequiresExactModifiers() {

@@ -69,7 +69,9 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         var outputConfig: AnthropicCleanupProvider.Request.OutputConfig?
 
         enum CodingKeys: String, CodingKey {
-            case anthropicVersion = "anthropic_version", maxTokens = "max_tokens", system, messages
+            case anthropicVersion = "anthropic_version"
+            case maxTokens = "max_tokens"
+            case system, messages
             case outputConfig = "output_config"
         }
     }
@@ -77,7 +79,8 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
     static func makeInvokeBody(system: String, user: String, model: String) -> InvokeBody {
         // Same shaping as the first-party API, minus `model` (it is in the URL) and `fallbacks`
         // (not supported on Bedrock).
-        let request = AnthropicCleanupProvider.makeRequest(system: system, user: user, model: model, allowFallbacks: false)
+        let request = AnthropicCleanupProvider.makeRequest(
+            system: system, user: user, model: model, allowFallbacks: false)
         return InvokeBody(
             maxTokens: request.maxTokens, system: request.system, messages: request.messages,
             outputConfig: request.outputConfig)

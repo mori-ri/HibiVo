@@ -42,7 +42,8 @@ struct WindowButtonsInset: NSViewRepresentable {
             ]
             for name in names {
                 observers.append(
-                    NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) {
+                        [weak self] _ in
                         MainActor.assumeIsolated { self?.scheduleApply() }
                     })
             }
