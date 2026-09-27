@@ -36,6 +36,7 @@ public final class HUDController {
         withObservationTracking {
             _ = state.phase
             _ = state.partialTranscript
+            _ = state.meetingReconnecting
             _ = settings.showLiveTranscript
         } onChange: { [weak self] in
             Task { @MainActor in
@@ -49,7 +50,7 @@ public final class HUDController {
         switch state.phase {
         case .idle:
             panel.orderOut(nil)
-        case .recording, .processing, .error:
+        case .recording, .processing, .meeting, .error:
             panel.ignoresMouseEvents = state.phase != .recording
             layout()
             panel.orderFrontRegardless()

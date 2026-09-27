@@ -94,7 +94,7 @@ public final class DictationController {
         case .pressed where state.phase == .recording: end(at: time)
         case .pressed: begin(pressedAt: time)
         case .released: releaseKey(at: time)
-        case .interrupted, .escape: cancel()
+        case .interrupted, .escape, .meeting: cancel()
         }
     }
 

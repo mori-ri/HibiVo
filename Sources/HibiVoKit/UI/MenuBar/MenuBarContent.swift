@@ -22,6 +22,14 @@ public struct MenuBarContent: View {
 
         Text("\(env.settings.hotkey.displayName) を押して話す（もう一度押すと終了）")
 
+        if env.state.phase == .meeting {
+            Button("ミーティングの文字起こしを終了") { env.meeting.stop() }
+        } else {
+            Button("ミーティングの文字起こしを開始(\(env.settings.hotkey.displayName) + M)") { env.meeting.start() }
+                .disabled(env.state.phase.isActive)
+        }
+        Button("ミーティングの記録を開く…") { env.openMeetingsFolder() }
+
         if let last = env.history.records.first(where: { !$0.finalText.isEmpty }) {
             Button("直前の結果をもう一度入力") { env.pasteAgain(last.finalText) }
         }
@@ -87,6 +95,7 @@ public struct MenuBarLabel: View {
             if let logo = Self.logo { Image(nsImage: logo) } else { Image(systemName: "mic") }
         case .recording: Image(systemName: "mic.fill")
         case .processing: Image(systemName: "ellipsis.circle")
+        case .meeting: Image(systemName: "record.circle")
         case .error: Image(systemName: "exclamationmark.triangle")
         }
     }

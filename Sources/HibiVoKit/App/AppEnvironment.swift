@@ -15,6 +15,7 @@ public final class AppEnvironment {
     private let inserter = TextInsertionService()
     private let contextBuilder: DictationContextBuilder
     let dictation: DictationController
+    public let meeting: MeetingController
     private let hud: HUDController
     private var permissionPollTask: Task<Void, Never>?
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "app")
@@ -39,13 +40,33 @@ public final class AppEnvironment {
             microphoneUID: { settings.microphoneUID },
             ducker: SystemVolumeDucker(),
             duckingEnabled: { settings.duckOutputWhileRecording })
+        meeting = MeetingController(
+            state: state,
+            audio: AudioCaptureService(),
+            settings: settings,
+            secrets: secrets,
+            provider: SonioxProvider(),
+            vocabulary: { vocabulary.activeEntries },
+            usage: usage,
+            onSaved: { NSWorkspace.shared.activateFileViewerSelecting([$0]) })
         let dictation = dictation
+        let meeting = meeting
         hud = HUDController(state: state, settings: settings, onClick: { dictation.toggleCleanup() })
 
         hotkey.onAction = { action, occurredAt in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth
             // mics), and a slow callback makes the system disable the event tap.
-            Task { @MainActor in dictation.handle(action, at: occurredAt) }
+            Task { @MainActor in
+                if meeting.isActive {
+                    meeting.handle(action)
+                } else if action == .meeting {
+                    // The trigger press already began a dictation; drop it and record the meeting instead.
+                    dictation.handle(action, at: occurredAt)
+                    meeting.start()
+                } else {
+                    dictation.handle(action, at: occurredAt)
+                }
+            }
         }
         observeRecording()
     }
@@ -72,6 +93,13 @@ public final class AppEnvironment {
     public func applyHotkey(_ trigger: HotkeyTrigger) {
         settings.hotkey = trigger
         hotkey.trigger = trigger
+    }
+
+    /// Shows the saved meeting transcripts in Finder.
+    public func openMeetingsFolder() {
+        let url = MeetingController.defaultDirectory
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - History actions

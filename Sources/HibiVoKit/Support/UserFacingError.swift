@@ -10,6 +10,8 @@ public enum UserFacingError: Error, Equatable, Sendable {
     case accessibilityMissing
     case copiedOnly(reason: String)
     case cleanupFellBack
+    case meetingRequiresAPIKey(provider: String)
+    case meetingSaveFailed
 
     public var message: String {
         switch self {
@@ -23,6 +25,8 @@ public enum UserFacingError: Error, Equatable, Sendable {
         case .accessibilityMissing: "アクセシビリティ権限が必要です"
         case .copiedOnly(let reason): "\(reason)。クリップボードにコピーしました"
         case .cleanupFellBack: "整形できなかったため、文字起こしをそのまま入力しました"
+        case .meetingRequiresAPIKey(let provider): "ミーティングの文字起こしには \(provider) の API Key が必要です"
+        case .meetingSaveFailed: "ミーティングの記録を保存できませんでした"
         }
     }
 }

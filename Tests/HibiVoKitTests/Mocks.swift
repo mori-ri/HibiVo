@@ -107,3 +107,55 @@ final class MockDucker: OutputDucking {
 
     func restore() { isDucked = false }
 }
+
+final class MockMeetingProvider: MeetingTranscriptionProvider, @unchecked Sendable {
+    let id = "mock"
+    let displayName = "Mock"
+    let sampleRate: Double = 16_000
+    let models = ["m1"]
+    let defaultModel = "m1"
+    private(set) var sessions: [MockMeetingSession] = []
+    private(set) var configs: [TranscriptionConfig] = []
+
+    func makeSession(_ config: TranscriptionConfig) -> any TranscriptionSession {
+        makeMeetingSession(config)
+    }
+
+    func makeMeetingSession(_ config: TranscriptionConfig) -> any MeetingTranscriptionSession {
+        configs.append(config)
+        let session = MockMeetingSession()
+        sessions.append(session)
+        return session
+    }
+}
+
+actor MockMeetingSession: MeetingTranscriptionSession {
+    nonisolated let partials: AsyncStream<String>
+    nonisolated let events: AsyncStream<MeetingSessionEvent>
+    private let continuation: AsyncStream<MeetingSessionEvent>.Continuation
+    private(set) var receivedBytes = 0
+    private(set) var didFinish = false
+    private(set) var didCancel = false
+
+    init() {
+        partials = AsyncStream { $0.finish() }
+        (events, continuation) = AsyncStream.makeStream()
+    }
+
+    func emit(_ event: MeetingSessionEvent) {
+        continuation.yield(event)
+        if case .ended = event { continuation.finish() }
+    }
+
+    func start() async {}
+    func send(_ pcm16: Data) async { receivedBytes += pcm16.count }
+    func finish() async throws -> String {
+        didFinish = true
+        continuation.finish()
+        return ""
+    }
+    func cancel() async {
+        didCancel = true
+        continuation.finish()
+    }
+}

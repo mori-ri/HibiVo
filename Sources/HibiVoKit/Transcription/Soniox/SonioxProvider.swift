@@ -1,7 +1,7 @@
 import Foundation
 import OSLog
 
-public struct SonioxProvider: TranscriptionProvider {
+public struct SonioxProvider: MeetingTranscriptionProvider {
     public let id = "soniox"
     public let displayName = "Soniox"
     public let sampleRate: Double = 16_000
@@ -17,6 +17,10 @@ public struct SonioxProvider: TranscriptionProvider {
     public func makeSession(_ config: TranscriptionConfig) -> any TranscriptionSession {
         SonioxSession(config: config, sampleRate: sampleRate, urlSession: urlSession)
     }
+
+    public func makeMeetingSession(_ config: TranscriptionConfig) -> any MeetingTranscriptionSession {
+        SonioxSession(config: config, sampleRate: sampleRate, urlSession: urlSession)
+    }
 }
 
 /// One Soniox WebSocket connection for one utterance.
@@ -24,13 +28,18 @@ public struct SonioxProvider: TranscriptionProvider {
 /// Audio sent before the connection is ready is buffered, so speech from the moment the key goes
 /// down is never lost. On `finish()` we send a short tail of silence plus `finalize`, then wait for
 /// the `<fin>` token, which marks every earlier token as final.
-actor SonioxSession: TranscriptionSession {
+///
+/// Meeting transcription uses the same session for up to hours and reads `events` instead of the
+/// final string; those events are only produced when diarization is requested.
+actor SonioxSession: MeetingTranscriptionSession {
     static let finalizeTimeout: Duration = .seconds(4)
     /// Soniox recommends a little trailing silence before a manual finalize.
     static let trailingSilence = Data(count: 16_000 * 2 / 5)  // 200 ms of PCM16 @ 16 kHz
 
     nonisolated let partials: AsyncStream<String>
     private let partialsContinuation: AsyncStream<String>.Continuation
+    nonisolated let events: AsyncStream<MeetingSessionEvent>
+    private let eventsContinuation: AsyncStream<MeetingSessionEvent>.Continuation
     private let config: TranscriptionConfig
     private let sampleRate: Double
     private let urlSession: URLSession
@@ -52,6 +61,8 @@ actor SonioxSession: TranscriptionSession {
         self.sampleRate = sampleRate
         self.urlSession = urlSession
         (partials, partialsContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+        (events, eventsContinuation) = AsyncStream.makeStream()
+        if !config.speakerDiarization { eventsContinuation.finish() }
     }
 
     func start() async {
@@ -165,14 +176,44 @@ actor SonioxSession: TranscriptionSession {
             fail(code == 401 ? .unauthorized : .server(response.errorMessage ?? "\(code)"))
             return
         }
+        if config.speakerDiarization {
+            // Meetings keep only the events; accumulating hours of text here as well would be wasted.
+            yieldEvents(response)
+            if response.tokens?.contains(where: { $0.text == SonioxProtocol.finalizeMarker }) == true {
+                resolve(.success(()))
+            }
+            return
+        }
         transcript.apply(response)
         partialsContinuation.yield(transcript.displayText)
         if transcript.didFinalize || transcript.didFinish { resolve(.success(())) }
     }
 
+    private func yieldEvents(_ response: SonioxProtocol.Response) {
+        let tokens = (response.tokens ?? [])
+            .filter { $0.text != SonioxProtocol.finalizeMarker && $0.text != SonioxProtocol.endMarker }
+            .map {
+                MeetingToken(
+                    text: $0.text, isFinal: $0.isFinal, speaker: $0.speaker, startMs: $0.startMs, endMs: $0.endMs)
+            }
+        if response.tokens != nil { eventsContinuation.yield(.tokens(tokens)) }
+        if response.finished == true {
+            resolve(.success(()))
+            if !isClosed {
+                eventsContinuation.yield(.ended(nil))
+                eventsContinuation.finish()
+            }
+        }
+    }
+
     private func fail(_ error: TranscriptionError) {
         if failure == nil { failure = error }
         resolve(.failure(error))
+        // A cancel comes from the owner, which doesn't need to be told.
+        if !isClosed, error != .cancelled {
+            eventsContinuation.yield(.ended(error))
+            eventsContinuation.finish()
+        }
     }
 
     private func close() {
@@ -181,5 +222,6 @@ actor SonioxSession: TranscriptionSession {
         receiveTask?.cancel()
         socket?.cancel(with: .normalClosure, reason: nil)
         partialsContinuation.finish()
+        eventsContinuation.finish()
     }
 }

@@ -23,4 +23,24 @@ struct SonioxIntegrationTests {
             #expect(text.isEmpty)
         }
     }
+
+    /// A diarized meeting session reports a rejected key through `events`, and closes cleanly with a valid one.
+    @Test func meetingSessionRoundTrip() async throws {
+        let key = ProcessInfo.processInfo.environment["SONIOX_API_KEY"]
+        let provider = SonioxProvider()
+        let session = provider.makeMeetingSession(
+            TranscriptionConfig(
+                apiKey: key ?? "invalid-key", model: provider.defaultModel, language: "ja", speakerDiarization: true))
+        await session.start()
+        for _ in 0..<10 { await session.send(Data(count: 3_200)) }
+
+        if key == nil {
+            var events: [MeetingSessionEvent] = []
+            for await event in session.events { events.append(event) }
+            #expect(events.last == .ended(.unauthorized))
+        } else {
+            _ = try await session.finish()
+            for await event in session.events { #expect(event != .ended(.unauthorized)) }
+        }
+    }
 }

@@ -93,3 +93,36 @@ import Testing
         #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: 59, flags: 0)).action == .released)
     }
 }
+
+@Suite struct MeetingHotkeyTests {
+    let fnDown: UInt64 = CGEventFlags.maskSecondaryFn.rawValue
+
+    @Test func triggerPlusMTogglesMeetingAndSwallowsM() {
+        var sut = HotkeyInterpreter(trigger: .fn)
+        #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: fnDown)).action == .pressed)
+        let m = sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.m, flags: fnDown))
+        #expect(m == .init(action: .meeting, consume: true))
+        #expect(
+            sut.handle(KeyEvent(kind: .keyUp, keyCode: KeyCode.m, flags: fnDown)) == .init(action: nil, consume: true))
+        // Letting go of Fn after Fn+M is not a release.
+        #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: 0)).action == nil)
+        // The next plain tap is a normal press/release, which the meeting uses to stop.
+        #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: fnDown)).action == .pressed)
+        #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: 0)).action == .released)
+    }
+
+    @Test func mWithoutTriggerIsIgnored() {
+        var sut = HotkeyInterpreter(trigger: .fn)
+        #expect(
+            sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.m, flags: 0)) == .init(action: nil, consume: false))
+        #expect(sut.handle(KeyEvent(kind: .keyUp, keyCode: KeyCode.m, flags: 0)) == .init(action: nil, consume: false))
+    }
+
+    @Test func shortcutTriggerPlusMTogglesMeeting() {
+        var sut = HotkeyInterpreter(trigger: .shortcut(keyCode: KeyCode.space, modifiers: [.control]))
+        let ctrl = CGEventFlags.maskControl.rawValue
+        #expect(sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.space, flags: ctrl)).action == .pressed)
+        #expect(sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.m, flags: ctrl)).action == .meeting)
+        #expect(sut.handle(KeyEvent(kind: .keyUp, keyCode: KeyCode.space, flags: ctrl)).action == nil)
+    }
+}

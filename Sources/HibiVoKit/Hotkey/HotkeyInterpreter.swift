@@ -7,6 +7,8 @@ public enum HotkeyAction: Equatable, Sendable {
     /// Another key was pressed while the trigger was held (e.g. ⌥+letter). Recording should be cancelled.
     case interrupted
     case escape
+    /// M was pressed while the trigger was held: start (or stop) meeting transcription.
+    case meeting
 }
 
 /// A keyboard event reduced to the fields the interpreter needs. Pure so it can be unit tested.
@@ -44,6 +46,8 @@ public struct HotkeyInterpreter: Sendable {
     public private(set) var isHeld = false
     /// Set while a recording is active so Esc can be swallowed only then.
     public var isRecording = false
+    /// The M that toggled a meeting is swallowed on the way down, so swallow its key-up too.
+    private var swallowMeetingKeyUp = false
 
     public init(trigger: HotkeyTrigger) {
         self.trigger = trigger
@@ -53,6 +57,10 @@ public struct HotkeyInterpreter: Sendable {
         if event.kind == .keyDown, event.keyCode == KeyCode.escape, isRecording {
             isHeld = false
             return Output(action: .escape, consume: true)
+        }
+        if event.kind == .keyUp, event.keyCode == KeyCode.m, swallowMeetingKeyUp {
+            swallowMeetingKeyUp = false
+            return Output(action: nil, consume: true)
         }
 
         switch trigger {
@@ -83,6 +91,8 @@ public struct HotkeyInterpreter: Sendable {
             isHeld = down
             // Modifier events are never swallowed: doing so desynchronises the system's modifier state.
             return Output(action: down ? .pressed : .released, consume: false)
+        case .keyDown where isHeld && !event.isRepeat && event.keyCode == KeyCode.m:
+            return meetingToggle()
         case .keyDown where isHeld && !event.isRepeat:
             isHeld = false
             return Output(action: .interrupted, consume: false)
@@ -108,6 +118,8 @@ public struct HotkeyInterpreter: Sendable {
             // Letting go of a modifier before the key also ends the recording.
             isHeld = false
             return Output(action: .released, consume: false)
+        case .keyDown where isHeld && event.keyCode == KeyCode.m:
+            return meetingToggle()
         case .keyDown where isHeld:
             isHeld = false
             return Output(action: .interrupted, consume: false)
@@ -116,8 +128,16 @@ public struct HotkeyInterpreter: Sendable {
         }
     }
 
+    /// Ends the hold without a release, so letting go of the trigger afterwards is not an action.
+    private mutating func meetingToggle() -> Output {
+        isHeld = false
+        swallowMeetingKeyUp = true
+        return Output(action: .meeting, consume: true)
+    }
+
     public mutating func reset() {
         isHeld = false
         isRecording = false
+        swallowMeetingKeyUp = false
     }
 }
