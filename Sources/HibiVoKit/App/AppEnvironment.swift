@@ -11,6 +11,7 @@ public final class AppEnvironment {
     public let transcriptionProviders: [any TranscriptionProvider] = [SonioxProvider()]
     public let vocabulary = VocabularyStore()
     public let history = HistoryStore()
+    public let usage = UsageStore()
     private let inserter = TextInsertionService()
     private let contextBuilder: DictationContextBuilder
     let dictation: DictationController
@@ -34,6 +35,7 @@ public final class AppEnvironment {
             inserter: inserter,
             history: history,
             historyEnabled: { settings.historyEnabled },
+            usage: usage,
             microphoneUID: { settings.microphoneUID },
             ducker: SystemVolumeDucker(),
             duckingEnabled: { settings.duckOutputWhileRecording })
@@ -96,6 +98,9 @@ public final class AppEnvironment {
                 raw: record.rawTranscript, mode: mode,
                 vocabulary: vocabulary.activeEntries.map(\.promptTerm), appName: record.appName),
             provider: cleanup.provider, model: cleanup.model)
+        if let tokens = outcome.usage, let provider = cleanup.provider {
+            usage.record(UsageEvent(cleanup: CleanupUsage(provider, model: cleanup.model, tokens: tokens)))
+        }
         guard outcome.didCleanup else { return false }
         var updated = record
         updated.cleanedTranscript = outcome.text

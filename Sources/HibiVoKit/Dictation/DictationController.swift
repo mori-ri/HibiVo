@@ -10,12 +10,17 @@ public final class DictationController {
     /// Safety cap in case a key release is ever missed.
     static let maximumRecording: Duration = .seconds(600)
 
+    private struct Pumped {
+        var peak: Float = 0
+        var bytes = 0
+    }
+
     private struct Recording {
         var context: DictationContext
         var session: any TranscriptionSession
         var startedAt: ContinuousClock.Instant
-        /// Forwards audio to STT; returns the peak level seen.
-        var pump: Task<Float, Never>
+        /// Forwards audio to STT; returns the peak level seen and how much audio was sent.
+        var pump: Task<Pumped, Never>
         var partials: Task<Void, Never>
         var watchdog: Task<Void, Never>
     }
@@ -28,6 +33,7 @@ public final class DictationController {
     private let cleanup: CleanupCoordinator
     private let history: HistoryStore?
     private let historyEnabled: @MainActor () -> Bool
+    private let usage: UsageStore?
     private let microphoneUID: @MainActor () -> String?
     private let ducker: (any OutputDucking)?
     private let duckingEnabled: @MainActor () -> Bool
@@ -49,6 +55,7 @@ public final class DictationController {
         cleanup: CleanupCoordinator = CleanupCoordinator(),
         history: HistoryStore? = nil,
         historyEnabled: @escaping @MainActor () -> Bool = { true },
+        usage: UsageStore? = nil,
         microphoneUID: @escaping @MainActor () -> String? = { nil },
         ducker: (any OutputDucking)? = nil,
         duckingEnabled: @escaping @MainActor () -> Bool = { true },
@@ -62,6 +69,7 @@ public final class DictationController {
         self.cleanup = cleanup
         self.history = history
         self.historyEnabled = historyEnabled
+        self.usage = usage
         self.microphoneUID = microphoneUID
         self.ducker = ducker
         self.duckingEnabled = duckingEnabled
@@ -114,14 +122,15 @@ public final class DictationController {
         state.partialTranscript = ""
 
         let pump = Task { [state] in
-            var peak: Float = 0
+            var pumped = Pumped()
             for await chunk in stream {
-                peak = max(peak, chunk.level)
+                pumped.peak = max(pumped.peak, chunk.level)
                 // Light smoothing so the meter doesn't flicker.
                 state.audioLevel = state.audioLevel * 0.5 + chunk.level * 0.5
                 await session.send(chunk.pcm16)
+                pumped.bytes += chunk.pcm16.count
             }
-            return peak
+            return pumped
         }
         let partials = Task { [state] in
             for await text in session.partials where state.phase == .recording {
@@ -161,7 +170,11 @@ public final class DictationController {
         ducker?.restore()
         recording.pump.cancel()
         recording.partials.cancel()
-        processing = Task { await recording.session.cancel() }
+        processing = Task {
+            await recording.session.cancel()
+            // Audio already streamed is billed even though the utterance was dropped.
+            recordUsage(recording.context, audio: await recording.pump.value)
+        }
         state.phase = .idle
     }
 
@@ -169,12 +182,13 @@ public final class DictationController {
 
     private func process(_ recording: Recording, releasedAt: ContinuousClock.Instant) async {
         let context = recording.context
-        let peak = await recording.pump.value
+        let pumped = await recording.pump.value
         recording.partials.cancel()
 
-        guard peak >= Self.silenceThreshold else {
+        guard pumped.peak >= Self.silenceThreshold else {
             await recording.session.cancel()
-            log.info("Silence detected (peak \(peak)); nothing to transcribe")
+            recordUsage(context, audio: pumped)
+            log.info("Silence detected (peak \(pumped.peak)); nothing to transcribe")
             state.phase = .idle
             return
         }
@@ -184,6 +198,7 @@ public final class DictationController {
             transcript = try await recording.session.finish()
         } catch {
             log.error("Transcription failed: \(String(describing: error), privacy: .public)")
+            recordUsage(context, audio: pumped)
             let message = Self.userFacing(error, provider: context.transcriptionProvider)
             record(context, raw: "", cleaned: nil, releasedAt: releasedAt, status: .failed, error: message.message)
             show(message)
@@ -191,6 +206,7 @@ public final class DictationController {
         }
         let sttDone = clock.now
         guard !transcript.isEmpty else {
+            recordUsage(context, audio: pumped)
             show(.nothingRecognized)
             return
         }
@@ -204,6 +220,7 @@ public final class DictationController {
         let cleanupDone = clock.now
 
         let outcome = await inserter.insert(cleaned.text, into: context.target)
+        recordUsage(context, audio: pumped, inserted: cleaned.text, cleanup: cleaned)
         log.info(
             "Release→STT \(sttDone - releasedAt), cleanup \(cleanupDone - sttDone), paste \(self.clock.now - cleanupDone)")
 
@@ -241,6 +258,24 @@ public final class DictationController {
                 latencyMs: Int(elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000),
                 status: status,
                 errorMessage: error))
+    }
+
+    private func recordUsage(
+        _ context: DictationContext, audio: Pumped, inserted: String? = nil, cleanup outcome: CleanupOutcome? = nil
+    ) {
+        guard let usage else { return }
+        let provider = context.transcriptionProvider
+        // Mono PCM16: two bytes per sample.
+        let seconds = Double(audio.bytes) / (provider.sampleRate * 2)
+        usage.record(
+            UsageEvent(
+                dictations: inserted == nil ? 0 : 1,
+                characters: inserted?.count ?? 0,
+                transcription: TranscriptionUsage(
+                    provider: provider.id, model: context.transcriptionConfig.model, seconds: seconds),
+                cleanup: outcome?.usage.flatMap { tokens in
+                    context.cleanup.provider.map { CleanupUsage($0, model: context.cleanup.model, tokens: tokens) }
+                }))
     }
 
     private static func userFacing(_ error: Error, provider: any TranscriptionProvider) -> UserFacingError {

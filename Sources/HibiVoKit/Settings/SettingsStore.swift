@@ -34,6 +34,8 @@ public final class SettingsStore {
     /// Whether the HUD shows the streaming transcript while recording.
     public var showLiveTranscript: Bool { didSet { defaults.set(showLiveTranscript, forKey: "showLiveTranscript") } }
     public var appModeOverrides: [AppModeOverride] { didSet { save(appModeOverrides, "appModeOverrides") } }
+    /// Yen per US dollar, for showing estimated API cost in yen.
+    public var usdJPYRate: Double { didSet { defaults.set(usdJPYRate, forKey: "usdJPYRate") } }
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -53,6 +55,7 @@ public final class SettingsStore {
         duckOutputWhileRecording = defaults.object(forKey: "duckOutputWhileRecording") as? Bool ?? true
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
+        usdJPYRate = defaults.object(forKey: "usdJPYRate") as? Double ?? UsagePricing.defaultUSDJPYRate
     }
 
     /// Cleanup mode for the app that will receive the text.

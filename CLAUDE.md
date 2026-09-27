@@ -66,6 +66,7 @@ swift scripts/make-icons.swift          # Resources/AppIconSource.png から App
 - `SettingsStore` は秘密情報以外の設定を UserDefaults に保存する。
 - 秘密情報は `SecretStore` / `KeychainService` 経由で Keychain にのみ保存する。
 - `VocabularyStore` / `HistoryStore` は `@MainActor @Observable` なインメモリストアで、`JSONFileStore`(`~/Library/Application Support/HibiVo/`)経由で保存する。書き込み用 actor は古い世代を破棄するため、並行保存でファイルが巻き戻らない。
+- `UsageStore` は日別の利用集計(回数・文字数・送信音声秒数・モデル別トークン)を `usage.json` に保存する。テキストは持たず、履歴の設定とは独立。料金の概算は `UsagePricing` の公開価格表から計算する。
 - 音声はディスクに一切書き込まない。
 
 ## 過去に問題になった並行性ルール

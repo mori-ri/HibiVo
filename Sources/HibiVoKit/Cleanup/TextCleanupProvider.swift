@@ -19,7 +19,35 @@ public protocol TextCleanupProvider: Sendable {
     var displayName: String { get }
     var defaultModel: String { get }
 
-    func complete(system: String, user: String, model: String) async throws -> String
+    func complete(system: String, user: String, model: String) async throws -> CleanupCompletion
+}
+
+/// Billable tokens reported by the provider for one request.
+public struct TokenUsage: Codable, Hashable, Sendable {
+    public var input: Int
+    public var output: Int
+
+    public init(input: Int, output: Int) {
+        self.input = input
+        self.output = output
+    }
+
+    public static let zero = TokenUsage(input: 0, output: 0)
+
+    public static func + (lhs: TokenUsage, rhs: TokenUsage) -> TokenUsage {
+        TokenUsage(input: lhs.input + rhs.input, output: lhs.output + rhs.output)
+    }
+}
+
+/// One cleanup response: the rewritten text and, when the provider reports it, its token usage.
+public struct CleanupCompletion: Equatable, Sendable {
+    public var text: String
+    public var usage: TokenUsage?
+
+    public init(text: String, usage: TokenUsage? = nil) {
+        self.text = text
+        self.usage = usage
+    }
 }
 
 /// The cleanup providers users can pick in Settings.

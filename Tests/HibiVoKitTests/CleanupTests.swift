@@ -9,10 +9,11 @@ struct MockCleanupProvider: TextCleanupProvider {
     let defaultModel = "mock-model"
     var result: Result<String, CleanupError>
     var delay: Duration = .zero
+    var usage: TokenUsage? = nil
 
-    func complete(system: String, user: String, model: String) async throws -> String {
+    func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
         if delay > .zero { try await Task.sleep(for: delay) }
-        return try result.get()
+        return CleanupCompletion(text: try result.get(), usage: usage)
     }
 }
 
@@ -152,8 +153,12 @@ struct MockCleanupProvider: TextCleanupProvider {
     }
 
     @Test func anthropicParsesTextAndSkipsThinkingBlocks() throws {
-        let data = Data(#"{"content":[{"type":"thinking","thinking":""},{"type":"text","text":"整形済み"}],"stop_reason":"end_turn"}"#.utf8)
-        #expect(try AnthropicCleanupProvider.parse(data) == "整形済み")
+        let data = Data(
+            #"{"content":[{"type":"thinking","thinking":""},{"type":"text","text":"整形済み"}],"stop_reason":"end_turn","usage":{"input_tokens":120,"output_tokens":30,"cache_read_input_tokens":0}}"#
+                .utf8)
+        let completion = try AnthropicCleanupProvider.parse(data)
+        #expect(completion.text == "整形済み")
+        #expect(completion.usage == TokenUsage(input: 120, output: 30))
     }
 
     @Test func anthropicRefusalThrows() {
@@ -162,8 +167,17 @@ struct MockCleanupProvider: TextCleanupProvider {
     }
 
     @Test func openAIParsesFirstChoice() throws {
+        let data = Data(
+            #"{"choices":[{"message":{"role":"assistant","content":"整形済み"}}],"usage":{"prompt_tokens":80,"completion_tokens":20,"total_tokens":100}}"#
+                .utf8)
+        let completion = try OpenAICompatibleCleanupProvider.parse(data)
+        #expect(completion.text == "整形済み")
+        #expect(completion.usage == TokenUsage(input: 80, output: 20))
+    }
+
+    @Test func openAIWithoutUsageStillParses() throws {
         let data = Data(#"{"choices":[{"message":{"role":"assistant","content":"整形済み"}}]}"#.utf8)
-        #expect(try OpenAICompatibleCleanupProvider.parse(data) == "整形済み")
+        #expect(try OpenAICompatibleCleanupProvider.parse(data).usage == nil)
     }
 }
 

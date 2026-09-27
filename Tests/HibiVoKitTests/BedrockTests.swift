@@ -123,7 +123,9 @@ import Testing
         let data = Data(
             #"{"output":{"message":{"role":"assistant","content":[{"reasoningContent":{"reasoningText":{"text":"考え中"}}},{"text":"整形済みの文章です。"}]}},"stopReason":"end_turn","usage":{"inputTokens":10,"outputTokens":5}}"#
                 .utf8)
-        #expect(try BedrockCleanupProvider.parseConverse(data) == "整形済みの文章です。")
+        let completion = try BedrockCleanupProvider.parseConverse(data)
+        #expect(completion.text == "整形済みの文章です。")
+        #expect(completion.usage == TokenUsage(input: 10, output: 5))
     }
 
     @Test func converseGuardrailStopIsRefusal() {
