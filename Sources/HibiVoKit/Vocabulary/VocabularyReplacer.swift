@@ -7,12 +7,13 @@ import Foundation
 ///
 /// Matching ignores the difference between hiragana and katakana and between full- and half-width
 /// forms, because STT picks its own script: a spoken form registered as "ひびぼ" also catches
-/// "ヒビボ" and "ﾋﾋﾞﾎﾞ". Text that isn't replaced is left exactly as it was.
+/// "ヒビボ" and "ﾋﾋﾞﾎﾞ". Text that isn't replaced is left exactly as it was. Short kana forms
+/// (`VocabularyEntry.contextualForms`) are never replaced here; cleanup decides them in context.
 public enum VocabularyReplacer {
     public static func apply(_ entries: [VocabularyEntry], to text: String) -> String {
         let rules =
             entries
-            .flatMap { entry in entry.spokenForms.map { (from: KanaFolding.keys($0), to: entry.preferred) } }
+            .flatMap { entry in entry.replaceableForms.map { (from: KanaFolding.keys($0), to: entry.preferred) } }
             .filter { !$0.from.isEmpty }
             .sorted { $0.from.count > $1.from.count }
         guard !rules.isEmpty else { return text }
@@ -44,6 +45,11 @@ enum KanaFolding {
 
     static func keys(_ string: String) -> [String] {
         string.map(key)
+    }
+
+    /// Whether a folded key is katakana, including the prolonged sound mark and iteration marks.
+    static func isKatakana(_ key: String) -> Bool {
+        !key.isEmpty && key.unicodeScalars.allSatisfy { (0x30A1...0x30FE).contains($0.value) && $0.value != 0x30FB }
     }
 
     /// Hiragana (ぁ–ゖ, ゝゞ) to katakana; everything else unchanged.

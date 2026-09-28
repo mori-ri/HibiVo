@@ -3,10 +3,13 @@ public enum CleanupPromptBuilder {
     public struct Term: Equatable, Sendable {
         public var preferred: String
         public var spokenForms: [String]
+        /// Readings shared with everyday words, to be applied only where the context calls for this term.
+        public var contextualForms: [String]
 
-        public init(preferred: String, spokenForms: [String] = []) {
+        public init(preferred: String, spokenForms: [String] = [], contextualForms: [String] = []) {
             self.preferred = preferred
             self.spokenForms = spokenForms
+            self.contextualForms = contextualForms
         }
     }
 
@@ -83,9 +86,14 @@ public enum CleanupPromptBuilder {
 
     static func vocabularySection(_ terms: [Term]) -> String {
         let lines = terms.prefix(200).map { term in
-            term.spokenForms.isEmpty
-                ? "- \(term.preferred)"
-                : "- \(term.preferred)（聞き取り例: \(term.spokenForms.joined(separator: "、"))）"
+            var notes: [String] = []
+            if !term.spokenForms.isEmpty { notes.append("聞き取り例: \(term.spokenForms.joined(separator: "、"))") }
+            if !term.contextualForms.isEmpty {
+                notes.append(
+                    "読み: \(term.contextualForms.joined(separator: "、"))。"
+                        + "同じ読みの一般的な言葉もあるため、文脈上この語を指すときだけこの表記にし、それ以外は変えない")
+            }
+            return notes.isEmpty ? "- \(term.preferred)" : "- \(term.preferred)（\(notes.joined(separator: "。"))）"
         }
         return "# ユーザー辞書（この表記を優先する）\n" + lines.joined(separator: "\n")
     }
