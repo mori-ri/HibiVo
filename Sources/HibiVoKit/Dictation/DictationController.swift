@@ -114,6 +114,9 @@ public final class DictationController {
         // A press while processing is ignored so pastes never interleave.
         guard !state.phase.isActive else { return }
         errorDismiss?.cancel()
+        // Measured before the audio engine starts, which can take a while with Bluetooth mics, so a
+        // push-to-talk hold is not mistaken for a short tap.
+        let pressedAt = clock.now
 
         let context: DictationContext
         do {
@@ -162,7 +165,7 @@ public final class DictationController {
             self?.end()
         }
         recording = Recording(
-            context: context, session: session, startedAt: clock.now, pump: pump, partials: partials,
+            context: context, session: session, startedAt: pressedAt, pump: pump, partials: partials,
             watchdog: watchdog)
     }
 

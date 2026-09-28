@@ -42,14 +42,22 @@ public final class AppEnvironment {
         let dictation = dictation
         hud = HUDController(state: state, settings: settings, onClick: { dictation.toggleCleanup() })
 
-        hotkey.onAction = { [weak self] action in
+        hotkey.onAction = { action in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth
             // mics), and a slow callback makes the system disable the event tap.
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                dictation.handle(action)
-                hotkey.isRecording = state.phase == .recording
-            }
+            Task { @MainActor in dictation.handle(action) }
+        }
+        observeRecording()
+    }
+
+    /// Keeps Esc capture in sync with the phase, including stops the hotkey didn't cause
+    /// (the recording time cap), so a stale flag never swallows the user's next Esc.
+    private func observeRecording() {
+        hotkey.isRecording = state.phase == .recording
+        withObservationTracking {
+            _ = state.phase
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeRecording() }
         }
     }
 
