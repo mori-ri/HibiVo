@@ -43,6 +43,7 @@ public final class AppEnvironment {
         meeting = MeetingController(
             state: state,
             audio: AudioCaptureService(),
+            systemAudio: SystemAudioCaptureService.isSupported ? SystemAudioCaptureService() : nil,
             settings: settings,
             secrets: secrets,
             provider: SonioxProvider(),

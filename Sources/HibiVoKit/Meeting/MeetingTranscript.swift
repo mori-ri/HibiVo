@@ -13,6 +13,8 @@ public struct MeetingTranscript: Equatable, Sendable {
         }
 
         public var kind: Kind
+        /// Which STT session produced it; speaker labels are only comparable within one session.
+        public var session: Int
         public var startMs: Int
         public var endMs: Int
         public var text: String
@@ -27,6 +29,8 @@ public struct MeetingTranscript: Equatable, Sendable {
     public private(set) var tentativeText = ""
     /// Meeting time at which the current STT session started.
     public var offsetMs = 0
+    /// Counts STT sessions; bumped by `markReconnect`.
+    public private(set) var session = 0
 
     public init() {}
 
@@ -57,7 +61,8 @@ public struct MeetingTranscript: Equatable, Sendable {
     public mutating func markReconnect(atMs: Int) {
         tentativeText = ""
         offsetMs = atMs
-        segments.append(Segment(kind: .reconnected, startMs: atMs, endMs: atMs, text: ""))
+        session += 1
+        segments.append(Segment(kind: .reconnected, session: session, startMs: atMs, endMs: atMs, text: ""))
     }
 
     private mutating func append(_ token: MeetingToken) {
@@ -66,7 +71,9 @@ public struct MeetingTranscript: Equatable, Sendable {
         let end = token.endMs.map { $0 + offsetMs } ?? start
         let kind = Segment.Kind.speech(speaker: token.speaker)
 
-        if var last = segments.last, last.kind == kind, start - last.endMs < Self.paragraphGapMs {
+        if var last = segments.last, last.kind == kind, last.session == session,
+            start - last.endMs < Self.paragraphGapMs
+        {
             last.text += token.text
             last.endMs = max(last.endMs, end)
             segments[segments.count - 1] = last
@@ -74,16 +81,23 @@ public struct MeetingTranscript: Equatable, Sendable {
             // English tokens carry their own leading space; drop it at the start of a paragraph.
             let text = token.text.drop { $0 == " " }
             guard !text.isEmpty else { return }
-            segments.append(Segment(kind: kind, startMs: start, endMs: end, text: String(text)))
+            segments.append(Segment(kind: kind, session: session, startMs: start, endMs: end, text: String(text)))
         }
     }
 }
 
 /// Renders a meeting transcript as the Markdown file saved on disk.
 public enum MeetingDocument {
+    /// Something worth telling the reader about how the audio was captured.
+    public enum Notice: Equatable, Sendable {
+        case systemAudioUnavailable
+        case systemAudioSilent
+    }
+
+    /// - Parameter includesSystemAudio: Whether the Mac's audio output was mixed in with the microphone.
     public static func markdown(
-        _ transcript: MeetingTranscript, startedAt: Date, endedAt: Date?, vocabulary: [VocabularyEntry] = [],
-        timeZone: TimeZone = .current
+        _ transcript: MeetingTranscript, startedAt: Date, endedAt: Date?, includesSystemAudio: Bool = false,
+        notices: [Notice] = [], vocabulary: [VocabularyEntry] = [], timeZone: TimeZone = .current
     ) -> String {
         var lines = ["# ミーティング \(format(startedAt, "yyyy-MM-dd HH:mm", timeZone))", ""]
         lines.append("- 開始: \(format(startedAt, "yyyy-MM-dd HH:mm:ss", timeZone))")
@@ -93,24 +107,53 @@ public enum MeetingDocument {
         } else {
             lines.append("- 記録中")
         }
+        lines.append(includesSystemAudio ? "- 音声: マイクとシステム音声(相手の声)" : "- 音声: マイクのみ")
         lines.append("- 話者は音声から自動で推定しています。番号は実際の人物と一致しないことがあります。")
+        for notice in notices {
+            switch notice {
+            case .systemAudioUnavailable:
+                lines.append("- システム音声を取得できなかったため、オンライン参加者の声は記録されていません。")
+            case .systemAudioSilent:
+                lines.append(
+                    "- システム音声が最後まで無音でした。相手の声が入っていない場合は、システム設定 › プライバシーとセキュリティ で HibiVo にシステムオーディオの録音を許可してください。"
+                )
+            }
+        }
         lines += ["", "---", ""]
 
+        let labels = speakerLabels(transcript)
         for segment in transcript.segments {
             let time = "[\(timestamp(segment.startMs))]"
             switch segment.kind {
             case .reconnected:
-                lines.append("*\(time) 接続が切れたため再接続しました。以降の話者番号は振り直されています。*")
+                lines.append("*\(time) 文字起こしが途切れたため再接続しました。以降は同じ人でも別の番号になることがあります。*")
             case .speech(let speaker):
                 let text = VocabularyReplacer.apply(vocabulary, to: segment.text)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { continue }
-                let label = speaker.map { " **話者\($0)**" } ?? ""
+                let label = labels[SpeakerKey(session: segment.session, speaker: speaker)].map { " **\($0)**" } ?? ""
                 lines.append("\(time)\(label) \(text)")
             }
             lines.append("")
         }
         return lines.joined(separator: "\n")
+    }
+
+    struct SpeakerKey: Hashable {
+        var session: Int
+        var speaker: String?
+    }
+
+    /// Numbers speakers in order of first appearance. A new STT session relabels everyone, so its
+    /// speakers get fresh numbers rather than colliding with earlier ones.
+    static func speakerLabels(_ transcript: MeetingTranscript) -> [SpeakerKey: String] {
+        var order: [SpeakerKey] = []
+        for segment in transcript.segments {
+            guard case .speech(let speaker) = segment.kind, speaker != nil else { continue }
+            let key = SpeakerKey(session: segment.session, speaker: speaker)
+            if !order.contains(key) { order.append(key) }
+        }
+        return Dictionary(uniqueKeysWithValues: order.enumerated().map { ($0.element, "話者\($0.offset + 1)") })
     }
 
     /// `HH:mm:ss` from the start of the meeting.

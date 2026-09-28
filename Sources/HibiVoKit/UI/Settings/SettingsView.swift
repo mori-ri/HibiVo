@@ -34,6 +34,26 @@ struct GeneralSettingsView: View {
                 ToggleRow("話している内容をリアルタイムで表示", isOn: $settings.showLiveTranscript)
             }
             SettingsSection(
+                title: "ミーティング",
+                footer:
+                    "\(env.settings.hotkey.displayName) を押しながら M で開始し、もう一度 \(env.settings.hotkey.displayName) を押すと終了します。文字起こしは Soniox で行い、Markdown で保存します。"
+            ) {
+                ToggleRow("オンライン参加者の声(システム音声)も記録する", isOn: $settings.meetingCapturesSystemAudio)
+                if !SystemAudioCaptureService.isSupported {
+                    NoteRow("システム音声の記録には macOS 14.2 以降が必要です。", color: .red)
+                } else if env.settings.meetingCapturesSystemAudio {
+                    NoteRow(
+                        "マイクの音と混ぜて 1 本にし、全員を話者 1・2… として識別します。初回はシステムオーディオ録音の許可を求められます。スピーカーで聞くと相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあるため、イヤホンの使用をおすすめします。"
+                    )
+                    LabeledRow("システムオーディオ録音の権限") {
+                        Button("設定を開く…") { Permissions.openSystemAudioSettings() }
+                    }
+                }
+                LabeledRow("保存先") {
+                    Button("開く…") { env.openMeetingsFolder() }
+                }
+            }
+            SettingsSection(
                 title: "履歴",
                 footer: "文字起こしと整形結果のテキストを、この Mac の中に最大 \(HistoryStore.limit) 件保存します。音声は保存しません。"
             ) {

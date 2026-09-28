@@ -4,8 +4,11 @@ import OSLog
 /// Meeting transcription: trigger+M starts a recording that runs until the trigger is tapped again,
 /// transcribed with speaker labels and saved to a Markdown file as it goes.
 ///
-/// Unlike dictation nothing is pasted. The file is rewritten every few seconds so a crash loses at
-/// most the last moments, and a dropped STT connection is re-opened without stopping the recording.
+/// When enabled, the system audio (the remote side of an online meeting) is mixed into the
+/// microphone so one diarized STT session hears everyone: people in the room and online alike get
+/// their own speaker number, at the cost of one stream. Unlike dictation nothing is pasted. The file
+/// is rewritten every few seconds so a crash loses at most the last moments, and a dropped STT
+/// connection is re-opened without stopping the recording.
 @MainActor
 public final class MeetingController {
     /// Stops a meeting that was forgotten, so it doesn't bill for hours.
@@ -13,6 +16,8 @@ public final class MeetingController {
     public static let defaultReconnectDelays: [Duration] = [
         .seconds(1), .seconds(2), .seconds(5), .seconds(10), .seconds(30),
     ]
+    /// Seconds one source may run ahead of the other before it is sent alone (the other counts as silent).
+    static let maximumMixLag = 0.3
 
     @MainActor
     private final class Meeting {
@@ -25,12 +30,23 @@ public final class MeetingController {
         /// Bumped per STT session so events from a replaced session are ignored.
         var generation = 0
         var events: Task<Void, Never>?
-        var pump: Task<Void, Never>?
+        var pumps: [Task<Void, Never>] = []
+        /// Audio ready for STT, in order. One sender drains it so the two sources can't reorder chunks.
+        let outgoing: AsyncStream<Data>
+        let outgoingContinuation: AsyncStream<Data>.Continuation
+        var sender: Task<Void, Never>?
         var reconnect: Task<Void, Never>?
         var reconnectAttempts = 0
         /// Whether the current session produced any final text, i.e. its speaker labels were used.
         var sessionHadSpeech = false
-        /// Audio sent so far (PCM16 mono), which is also the meeting clock for new sessions.
+        /// nil while only the microphone is recorded.
+        var mixer: PCMMixer?
+        /// System audio was asked for but could not be started.
+        var systemAudioUnavailable = false
+        /// Loudest system-audio chunk; exactly 0 suggests the permission is missing.
+        var systemPeak: Float = 0
+        var systemBytes = 0
+        /// Audio sent to STT so far (PCM16 mono), which is also the meeting clock for new sessions.
         var bytes = 0
         var isDirty = false
         var isStopping = false
@@ -47,11 +63,13 @@ public final class MeetingController {
             self.fileURL = fileURL
             self.vocabulary = vocabulary
             self.session = session
+            (outgoing, outgoingContinuation) = AsyncStream.makeStream()
         }
     }
 
     private let state: AppState
     private let audio: any AudioCapturing
+    private let systemAudio: (any AudioCapturing)?
     private let settings: SettingsStore
     private let secrets: any SecretStore
     private let provider: any MeetingTranscriptionProvider
@@ -70,9 +88,12 @@ public final class MeetingController {
     private var stopping: Task<Void, Never>?
     private var errorDismiss: Task<Void, Never>?
 
+    /// - Parameter systemAudio: Captures the remote side of an online meeting; nil where unsupported.
+    ///   Used only while `settings.meetingCapturesSystemAudio` is on.
     public init(
         state: AppState,
         audio: any AudioCapturing,
+        systemAudio: (any AudioCapturing)? = nil,
         settings: SettingsStore,
         secrets: any SecretStore,
         provider: any MeetingTranscriptionProvider,
@@ -85,6 +106,7 @@ public final class MeetingController {
     ) {
         self.state = state
         self.audio = audio
+        self.systemAudio = systemAudio
         self.settings = settings
         self.secrets = secrets
         self.provider = provider
@@ -138,13 +160,26 @@ public final class MeetingController {
             vocabulary: entries.map(\.preferred),
             speakerDiarization: true)
 
-        let stream: AsyncStream<AudioChunk>
+        let microphone: AsyncStream<AudioChunk>
         do {
-            stream = try audio.start(sampleRate: provider.sampleRate, deviceUID: settings.microphoneUID)
+            microphone = try audio.start(sampleRate: provider.sampleRate, deviceUID: settings.microphoneUID)
         } catch {
             log.error("Audio start failed: \(String(describing: error), privacy: .public)")
             show(.microphoneUnavailable)
             return
+        }
+
+        var system: AsyncStream<AudioChunk>?
+        var systemAudioUnavailable = false
+        if settings.meetingCapturesSystemAudio {
+            do {
+                guard let systemAudio else { throw AudioCaptureError.engineFailed("unsupported") }
+                system = try systemAudio.start(sampleRate: provider.sampleRate, deviceUID: nil)
+            } catch {
+                // The microphone alone still makes a useful record; the file says what is missing.
+                log.error("System audio start failed: \(String(describing: error), privacy: .public)")
+                systemAudioUnavailable = true
+            }
         }
 
         let startedAt = Date()
@@ -152,19 +187,28 @@ public final class MeetingController {
             config: config, startedAt: startedAt,
             fileURL: directory.appending(path: MeetingDocument.fileName(startedAt: startedAt)),
             vocabulary: entries, session: provider.makeMeetingSession(config))
+        meeting.systemAudioUnavailable = systemAudioUnavailable
         meeting.activity = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled, .userInitiated], reason: "Meeting transcription")
         self.meeting = meeting
         open(meeting.session, in: meeting)
-
-        meeting.pump = Task { [state] in
-            for await chunk in stream {
-                state.audioLevel = state.audioLevel * 0.5 + chunk.level * 0.5
-                meeting.bytes += chunk.pcm16.count
+        meeting.sender = Task {
+            for await pcm16 in meeting.outgoing {
+                meeting.bytes += pcm16.count
                 // Read the session each time: a reconnect swaps it while audio keeps flowing.
-                await meeting.session.send(chunk.pcm16)
+                await meeting.session.send(pcm16)
             }
         }
+
+        if let system {
+            meeting.mixer = PCMMixer(maximumLag: Int(provider.sampleRate * Self.maximumMixLag))
+            meeting.pumps = [
+                pump(microphone, as: .microphone, into: meeting), pump(system, as: .system, into: meeting),
+            ]
+        } else {
+            meeting.pumps = [pump(microphone, as: .microphone, into: meeting)]
+        }
+
         saver = Task { [weak self, saveInterval] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: saveInterval)
@@ -183,7 +227,7 @@ public final class MeetingController {
         state.meetingReconnecting = false
         state.audioLevel = 0
         state.partialTranscript = ""
-        log.info("Meeting started")
+        log.info("Meeting started (system audio: \(system != nil))")
     }
 
     public func stop() {
@@ -192,10 +236,35 @@ public final class MeetingController {
         watchdog?.cancel()
         saver?.cancel()
         meeting.reconnect?.cancel()
-        audio.stop()  // Finishes the audio stream, which lets `pump` drain.
+        // Finishes the audio streams, which lets the pumps drain.
+        audio.stop()
+        if meeting.mixer != nil { systemAudio?.stop() }
         state.phase = .processing
         state.meetingReconnecting = false
         stopping = Task { await finish(meeting) }
+    }
+
+    // MARK: - Audio
+
+    /// Forwards one source to STT, through the mixer when there are two. Runs on the main actor, so
+    /// the two pumps never touch the mixer at the same time.
+    private func pump(_ stream: AsyncStream<AudioChunk>, as input: PCMMixer.Input, into meeting: Meeting) -> Task<
+        Void, Never
+    > {
+        Task { [state] in
+            for await chunk in stream {
+                switch input {
+                case .microphone:
+                    // The meter follows the microphone: that is the one the user controls.
+                    state.audioLevel = state.audioLevel * 0.5 + chunk.level * 0.5
+                case .system:
+                    meeting.systemPeak = max(meeting.systemPeak, chunk.level)
+                    meeting.systemBytes += chunk.pcm16.count
+                }
+                let ready = meeting.mixer == nil ? chunk.pcm16 : meeting.mixer?.push(chunk.pcm16, from: input)
+                if let ready { meeting.outgoingContinuation.yield(ready) }
+            }
+        }
     }
 
     // MARK: - Sessions
@@ -221,6 +290,7 @@ public final class MeetingController {
                 meeting.reconnectAttempts = 0
                 meeting.sessionHadSpeech = true
             }
+            // Any reply means the session is up, even while nobody is talking.
             if state.meetingReconnecting { state.meetingReconnecting = false }
             if state.phase == .meeting { state.partialTranscript = meeting.transcript.liveTail }
         case .ended(let error):
@@ -231,15 +301,15 @@ public final class MeetingController {
                 stop()
                 return
             }
-            log.notice("Meeting STT session ended (\(String(describing: error), privacy: .public)); reconnecting")
+            log.notice(
+                "Meeting STT session ended (\(String(describing: error), privacy: .public)); reconnecting")
             scheduleReconnect(meeting)
         }
     }
 
     private func scheduleReconnect(_ meeting: Meeting) {
         state.meetingReconnecting = true
-        let delays = reconnectDelays
-        let delay = delays[min(meeting.reconnectAttempts, delays.count - 1)]
+        let delay = reconnectDelays[min(meeting.reconnectAttempts, reconnectDelays.count - 1)]
         meeting.reconnectAttempts += 1
         meeting.reconnect?.cancel()
         meeting.reconnect = Task { [weak self] in
@@ -264,7 +334,10 @@ public final class MeetingController {
     // MARK: - Finishing
 
     private func finish(_ meeting: Meeting) async {
-        await meeting.pump?.value
+        for pump in meeting.pumps { await pump.value }
+        if let tail = meeting.mixer?.flush() { meeting.outgoingContinuation.yield(tail) }
+        meeting.outgoingContinuation.finish()
+        await meeting.sender?.value
         // Finalizes the tail of the audio; the resulting tokens arrive through `events` before it closes.
         _ = try? await meeting.session.finish()
         await meeting.events?.value
@@ -305,9 +378,16 @@ public final class MeetingController {
     }
 
     private func markdown(_ meeting: Meeting, ended: Bool) -> String {
-        MeetingDocument.markdown(
+        var notices: [MeetingDocument.Notice] = []
+        if meeting.systemAudioUnavailable { notices.append(.systemAudioUnavailable) }
+        // A denied permission yields exact digital silence rather than an error. Only judge at the end:
+        // the other side may simply not have spoken yet.
+        if ended, meeting.mixer != nil, meeting.systemBytes > 0, meeting.systemPeak == 0 {
+            notices.append(.systemAudioSilent)
+        }
+        return MeetingDocument.markdown(
             meeting.transcript, startedAt: meeting.startedAt, endedAt: ended ? Date() : nil,
-            vocabulary: meeting.vocabulary)
+            includesSystemAudio: meeting.mixer != nil, notices: notices, vocabulary: meeting.vocabulary)
     }
 
     private func milliseconds(_ bytes: Int) -> Int {

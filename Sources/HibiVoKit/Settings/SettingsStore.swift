@@ -33,6 +33,10 @@ public final class SettingsStore {
     }
     /// Whether the HUD shows the streaming transcript while recording.
     public var showLiveTranscript: Bool { didSet { defaults.set(showLiveTranscript, forKey: "showLiveTranscript") } }
+    /// Whether meetings also record what the Mac plays, i.e. the other side of an online meeting.
+    public var meetingCapturesSystemAudio: Bool {
+        didSet { defaults.set(meetingCapturesSystemAudio, forKey: "meetingCapturesSystemAudio") }
+    }
     public var appModeOverrides: [AppModeOverride] { didSet { save(appModeOverrides, "appModeOverrides") } }
     /// Yen per US dollar, for showing estimated API cost in yen.
     public var usdJPYRate: Double { didSet { defaults.set(usdJPYRate, forKey: "usdJPYRate") } }
@@ -54,6 +58,7 @@ public final class SettingsStore {
         historyEnabled = defaults.object(forKey: "historyEnabled") as? Bool ?? true
         duckOutputWhileRecording = defaults.object(forKey: "duckOutputWhileRecording") as? Bool ?? true
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
+        meetingCapturesSystemAudio = defaults.object(forKey: "meetingCapturesSystemAudio") as? Bool ?? true
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
         usdJPYRate = defaults.object(forKey: "usdJPYRate") as? Double ?? UsagePricing.defaultUSDJPYRate
         seedAppModeOverrides()

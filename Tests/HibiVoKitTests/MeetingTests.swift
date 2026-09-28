@@ -76,6 +76,39 @@ import Testing
     @Test func markdownWhileRecordingSaysSo() {
         let md = MeetingDocument.markdown(MeetingTranscript(), startedAt: Date(), endedAt: nil)
         #expect(md.contains("- 記録中"))
+        #expect(md.contains("- 音声: マイクのみ"))
+    }
+
+    @Test func speakersAreNumberedInOrderOfAppearance() {
+        var t = MeetingTranscript()
+        // Soniox labels need not start at 1 or be in order.
+        t.apply([token("会議室から", "3", 0, 500), token("オンラインです", "1", 1_000, 1_500), token("了解", "3", 2_000, 2_500)])
+        let md = MeetingDocument.markdown(t, startedAt: Date(), endedAt: nil, includesSystemAudio: true)
+        let lines = md.split(separator: "\n").filter { $0.hasPrefix("[") }
+        #expect(
+            lines == [
+                "[00:00:00] **話者1** 会議室から",
+                "[00:00:01] **話者2** オンラインです",
+                "[00:00:02] **話者1** 了解",
+            ])
+        #expect(md.contains("- 音声: マイクとシステム音声(相手の声)"))
+    }
+
+    @Test func speakersAfterReconnectGetNewNumbers() {
+        var t = MeetingTranscript()
+        t.apply([token("前", "1", 0, 500)])
+        t.markReconnect(atMs: 10_000)
+        t.apply([token("後", "1", 0, 500)])
+        let md = MeetingDocument.markdown(t, startedAt: Date(), endedAt: nil)
+        #expect(md.contains("**話者1** 前"))
+        #expect(md.contains("文字起こしが途切れたため再接続しました"))
+        #expect(md.contains("**話者2** 後"))
+    }
+
+    @Test func noticesExplainMissingSystemAudio() {
+        let md = MeetingDocument.markdown(
+            MeetingTranscript(), startedAt: Date(), endedAt: nil, notices: [.systemAudioUnavailable])
+        #expect(md.contains("オンライン参加者の声は記録されていません"))
     }
 
     @Test func fileNameIsSortableAndFilesystemSafe() {
@@ -118,11 +151,14 @@ import Testing
     let state = AppState()
     let settings: SettingsStore
     let audio = MockAudio()
+    let systemAudio = MockAudio()
     let provider = MockMeetingProvider()
     let directory: URL
 
     init() {
         settings = SettingsStore(defaults: UserDefaults(suiteName: "MeetingControllerTests-\(UUID())")!)
+        // Most tests cover the microphone alone; the system-audio ones turn it back on.
+        settings.meetingCapturesSystemAudio = false
         directory = FileManager.default.temporaryDirectory.appending(path: "HibiVoMeetingTests-\(UUID())")
     }
 
@@ -130,7 +166,8 @@ import Testing
         secrets: MockSecrets = MockSecrets(), onSaved: @escaping @MainActor (URL) -> Void = { _ in }
     ) -> MeetingController {
         MeetingController(
-            state: state, audio: audio, settings: settings, secrets: secrets, provider: provider,
+            state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: secrets,
+            provider: provider,
             directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved)
     }
 
@@ -260,5 +297,107 @@ import Testing
         #expect(state.phase == .error(UserFacingError.invalidAPIKey(provider: "Mock").message))
         #expect(savedFiles().count == 1)
         #expect(provider.sessions.count == 1)
+    }
+
+    @Test func systemAudioIsMixedIntoOneSession() async throws {
+        settings.meetingCapturesSystemAudio = true
+        let sut = makeController()
+        sut.start()
+        #expect(systemAudio.startCount == 1)
+        #expect(provider.sessions.count == 1)
+        let session = provider.sessions[0]
+
+        // 10 ms from each source become 10 ms of mixed audio, not 20.
+        audio.speak(bytes: 320)
+        systemAudio.speak(bytes: 320)
+        await session.emit(
+            .tokens([
+                MeetingToken(text: "聞こえますか", isFinal: true, speaker: "1", startMs: 0, endMs: 500),
+                MeetingToken(text: "聞こえます", isFinal: true, speaker: "2", startMs: 1_000, endMs: 1_500),
+            ]))
+        await settle { state.partialTranscript == "聞こえます" }
+        sut.stop()
+        await sut.waitUntilIdle()
+
+        #expect(await session.receivedBytes == 320)
+        let url = try #require(savedFiles().first)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        #expect(text.contains("**話者1** 聞こえますか"))
+        #expect(text.contains("**話者2** 聞こえます"))
+        #expect(text.contains("- 音声: マイクとシステム音声"))
+        // Some level came through, so no permission warning.
+        #expect(!text.contains("無音でした"))
+    }
+
+    @Test func systemAudioFailureFallsBackToMicrophone() async throws {
+        settings.meetingCapturesSystemAudio = true
+        systemAudio.failStart = true
+        let sut = makeController()
+        sut.start()
+        #expect(state.phase == .meeting)
+        await provider.sessions[0].emit(
+            .tokens([MeetingToken(text: "記録", isFinal: true, speaker: "1", startMs: 0, endMs: 500)]))
+        await settle { state.partialTranscript == "記録" }
+        sut.stop()
+        await sut.waitUntilIdle()
+        let text = try String(contentsOf: try #require(savedFiles().first), encoding: .utf8)
+        #expect(text.contains("オンライン参加者の声は記録されていません"))
+        #expect(text.contains("- 音声: マイクのみ"))
+    }
+
+    @Test func silentSystemAudioSuggestsCheckingThePermission() async throws {
+        settings.meetingCapturesSystemAudio = true
+        let sut = makeController()
+        sut.start()
+        systemAudio.speak(level: 0)
+        await provider.sessions[0].emit(
+            .tokens([MeetingToken(text: "記録", isFinal: true, speaker: "1", startMs: 0, endMs: 500)]))
+        await settle { state.partialTranscript == "記録" }
+        sut.stop()
+        await sut.waitUntilIdle()
+        let text = try String(contentsOf: try #require(savedFiles().first), encoding: .utf8)
+        #expect(text.contains("システム音声が最後まで無音でした"))
+    }
+
+    @Test func turningSystemAudioOffRecordsOnlyTheMicrophone() async {
+        let sut = makeController()
+        sut.start()
+        #expect(systemAudio.startCount == 0)
+        #expect(provider.sessions.count == 1)
+        sut.stop()
+        await sut.waitUntilIdle()
+    }
+}
+
+@Suite struct PCMMixerTests {
+    private func pcm(_ samples: [Int16]) -> Data {
+        samples.withUnsafeBufferPointer { Data(buffer: $0) }
+    }
+
+    private func samples(_ data: Data?) -> [Int16] {
+        guard let data else { return [] }
+        var out = [Int16](repeating: 0, count: data.count / 2)
+        out.withUnsafeMutableBytes { _ = data.copyBytes(to: $0) }
+        return out
+    }
+
+    @Test func mixesOnceBothSourcesHaveSamples() {
+        var mixer = PCMMixer(maximumLag: 100)
+        #expect(mixer.push(pcm([100, 200, 300]), from: .microphone) == nil)
+        #expect(samples(mixer.push(pcm([10, 20]), from: .system)) == [110, 220])
+        #expect(samples(mixer.push(pcm([30, 40]), from: .system)) == [330])
+        #expect(samples(mixer.flush()) == [40])
+    }
+
+    @Test func aStalledSourceDoesNotHoldTheOtherBack() {
+        var mixer = PCMMixer(maximumLag: 2)
+        #expect(samples(mixer.push(pcm([1, 2, 3, 4, 5]), from: .microphone)) == [1, 2, 3])
+        #expect(samples(mixer.push(pcm([6]), from: .microphone)) == [4])
+    }
+
+    @Test func sumsAreClamped() {
+        var mixer = PCMMixer(maximumLag: 10)
+        _ = mixer.push(pcm([30_000, -30_000]), from: .microphone)
+        #expect(samples(mixer.push(pcm([10_000, -10_000]), from: .system)) == [Int16.max, Int16.min])
     }
 }
