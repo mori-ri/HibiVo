@@ -12,6 +12,7 @@ public enum UserFacingError: Error, Equatable, Sendable {
     case cleanupFellBack
     case meetingRequiresAPIKey(provider: String)
     case meetingSaveFailed
+    case meetingTranscriptionFailed
 
     public var message: String {
         switch self {
@@ -27,6 +28,7 @@ public enum UserFacingError: Error, Equatable, Sendable {
         case .cleanupFellBack: "整形できなかったため、文字起こしをそのまま入力しました"
         case .meetingRequiresAPIKey(let provider): "ミーティングの文字起こしには \(provider) の API Key が必要です"
         case .meetingSaveFailed: "ミーティングの記録を保存できませんでした"
+        case .meetingTranscriptionFailed: "ミーティングの文字起こしに失敗しました"
         }
     }
 }

@@ -163,11 +163,12 @@ import Testing
     }
 
     private func makeController(
-        secrets: MockSecrets = MockSecrets(), onSaved: @escaping @MainActor (URL) -> Void = { _ in }
+        secrets: MockSecrets = MockSecrets(), fileTranscriber: MockFileTranscriber? = nil,
+        onSaved: @escaping @MainActor (URL) -> Void = { _ in }
     ) -> MeetingController {
         MeetingController(
             state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: secrets,
-            provider: provider,
+            provider: provider, fileTranscriber: fileTranscriber,
             directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved)
     }
 
@@ -367,6 +368,80 @@ import Testing
         sut.stop()
         await sut.waitUntilIdle()
     }
+
+    @Test func afterMeetingRecordsWithoutStreamingThenTranscribesTheWholeMeeting() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([
+            .success([
+                MeetingToken(text: "始めます", isFinal: true, speaker: "1", startMs: 0, endMs: 800),
+                MeetingToken(text: "はい", isFinal: true, speaker: "2", startMs: 1_000, endMs: 1_200),
+                MeetingToken(text: "お願いします", isFinal: true, speaker: "3", startMs: 2_000, endMs: 2_500),
+            ])
+        ])
+        var saved: URL?
+        let sut = makeController(fileTranscriber: transcriber, onSaved: { saved = $0 })
+        sut.start()
+        #expect(state.phase == .meeting)
+        #expect(provider.sessions.isEmpty)
+
+        audio.speak(bytes: 320)
+        audio.speak(bytes: 320)
+        sut.stop()
+        await sut.waitUntilIdle()
+
+        #expect(state.phase == .idle)
+        #expect(state.meetingTranscriptionsInProgress == 0)
+        let call = try #require(await transcriber.calls.first)
+        #expect(call.bytes == 640)
+        #expect(call.sampleRate == 16_000)
+        #expect(call.config.speakerDiarization)
+        let text = try String(contentsOf: try #require(saved), encoding: .utf8)
+        #expect(text.contains("**話者1** 始めます"))
+        #expect(text.contains("**話者3** お願いします"))
+        #expect(text.contains("- 終了: "))
+    }
+
+    @Test func afterMeetingRetriesTransientFailures() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([
+            .failure(.network("offline")),
+            .success([MeetingToken(text: "届きました", isFinal: true, speaker: "1", startMs: 0, endMs: 500)]),
+        ])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.speak()
+        sut.stop()
+        await sut.waitUntilIdle()
+        #expect(await transcriber.calls.count == 2)
+        #expect(savedFiles().count == 1)
+    }
+
+    @Test func afterMeetingRejectedKeyIsReportedWithoutRetrying() async {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([.failure(.unauthorized)])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.speak()
+        sut.stop()
+        await sut.waitUntilIdle()
+        #expect(await transcriber.calls.count == 1)
+        #expect(state.phase == .error(UserFacingError.invalidAPIKey(provider: "Mock").message))
+        #expect(savedFiles().isEmpty)
+    }
+
+    @Test func afterMeetingFreesTheHotkeyWhileTranscribing() async {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([.success([])])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.speak()
+        sut.stop()
+        await settle { !sut.isActive }
+        // Recording is over, so a new meeting (or dictation) can start before the transcript is back.
+        #expect(!sut.isActive)
+        await sut.waitUntilIdle()
+        #expect(state.phase == .error(UserFacingError.nothingRecognized.message))
+    }
 }
 
 @Suite struct PCMMixerTests {
@@ -399,5 +474,67 @@ import Testing
         var mixer = PCMMixer(maximumLag: 10)
         _ = mixer.push(pcm([30_000, -30_000]), from: .microphone)
         #expect(samples(mixer.push(pcm([10_000, -10_000]), from: .system)) == [Int16.max, Int16.min])
+    }
+}
+
+@Suite struct SonioxFileTranscriberTests {
+    @Test func wavHeaderDescribesMonoPCM16() {
+        let header = [UInt8](SonioxFileTranscriber.wavHeader(dataSize: 32_000, sampleRate: 16_000))
+        func u32(_ at: Int) -> UInt32 { (0..<4).reduce(0) { $0 | UInt32(header[at + $1]) << (8 * $1) } }
+        func u16(_ at: Int) -> UInt16 { UInt16(header[at]) | UInt16(header[at + 1]) << 8 }
+        #expect(header.count == 44)
+        #expect(String(decoding: header[0..<4], as: UTF8.self) == "RIFF")
+        #expect(u32(4) == 36 + 32_000)
+        #expect(u16(22) == 1)
+        #expect(u32(24) == 16_000)
+        #expect(u32(28) == 32_000)
+        #expect(u16(34) == 16)
+        #expect(u32(40) == 32_000)
+    }
+
+    @Test func multipartBodyWrapsTheWav() {
+        let pcm = Data([1, 2, 3, 4])
+        let body = SonioxFileTranscriber.multipartBody(wav: pcm, sampleRate: 16_000, boundary: "B")
+        let head =
+            "--B\r\nContent-Disposition: form-data; name=\"file\"; filename=\"meeting.wav\"\r\n"
+            + "Content-Type: audio/wav\r\n\r\n"
+        let tail = "\r\n--B--\r\n"
+        #expect(body.count == head.utf8.count + 44 + pcm.count + tail.utf8.count)
+        #expect(body.prefix(head.utf8.count) == Data(head.utf8))
+        #expect(body.dropFirst(head.utf8.count).prefix(4) == Data("RIFF".utf8))
+        #expect(body.suffix(tail.utf8.count + pcm.count) == pcm + Data(tail.utf8))
+    }
+
+    @Test func createRequestAsksForDiarizationWithHintsAndTerms() throws {
+        let request = try SonioxFileTranscriber.createRequest(
+            fileID: "f1", model: "stt-async-v5",
+            config: TranscriptionConfig(apiKey: "k", model: "m", language: "ja", vocabulary: ["AppSync"]))
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer k")
+        #expect(request.httpMethod == "POST")
+        let body = try #require(request.httpBody)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(object["file_id"] as? String == "f1")
+        #expect(object["model"] as? String == "stt-async-v5")
+        #expect(object["enable_speaker_diarization"] as? Bool == true)
+        #expect(object["language_hints"] as? [String] == ["ja", "en"])
+        #expect((object["context"] as? [String: Any])?["terms"] as? [String] == ["AppSync"])
+    }
+
+    @Test func transcriptTokensAreAllFinal() throws {
+        let json = #"{"id":"t","text":"はい","tokens":[{"text":"はい","speaker":"2","start_ms":10,"end_ms":200}]}"#
+        let response = try JSONDecoder().decode(SonioxProtocol.Response.self, from: Data(json.utf8))
+        #expect(
+            SonioxFileTranscriber.tokens(response) == [
+                MeetingToken(text: "はい", isFinal: true, speaker: "2", startMs: 10, endMs: 200)
+            ])
+    }
+
+    @Test func asyncAudioIsPricedLowerThanRealtime() throws {
+        let async = try #require(
+            UsagePricing.transcriptionUSD(TranscriptionUsage(provider: "soniox", model: "stt-async-v5", seconds: 3600)))
+        let live = try #require(
+            UsagePricing.transcriptionUSD(TranscriptionUsage(provider: "soniox", model: "stt-rt-v5", seconds: 3600)))
+        #expect(abs(async - 0.10) < 1e-9)
+        #expect(abs(live - 0.12) < 1e-9)
     }
 }

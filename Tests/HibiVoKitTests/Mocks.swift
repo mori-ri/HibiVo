@@ -159,3 +159,20 @@ actor MockMeetingSession: MeetingTranscriptionSession {
         continuation.finish()
     }
 }
+
+actor MockFileTranscriber: MeetingFileTranscriber {
+    nonisolated let model = "mock-async"
+    private var results: [Result<[MeetingToken], TranscriptionError>]
+    private(set) var calls: [(bytes: Int, sampleRate: Int, config: TranscriptionConfig)] = []
+
+    /// Each call takes the next result; the last one repeats.
+    init(_ results: [Result<[MeetingToken], TranscriptionError>]) {
+        self.results = results
+    }
+
+    func transcribe(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> [MeetingToken] {
+        calls.append((pcm16.count, sampleRate, config))
+        let result = results.count > 1 ? results.removeFirst() : results[0]
+        return try result.get()
+    }
+}

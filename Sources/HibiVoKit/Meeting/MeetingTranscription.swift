@@ -37,3 +37,20 @@ public protocol MeetingTranscriptionSession: TranscriptionSession {
 public protocol MeetingTranscriptionProvider: TranscriptionProvider {
     func makeMeetingSession(_ config: TranscriptionConfig) -> any MeetingTranscriptionSession
 }
+
+/// When a meeting is transcribed.
+public enum MeetingTranscriptionTiming: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Streamed while the meeting runs: live text and a file that grows as it goes.
+    case realtime
+    /// Recorded in memory and transcribed once it ends: much better speaker separation, nothing live.
+    case afterMeeting
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .realtime: "リアルタイム"
+        case .afterMeeting: "終了後にまとめて(話者の識別が高精度)"
+        }
+    }
+}

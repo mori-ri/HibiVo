@@ -37,6 +37,9 @@ public final class SettingsStore {
     public var meetingCapturesSystemAudio: Bool {
         didSet { defaults.set(meetingCapturesSystemAudio, forKey: "meetingCapturesSystemAudio") }
     }
+    public var meetingTranscriptionTiming: MeetingTranscriptionTiming {
+        didSet { save(meetingTranscriptionTiming, "meetingTranscriptionTiming") }
+    }
     public var appModeOverrides: [AppModeOverride] { didSet { save(appModeOverrides, "appModeOverrides") } }
     /// Yen per US dollar, for showing estimated API cost in yen.
     public var usdJPYRate: Double { didSet { defaults.set(usdJPYRate, forKey: "usdJPYRate") } }
@@ -59,6 +62,7 @@ public final class SettingsStore {
         duckOutputWhileRecording = defaults.object(forKey: "duckOutputWhileRecording") as? Bool ?? true
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
         meetingCapturesSystemAudio = defaults.object(forKey: "meetingCapturesSystemAudio") as? Bool ?? true
+        meetingTranscriptionTiming = Self.load("meetingTranscriptionTiming", from: defaults) ?? .realtime
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
         usdJPYRate = defaults.object(forKey: "usdJPYRate") as? Double ?? UsagePricing.defaultUSDJPYRate
         seedAppModeOverrides()

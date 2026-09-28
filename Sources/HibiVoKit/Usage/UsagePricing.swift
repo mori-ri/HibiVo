@@ -20,6 +20,8 @@ public enum UsagePricing {
 
     /// Soniox real-time: $0.12 per hour of audio.
     static let sonioxRealtimePerHour = 0.12
+    /// Soniox async (file) transcription, used for meetings transcribed after they end: $0.10 per hour.
+    static let sonioxAsyncPerHour = 0.10
     /// Gemini 3.5 Transcribe Live: Google's blended estimate of $0.009 per minute of audio
     /// (audio input tokens plus transcript output tokens).
     static let geminiLiveTranscribePerMinute = 0.009
@@ -97,7 +99,8 @@ public enum UsagePricing {
 
     public static func transcriptionUSD(_ usage: TranscriptionUsage) -> Double? {
         switch usage.provider {
-        case "soniox": usage.seconds / 3600 * sonioxRealtimePerHour
+        case "soniox":
+            usage.seconds / 3600 * (usage.model.contains("async") ? sonioxAsyncPerHour : sonioxRealtimePerHour)
         case "gemini": usage.seconds / 60 * geminiLiveTranscribePerMinute
         default: nil
         }

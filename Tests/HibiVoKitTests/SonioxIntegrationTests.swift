@@ -43,4 +43,22 @@ struct SonioxIntegrationTests {
             for await event in session.events { #expect(event != .ended(.unauthorized)) }
         }
     }
+
+    /// Async (file) transcription: a rejected key surfaces as `.unauthorized`; with a key, a second of
+    /// silence comes back as an empty transcript.
+    @Test func asyncTranscriptionRoundTrip() async throws {
+        let key = ProcessInfo.processInfo.environment["SONIOX_API_KEY"]
+        let config = TranscriptionConfig(
+            apiKey: key ?? "invalid-key", model: "stt-async-v5", language: "ja", speakerDiarization: true)
+        let transcriber = SonioxFileTranscriber(pollInterval: .seconds(1), timeout: .seconds(120))
+        let silence = Data(count: 32_000)
+        do {
+            let tokens = try await transcriber.transcribe(pcm16: silence, sampleRate: 16_000, config: config)
+            #expect(key != nil)
+            #expect(tokens.allSatisfy { $0.isFinal })
+        } catch {
+            #expect(key == nil)
+            #expect(error as? TranscriptionError == .unauthorized)
+        }
+    }
 }

@@ -38,6 +38,17 @@ struct GeneralSettingsView: View {
                 footer:
                     "\(env.settings.hotkey.displayName) を押しながら M で開始し、もう一度 \(env.settings.hotkey.displayName) を押すと終了します。文字起こしは Soniox で行い、Markdown で保存します。"
             ) {
+                PickerRow("文字起こしのタイミング", selection: $settings.meetingTranscriptionTiming) {
+                    ForEach(MeetingTranscriptionTiming.allCases) { Text($0.displayName).tag($0) }
+                }
+                switch env.settings.meetingTranscriptionTiming {
+                case .realtime:
+                    NoteRow("会議中に文字起こしし、数秒ごとにファイルへ書き足します。話者の区別はやや粗くなります。")
+                case .afterMeeting:
+                    NoteRow(
+                        "会議中は録音だけを行い、終了後に音声全体から文字起こしするため、話者を正確に区別できます。結果は 1 時間の会議で数分ほどで届きます。音声は終了までメモリに置くだけで保存しないため、途中でアプリが終了するとその会議は記録されません。"
+                    )
+                }
                 ToggleRow("オンライン参加者の声(システム音声)も記録する", isOn: $settings.meetingCapturesSystemAudio)
                 if !SystemAudioCaptureService.isSupported {
                     NoteRow("システム音声の記録には macOS 14.2 以降が必要です。", color: .red)

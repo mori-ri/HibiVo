@@ -90,10 +90,13 @@ enum SonioxProtocol {
         return Array((config.vocabulary + config.readings).filter { seen.insert($0).inserted }.prefix(200))
     }
 
+    /// Hint English as well so technical terms stay in Latin script ("AppSync", not "アップシンク").
+    static func languageHints(_ language: String) -> [String] {
+        language == "en" ? ["en"] : [language, "en"]
+    }
+
     static func config(for config: TranscriptionConfig, sampleRate: Double) throws -> String {
-        // Hint English as well so technical terms stay in Latin script ("AppSync", not "アップシンク").
-        var hints = [config.language]
-        if config.language != "en" { hints.append("en") }
+        let hints = languageHints(config.language)
         let terms = terms(for: config)
         let payload = Config(
             apiKey: config.apiKey,

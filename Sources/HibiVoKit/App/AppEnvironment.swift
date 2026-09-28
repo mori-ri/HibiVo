@@ -47,6 +47,7 @@ public final class AppEnvironment {
             settings: settings,
             secrets: secrets,
             provider: SonioxProvider(),
+            fileTranscriber: SonioxFileTranscriber(),
             vocabulary: { vocabulary.activeEntries },
             usage: usage,
             onSaved: { NSWorkspace.shared.activateFileViewerSelecting([$0]) })

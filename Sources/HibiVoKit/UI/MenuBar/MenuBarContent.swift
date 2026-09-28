@@ -28,6 +28,9 @@ public struct MenuBarContent: View {
             Button("ミーティングの文字起こしを開始(\(env.settings.hotkey.displayName) + M)") { env.meeting.start() }
                 .disabled(env.state.phase.isActive)
         }
+        if env.state.meetingTranscriptionsInProgress > 0 {
+            Text("ミーティングを文字起こし中…")
+        }
         Button("ミーティングの記録を開く…") { env.openMeetingsFolder() }
 
         if let last = env.history.records.first(where: { !$0.finalText.isEmpty }) {

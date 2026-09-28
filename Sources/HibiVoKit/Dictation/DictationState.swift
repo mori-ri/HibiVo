@@ -30,6 +30,8 @@ public final class AppState {
     public var meetingStartedAt: Date?
     /// The meeting's STT connection dropped and is being re-established.
     public var meetingReconnecting = false
+    /// Finished meetings still being transcribed in the background (after-meeting mode).
+    public var meetingTranscriptionsInProgress = 0
     public var hasAccessibilityPermission = false
     public var hasMicrophonePermission = false
     /// Page shown in the main window; the menu bar sets it before opening the window.
