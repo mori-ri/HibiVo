@@ -85,7 +85,12 @@ public enum CleanupPromptBuilder {
         """
 
     static func vocabularySection(_ terms: [Term]) -> String {
-        let lines = terms.prefix(200).map { term in
+        "# ユーザー辞書（この表記を優先する）\n" + vocabularyLines(terms)
+    }
+
+    /// One `- 表記（聞き取り例: …）` line per term. Shared with the meeting minutes prompt.
+    static func vocabularyLines(_ terms: [Term]) -> String {
+        terms.prefix(200).map { term in
             var notes: [String] = []
             if !term.spokenForms.isEmpty { notes.append("聞き取り例: \(term.spokenForms.joined(separator: "、"))") }
             if !term.contextualForms.isEmpty {
@@ -95,7 +100,7 @@ public enum CleanupPromptBuilder {
             }
             return notes.isEmpty ? "- \(term.preferred)" : "- \(term.preferred)（\(notes.joined(separator: "。"))）"
         }
-        return "# ユーザー辞書（この表記を優先する）\n" + lines.joined(separator: "\n")
+        .joined(separator: "\n")
     }
 
     static let outputRules = """

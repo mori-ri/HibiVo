@@ -60,6 +60,21 @@ struct GeneralSettingsView: View {
                         Button("設定を開く…") { Permissions.openSystemAudioSettings() }
                     }
                 }
+                ToggleRow("終了後に Claude で議事録を作成する", isOn: $settings.meetingMinutesEnabled)
+                if env.settings.meetingMinutesEnabled {
+                    PickerRow("議事録のモデル", selection: $settings.meetingMinutesModel) {
+                        ForEach(MeetingMinutesModel.allCases) { Text($0.displayName).tag($0) }
+                    }
+                    TextFieldRow("Claude Code の場所", text: $settings.claudeCodePath, prompt: "自動で検出")
+                    if let path = ClaudeCodeMinutesWriter.locate(configuredPath: env.settings.claudeCodePath) {
+                        NoteRow(
+                            "Claude Code(\(path.path))を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
+                        )
+                    } else {
+                        NoteRow(
+                            "Claude Code が見つかりません。インストールして claude.ai のアカウントでログインするか、実行ファイルの場所を入力してください。", color: .red)
+                    }
+                }
                 LabeledRow("保存先") {
                     Button("開く…") { env.openMeetingsFolder() }
                 }

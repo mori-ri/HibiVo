@@ -159,16 +159,17 @@ import Testing
         settings = SettingsStore(defaults: UserDefaults(suiteName: "MeetingControllerTests-\(UUID())")!)
         // Most tests cover the microphone alone; the system-audio ones turn it back on.
         settings.meetingCapturesSystemAudio = false
+        settings.meetingMinutesEnabled = false
         directory = FileManager.default.temporaryDirectory.appending(path: "HibiVoMeetingTests-\(UUID())")
     }
 
     private func makeController(
         secrets: MockSecrets = MockSecrets(), fileTranscriber: MockFileTranscriber? = nil,
-        onSaved: @escaping @MainActor (URL) -> Void = { _ in }
+        minutesWriter: MockMinutesWriter? = nil, onSaved: @escaping @MainActor (URL) -> Void = { _ in }
     ) -> MeetingController {
         MeetingController(
             state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: secrets,
-            provider: provider, fileTranscriber: fileTranscriber,
+            provider: provider, fileTranscriber: fileTranscriber, minutesWriter: { minutesWriter },
             directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved)
     }
 
@@ -442,6 +443,77 @@ import Testing
         await sut.waitUntilIdle()
         #expect(state.phase == .error(UserFacingError.nothingRecognized.message))
     }
+
+    /// Records one line of speech and stops, leaving the transcript saved.
+    private func recordShortMeeting(_ sut: MeetingController) async throws {
+        sut.start()
+        let session = try #require(provider.sessions.first)
+        await session.emit(
+            .tokens([MeetingToken(text: "来週リリースします", isFinal: true, speaker: "1", startMs: 0, endMs: 900)]))
+        await settle { state.partialTranscript == "来週リリースします" }
+        sut.stop()
+        await sut.waitUntilIdle()
+    }
+
+    @Test func savedMeetingIsTurnedIntoMinutes() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesModel = .opus
+        let writer = MockMinutesWriter(.success("# リリース日程の確認\n\n## 概要\nリリース日を決めた。"))
+        var shown: [URL] = []
+        let sut = MeetingController(
+            state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: MockSecrets(),
+            provider: provider, minutesWriter: { writer },
+            vocabulary: { [VocabularyEntry(preferred: "AppSync", spoken: "アップシンク")] }, directory: directory,
+            saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: { shown.append($0) })
+        try await recordShortMeeting(sut)
+
+        let call = try #require(await writer.calls.first)
+        #expect(call.model == "opus")
+        #expect(call.vocabulary == [CleanupPromptBuilder.Term(preferred: "AppSync", spokenForms: ["アップシンク"])])
+        #expect(call.transcript.contains("**話者1** 来週リリースします"))
+        // Finder is pointed at the minutes only, not at the transcript first.
+        let url = try #require(shown.first)
+        #expect(shown.count == 1)
+        #expect(url.lastPathComponent.hasSuffix("_リリース日程の確認.md"))
+        let minutes = try String(contentsOf: url, encoding: .utf8)
+        #expect(minutes.hasPrefix("# リリース日程の確認\n\n## 概要\nリリース日を決めた。"))
+        #expect(savedFiles().count == 2)
+        #expect(state.meetingMinutesInProgress == 0)
+        #expect(state.phase == .idle)
+    }
+
+    @Test func failedMinutesStillShowTheTranscript() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.failure(.failed("usage limit")))
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, onSaved: { shown.append($0) })
+        try await recordShortMeeting(sut)
+
+        #expect(shown.count == 1)
+        // The transcript is the only file, and it is what Finder shows.
+        #expect(shown.first?.lastPathComponent == savedFiles().first?.lastPathComponent)
+        #expect(savedFiles().count == 1)
+        #expect(state.phase == .error(UserFacingError.meetingMinutesFailed.message))
+    }
+
+    @Test func minutesWithoutClaudeCodeExplainWhy() async throws {
+        settings.meetingMinutesEnabled = true
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: nil, onSaved: { shown.append($0) })
+        try await recordShortMeeting(sut)
+        #expect(shown.count == 1)
+        #expect(state.phase == .error(UserFacingError.claudeCodeNotFound.message))
+    }
+
+    @Test func minutesOffShowsTheTranscriptOnly() async throws {
+        let writer = MockMinutesWriter(.success("unused"))
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, onSaved: { shown.append($0) })
+        try await recordShortMeeting(sut)
+        #expect(await writer.calls.isEmpty)
+        #expect(shown.count == 1)
+        #expect(state.phase == .idle)
+    }
 }
 
 @Suite struct PCMMixerTests {
@@ -536,5 +608,80 @@ import Testing
             UsagePricing.transcriptionUSD(TranscriptionUsage(provider: "soniox", model: "stt-rt-v5", seconds: 3600)))
         #expect(abs(async - 0.10) < 1e-9)
         #expect(abs(live - 0.12) < 1e-9)
+    }
+}
+
+@Suite struct ClaudeCodeMinutesWriterTests {
+    @Test func runsHeadlessWithoutToolsOrSettings() {
+        let args = ClaudeCodeMinutesWriter.arguments(model: "sonnet")
+        #expect(args.starts(with: ["-p", "--output-format", "json", "--model", "sonnet"]))
+        #expect(args.contains("--no-session-persistence"))
+        #expect(args.contains("--strict-mcp-config"))
+        #expect(args[args.firstIndex(of: "--tools")! + 1] == "")
+        #expect(args[args.firstIndex(of: "--setting-sources")! + 1] == "")
+        // --bare would force API-key auth and bypass the subscription.
+        #expect(!args.contains("--bare"))
+        #expect(args.last == MeetingMinutesPrompt.system)
+    }
+
+    @Test func apiKeysAreRemovedSoTheSubscriptionIsUsed() {
+        let environment = ClaudeCodeMinutesWriter.environment([
+            "ANTHROPIC_API_KEY": "sk", "ANTHROPIC_AUTH_TOKEN": "t", "CLAUDECODE": "1", "HOME": "/Users/me",
+        ])
+        #expect(environment == ["HOME": "/Users/me"])
+    }
+
+    @Test func parsesTheResult() throws {
+        let ok = #"{"type":"result","subtype":"success","is_error":false,"result":"概要\n本文"}"#
+        #expect(try ClaudeCodeMinutesWriter.parse(Data(ok.utf8)) == "概要\n本文")
+    }
+
+    @Test func reportsFailures() {
+        let error = #"{"type":"result","subtype":"success","is_error":true,"result":"Not logged in"}"#
+        #expect(throws: MeetingMinutesError.failed("Not logged in")) {
+            try ClaudeCodeMinutesWriter.parse(Data(error.utf8))
+        }
+        #expect(throws: MeetingMinutesError.failed("garbage")) {
+            try ClaudeCodeMinutesWriter.parse(Data("garbage".utf8))
+        }
+    }
+
+    @Test func promptWrapsTheTranscript() {
+        #expect(MeetingMinutesPrompt.user("本文") == "<transcript>\n本文\n</transcript>")
+        #expect(
+            MeetingMinutesPrompt.user(
+                "本文",
+                vocabulary: [.init(preferred: "AppSync", spokenForms: ["アップシンク"]), .init(preferred: "Bedrock")])
+                == "<vocabulary>\n- AppSync（聞き取り例: アップシンク）\n- Bedrock\n</vocabulary>\n\n<transcript>\n本文\n</transcript>"
+        )
+        #expect(MeetingMinutesPrompt.system.contains("<vocabulary>"))
+        #expect(MeetingMinutesPrompt.system.contains("## ToDo"))
+    }
+
+    @Test func minutesSitNextToTheTranscript() {
+        let transcript = URL(fileURLWithPath: "/m/2026-09-27_14-00-05.md")
+        #expect(
+            MeetingController.minutesURL(for: transcript, title: "リリース日程").path
+                == "/m/2026-09-27_14-00-05_リリース日程.md")
+        #expect(MeetingController.minutesURL(for: transcript, title: nil).path == "/m/2026-09-27_14-00-05_議事録.md")
+    }
+
+    @Test func titleComesFromTheFirstHeading() {
+        let split = MeetingMinutesTitle.split("# 新機能のリリース日程\n\n## 概要\n本文")
+        #expect(split.title == "新機能のリリース日程")
+        #expect(split.body == "## 概要\n本文")
+    }
+
+    @Test func minutesWithoutATitleKeepTheirBody() {
+        let split = MeetingMinutesTitle.split("## 概要\n本文")
+        #expect(split.title == nil)
+        #expect(split.body == "## 概要\n本文")
+    }
+
+    @Test func titlesAreMadeSafeForFileNames() {
+        #expect(MeetingMinutesTitle.fileNameSafe("A/B: 設計*レビュー?") == "AB 設計レビュー")
+        #expect(MeetingMinutesTitle.fileNameSafe("..隠し") == "隠し")
+        #expect(MeetingMinutesTitle.fileNameSafe(String(repeating: "長", count: 60)).count == 40)
+        #expect(MeetingMinutesTitle.split("# ///\n本文").title == nil)
     }
 }

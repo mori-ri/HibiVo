@@ -84,6 +84,9 @@ public final class MeetingController {
     private let secrets: any SecretStore
     private let provider: any MeetingTranscriptionProvider
     private let fileTranscriber: (any MeetingFileTranscriber)?
+    /// Built when a meeting is saved, so a changed Claude Code path or setting takes effect; nil when
+    /// minutes are off or Claude Code can't be found.
+    private let minutesWriter: @MainActor () -> (any MeetingMinutesWriting)?
     private let vocabulary: @MainActor () -> [VocabularyEntry]
     private let usage: UsageStore?
     private let directory: URL
@@ -98,7 +101,7 @@ public final class MeetingController {
     private var watchdog: Task<Void, Never>?
     private var stopping: Task<Void, Never>?
     private var errorDismiss: Task<Void, Never>?
-    /// After-meeting transcriptions still running.
+    /// After-meeting transcriptions and minutes still running.
     private var transcriptions: [Task<Void, Never>] = []
 
     /// - Parameter systemAudio: Captures the remote side of an online meeting; nil where unsupported.
@@ -111,6 +114,7 @@ public final class MeetingController {
         secrets: any SecretStore,
         provider: any MeetingTranscriptionProvider,
         fileTranscriber: (any MeetingFileTranscriber)? = nil,
+        minutesWriter: @escaping @MainActor () -> (any MeetingMinutesWriting)? = { nil },
         vocabulary: @escaping @MainActor () -> [VocabularyEntry] = { [] },
         usage: UsageStore? = nil,
         directory: URL = MeetingController.defaultDirectory,
@@ -125,6 +129,7 @@ public final class MeetingController {
         self.secrets = secrets
         self.provider = provider
         self.fileTranscriber = fileTranscriber
+        self.minutesWriter = minutesWriter
         self.vocabulary = vocabulary
         self.usage = usage
         self.directory = directory
@@ -153,10 +158,16 @@ public final class MeetingController {
         }
     }
 
-    /// Waits for a stopping meeting to be saved, including after-meeting transcription. Used by tests.
+    /// Waits for a stopping meeting to be saved, including after-meeting transcription and minutes.
+    /// Used by tests.
     func waitUntilIdle() async {
         await stopping?.value
-        for task in transcriptions { await task.value }
+        // Transcriptions append their minutes task while running, so loop until nothing is left.
+        var index = 0
+        while index < transcriptions.count {
+            await transcriptions[index].value
+            index += 1
+        }
     }
 
     public func start() {
@@ -382,17 +393,17 @@ public final class MeetingController {
         recordUsage(meeting)
 
         var saved = false
+        let document = markdown(meeting, ended: true)
         if meeting.transcript.isEmpty {
             await writer.remove(meeting.fileURL)
         } else {
-            saved = await writer.write(markdown(meeting, ended: true), to: meeting.fileURL)
+            saved = await writer.write(document, to: meeting.fileURL)
         }
         self.meeting = nil
         state.meetingStartedAt = nil
         state.partialTranscript = ""
         log.info("Meeting stopped (\(meeting.transcript.segments.count) segments)")
 
-        if saved { onSaved(meeting.fileURL) }
         if let failure = meeting.failure {
             show(failure)
         } else if meeting.transcript.isEmpty {
@@ -402,6 +413,8 @@ public final class MeetingController {
         } else {
             state.phase = .idle
         }
+        // After leaving .processing, so a problem with the minutes can still be shown.
+        if saved { didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary) }
     }
 
     /// Ends the recording part of an after-meeting meeting and transcribes it in the background.
@@ -455,12 +468,71 @@ public final class MeetingController {
             showUnlessBusy(.nothingRecognized)
             return
         }
-        if await writer.write(markdown(meeting, ended: true), to: meeting.fileURL) {
+        let document = markdown(meeting, ended: true)
+        if await writer.write(document, to: meeting.fileURL) {
             log.info("Meeting transcribed (\(meeting.transcript.segments.count) segments)")
-            onSaved(meeting.fileURL)
+            didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary)
         } else {
             showUnlessBusy(.meetingSaveFailed)
         }
+    }
+
+    /// Hands a saved transcript to Claude Code for minutes, or shows it right away when minutes are off.
+    /// With minutes, Finder shows the minutes once they exist (or the transcript if they fail), so the
+    /// user isn't pulled to Finder twice.
+    private func didSave(_ document: String, to url: URL, vocabulary: [VocabularyEntry]) {
+        guard settings.meetingMinutesEnabled else {
+            onSaved(url)
+            return
+        }
+        guard let writer = minutesWriter() else {
+            onSaved(url)
+            showUnlessBusy(.claudeCodeNotFound)
+            return
+        }
+        state.meetingMinutesInProgress += 1
+        let model = settings.meetingMinutesModel.rawValue
+        transcriptions.append(
+            Task {
+                await writeMinutes(
+                    from: document, transcriptURL: url, vocabulary: vocabulary.map(\.promptTerm), model: model,
+                    with: writer)
+            })
+    }
+
+    private func writeMinutes(
+        from document: String, transcriptURL: URL, vocabulary: [CleanupPromptBuilder.Term], model: String,
+        with minutesWriter: any MeetingMinutesWriting
+    ) async {
+        defer { state.meetingMinutesInProgress -= 1 }
+        let minutes: String
+        do {
+            minutes = try await minutesWriter.writeMinutes(transcript: document, vocabulary: vocabulary, model: model)
+        } catch {
+            log.error("Minutes failed: \(String(describing: error), privacy: .public)")
+            onSaved(transcriptURL)
+            showUnlessBusy(
+                error as? MeetingMinutesError == .claudeCodeNotFound ? .claudeCodeNotFound : .meetingMinutesFailed)
+            return
+        }
+        let (title, body) = MeetingMinutesTitle.split(minutes)
+        let url = Self.minutesURL(for: transcriptURL, title: title)
+        let heading = "# \(title ?? "議事録")\n\n"
+        let footer = "\n\n---\n\n*Claude が文字起こし「\(transcriptURL.lastPathComponent)」から作成しました。*\n"
+        if await writer.write(heading + body + footer, to: url) {
+            log.info("Minutes saved")
+            onSaved(url)
+        } else {
+            onSaved(transcriptURL)
+            showUnlessBusy(.meetingSaveFailed)
+        }
+    }
+
+    /// `2026-09-27_14-00-05.md` → `2026-09-27_14-00-05_新機能のリリース日程.md`, next to the transcript.
+    /// The date stays in front so meetings sort by time and two with the same title never collide.
+    nonisolated static func minutesURL(for transcriptURL: URL, title: String?) -> URL {
+        let name = transcriptURL.deletingPathExtension().lastPathComponent + "_\(title ?? "議事録").md"
+        return transcriptURL.deletingLastPathComponent().appending(path: name)
     }
 
     /// Background results must not cover up a dictation or meeting in progress.

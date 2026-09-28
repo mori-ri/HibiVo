@@ -93,6 +93,10 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 - 誤操作で記録を失わないよう、会議中の Esc や、ホットキーと他のキーの同時押し（Fn + ← など）では終了しません。
 - STT の設定にかかわらず Soniox を使います（Soniox の API Key が必要）。システム音声を記録しても送る音声は 1 本なので、料金は変わりません。接続が切れたら自動で再接続します。再接続後は話者番号が振り直されます。
 - 4 時間で自動的に終了します。
+- **議事録**: [Claude Code](https://claude.com/claude-code) がインストールされ、claude.ai のアカウントでログインしていれば、終了後に Claude が文字起こしから議事録（概要・決定事項・ToDo・議論の内容・未解決の事項）を作り、`<開始日時>_<会議の内容を表すタイトル>.md`（例: `2026-09-27_14-00-05_新機能リリース計画.md`）として隣に保存します。タイトルは Claude が内容から付けます。ユーザー辞書も Claude に渡すので、登録した表記が議事録でも使われます。
+  - Claude のサブスクリプションの利用枠で処理するので、API の料金はかかりません。
+  - モデル（Opus / Sonnet / Haiku、既定は Sonnet）と Claude Code の場所は 設定 › 一般 › ミーティング で変えられます。オフにもできます。
+  - Claude Code は、ツール・MCP・設定ファイルをすべて無効にし、空の一時フォルダで動かします。文字起こしを読んで議事録を返す以外のことはしません。
 
 ## プライバシー
 
@@ -100,7 +104,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 - **テキスト**: 文字起こしは STT Provider（Soniox / Google Gemini）へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
 - **履歴**: 文字起こし原文と整形結果を `~/Library/Application Support/HibiVo/history.json` に平文で最大 200 件保存します。設定 › 一般 › 「履歴を保存する」で無効にでき、履歴画面から全件削除できます。
 - **辞書**: `~/Library/Application Support/HibiVo/vocabulary.json` に保存します。
-- **ミーティング**: 文字起こしを `~/Library/Application Support/HibiVo/Meetings/` に Markdown で平文保存します。音声は保存しません。
+- **ミーティング**: 文字起こしと議事録を `~/Library/Application Support/HibiVo/Meetings/` に Markdown で平文保存します。音声は保存しません。議事録を作る場合、文字起こしは Claude Code 経由で Anthropic に送信されます。
 - **API Key / AWS 認証情報**: macOS の Keychain に保存します。設定ファイルには書き込みません。
 - 解析・テレメトリの送信はありません。
 

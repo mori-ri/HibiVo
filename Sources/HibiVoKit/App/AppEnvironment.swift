@@ -48,6 +48,11 @@ public final class AppEnvironment {
             secrets: secrets,
             provider: SonioxProvider(),
             fileTranscriber: SonioxFileTranscriber(),
+            minutesWriter: {
+                ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
+                    ClaudeCodeMinutesWriter(executable: $0)
+                }
+            },
             vocabulary: { vocabulary.activeEntries },
             usage: usage,
             onSaved: { NSWorkspace.shared.activateFileViewerSelecting([$0]) })

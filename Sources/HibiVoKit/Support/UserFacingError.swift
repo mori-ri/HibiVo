@@ -13,6 +13,8 @@ public enum UserFacingError: Error, Equatable, Sendable {
     case meetingRequiresAPIKey(provider: String)
     case meetingSaveFailed
     case meetingTranscriptionFailed
+    case claudeCodeNotFound
+    case meetingMinutesFailed
 
     public var message: String {
         switch self {
@@ -29,6 +31,8 @@ public enum UserFacingError: Error, Equatable, Sendable {
         case .meetingRequiresAPIKey(let provider): "ミーティングの文字起こしには \(provider) の API Key が必要です"
         case .meetingSaveFailed: "ミーティングの記録を保存できませんでした"
         case .meetingTranscriptionFailed: "ミーティングの文字起こしに失敗しました"
+        case .claudeCodeNotFound: "Claude Code が見つからないため、議事録を作成できませんでした"
+        case .meetingMinutesFailed: "議事録を作成できませんでした。文字起こしは保存済みです"
         }
     }
 }

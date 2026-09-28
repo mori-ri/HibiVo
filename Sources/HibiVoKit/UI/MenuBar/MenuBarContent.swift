@@ -31,6 +31,9 @@ public struct MenuBarContent: View {
         if env.state.meetingTranscriptionsInProgress > 0 {
             Text("ミーティングを文字起こし中…")
         }
+        if env.state.meetingMinutesInProgress > 0 {
+            Text("議事録を作成中…")
+        }
         Button("ミーティングの記録を開く…") { env.openMeetingsFolder() }
 
         if let last = env.history.records.first(where: { !$0.finalText.isEmpty }) {

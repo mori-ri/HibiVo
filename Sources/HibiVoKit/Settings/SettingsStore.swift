@@ -40,6 +40,13 @@ public final class SettingsStore {
     public var meetingTranscriptionTiming: MeetingTranscriptionTiming {
         didSet { save(meetingTranscriptionTiming, "meetingTranscriptionTiming") }
     }
+    /// Whether Claude Code writes minutes from each saved meeting.
+    public var meetingMinutesEnabled: Bool {
+        didSet { defaults.set(meetingMinutesEnabled, forKey: "meetingMinutesEnabled") }
+    }
+    public var meetingMinutesModel: MeetingMinutesModel { didSet { save(meetingMinutesModel, "meetingMinutesModel") } }
+    /// Path to the `claude` executable; empty means look in the standard install locations.
+    public var claudeCodePath: String { didSet { defaults.set(claudeCodePath, forKey: "claudeCodePath") } }
     public var appModeOverrides: [AppModeOverride] { didSet { save(appModeOverrides, "appModeOverrides") } }
     /// Yen per US dollar, for showing estimated API cost in yen.
     public var usdJPYRate: Double { didSet { defaults.set(usdJPYRate, forKey: "usdJPYRate") } }
@@ -63,6 +70,12 @@ public final class SettingsStore {
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
         meetingCapturesSystemAudio = defaults.object(forKey: "meetingCapturesSystemAudio") as? Bool ?? true
         meetingTranscriptionTiming = Self.load("meetingTranscriptionTiming", from: defaults) ?? .realtime
+        // On by default only where Claude Code is installed, so nobody else gets an error per meeting.
+        meetingMinutesEnabled =
+            defaults.object(forKey: "meetingMinutesEnabled") as? Bool
+            ?? (ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil)
+        meetingMinutesModel = Self.load("meetingMinutesModel", from: defaults) ?? .sonnet
+        claudeCodePath = defaults.string(forKey: "claudeCodePath") ?? ""
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
         usdJPYRate = defaults.object(forKey: "usdJPYRate") as? Double ?? UsagePricing.defaultUSDJPYRate
         seedAppModeOverrides()

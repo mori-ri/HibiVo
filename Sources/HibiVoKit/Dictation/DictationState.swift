@@ -32,6 +32,8 @@ public final class AppState {
     public var meetingReconnecting = false
     /// Finished meetings still being transcribed in the background (after-meeting mode).
     public var meetingTranscriptionsInProgress = 0
+    /// Saved meetings whose minutes Claude Code is still writing.
+    public var meetingMinutesInProgress = 0
     public var hasAccessibilityPermission = false
     public var hasMicrophonePermission = false
     /// Page shown in the main window; the menu bar sets it before opening the window.
