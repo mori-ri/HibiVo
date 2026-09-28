@@ -8,12 +8,18 @@ public struct TranscriptionConfig: Sendable {
     public var language: String
     /// Preferred spellings to bias recognition toward (e.g. "AppSync", "Claude Code").
     public var vocabulary: [String]
+    /// How dictionary terms sound (their spoken forms, hiragana turned into katakana). Hinting these
+    /// lets STT write an unfamiliar name consistently so the dictionary can then replace it.
+    public var readings: [String]
 
-    public init(apiKey: String, model: String, language: String, vocabulary: [String] = []) {
+    public init(
+        apiKey: String, model: String, language: String, vocabulary: [String] = [], readings: [String] = []
+    ) {
         self.apiKey = apiKey
         self.model = model
         self.language = language
         self.vocabulary = vocabulary
+        self.readings = readings
     }
 }
 

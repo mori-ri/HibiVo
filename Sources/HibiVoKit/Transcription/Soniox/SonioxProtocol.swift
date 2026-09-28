@@ -53,11 +53,17 @@ enum SonioxProtocol {
         }
     }
 
+    /// Preferred spellings first, then readings, without duplicates, within Soniox's 200-term budget.
+    static func terms(for config: TranscriptionConfig) -> [String] {
+        var seen = Set<String>()
+        return Array((config.vocabulary + config.readings).filter { seen.insert($0).inserted }.prefix(200))
+    }
+
     static func config(for config: TranscriptionConfig, sampleRate: Double) throws -> String {
         // Hint English as well so technical terms stay in Latin script ("AppSync", not "アップシンク").
         var hints = [config.language]
         if config.language != "en" { hints.append("en") }
-        let terms = Array(config.vocabulary.prefix(200))
+        let terms = terms(for: config)
         let payload = Config(
             apiKey: config.apiKey,
             model: config.model,

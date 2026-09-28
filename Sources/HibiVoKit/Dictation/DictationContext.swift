@@ -53,7 +53,8 @@ public struct DictationContextBuilder {
             model: provider.models.contains(settings.transcriptionModel)
                 ? settings.transcriptionModel : provider.defaultModel,
             language: settings.language,
-            vocabulary: entries.map(\.preferred))
+            vocabulary: entries.map(\.preferred),
+            readings: entries.flatMap(\.readings))
 
         return DictationContext(
             target: target, transcriptionProvider: provider, transcriptionConfig: config,
