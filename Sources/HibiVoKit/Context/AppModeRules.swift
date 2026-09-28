@@ -14,25 +14,13 @@ public struct AppModeOverride: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// Picks the cleanup mode for the app receiving the text: user override → built-in default → global default.
+/// Picks the cleanup mode for the app receiving the text: user setting → global default.
 public enum AppModeRules {
-    /// Sensible defaults so the app works well before anyone opens Settings.
-    public static let builtIn: [String: (name: String, mode: CleanupMode)] = [
-        // AI tools and terminals: dictation is usually an instruction to an AI.
-        "com.apple.Terminal": ("Terminal", .prompt),
-        "com.googlecode.iterm2": ("iTerm2", .prompt),
-        "com.mitchellh.ghostty": ("Ghostty", .prompt),
-        "dev.warp.Warp-Stable": ("Warp", .prompt),
-        "com.microsoft.VSCode": ("Visual Studio Code", .prompt),
-        "com.todesktop.230313mzl4w4u92": ("Cursor", .prompt),
-        "com.openai.chat": ("ChatGPT", .prompt),
-        "com.anthropic.claudefordesktop": ("Claude", .prompt),
-        // Chat.
-        "com.tinyspeck.slackmacgap": ("Slack", .natural),
-        "com.microsoft.teams2": ("Microsoft Teams", .natural),
-        // Mail.
-        "com.microsoft.Outlook": ("Outlook", .business),
-        "com.apple.mail": ("Mail", .business),
+    /// Seeded into the user's settings on first launch, then editable and removable like any other entry.
+    /// Only apps that ship with macOS, so the list never shows apps the user doesn't have.
+    public static let initialOverrides: [AppModeOverride] = [
+        AppModeOverride(bundleID: "com.apple.Terminal", name: "Terminal", mode: .prompt),
+        AppModeOverride(bundleID: "com.apple.mail", name: "Mail", mode: .business),
     ]
 
     public static func mode(for bundleID: String?, overrides: [AppModeOverride], default fallback: CleanupMode)
@@ -40,8 +28,6 @@ public enum AppModeRules {
     {
         guard let bundleID else { return fallback }
         let key = bundleID.lowercased()
-        if let override = overrides.first(where: { $0.bundleID.lowercased() == key }) { return override.mode }
-        if let builtIn = builtIn.first(where: { $0.key.lowercased() == key }) { return builtIn.value.mode }
-        return fallback
+        return overrides.first(where: { $0.bundleID.lowercased() == key })?.mode ?? fallback
     }
 }
