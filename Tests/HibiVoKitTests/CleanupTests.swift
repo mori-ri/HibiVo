@@ -48,6 +48,7 @@ struct MockCleanupProvider: TextCleanupProvider {
         let business = CleanupPromptBuilder.systemPrompt(mode: .business, vocabulary: [], appName: nil)
         #expect(business.contains("言い回し・語順・語尾は話者のまま残し"))
         #expect(business.contains("本文は 1 文ごとに改行"))
+        #expect(business.contains("「聞いた」→「伺った」"))
         #expect(business.contains("\n- 「えー」"))
         let natural = CleanupPromptBuilder.systemPrompt(mode: .natural, vocabulary: [], appName: nil)
         #expect(!natural.contains("1 文ごとに改行"))
