@@ -170,6 +170,7 @@ import Testing
         MeetingController(
             state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: secrets,
             provider: provider, fileTranscriber: fileTranscriber, minutesWriter: { minutesWriter },
+            vocabulary: { [VocabularyEntry(preferred: "AppSync", spoken: "あっぷしんく")] },
             directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved)
     }
 
@@ -192,6 +193,9 @@ import Testing
         #expect(state.meetingStartedAt != nil)
         let config = try #require(provider.configs.first)
         #expect(config.speakerDiarization)
+        #expect(config.vocabulary == ["AppSync"])
+        // The hiragana spoken form is hinted in katakana, as in dictation.
+        #expect(config.readings == ["アップシンク"])
         #expect(config.apiKey == "test-key")
 
         audio.speak()
@@ -580,7 +584,8 @@ import Testing
     @Test func createRequestAsksForDiarizationWithHintsAndTerms() throws {
         let request = try SonioxFileTranscriber.createRequest(
             fileID: "f1", model: "stt-async-v5",
-            config: TranscriptionConfig(apiKey: "k", model: "m", language: "ja", vocabulary: ["AppSync"]))
+            config: TranscriptionConfig(
+                apiKey: "k", model: "m", language: "ja", vocabulary: ["AppSync"], readings: ["アップシンク"]))
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer k")
         #expect(request.httpMethod == "POST")
         let body = try #require(request.httpBody)
@@ -589,7 +594,7 @@ import Testing
         #expect(object["model"] as? String == "stt-async-v5")
         #expect(object["enable_speaker_diarization"] as? Bool == true)
         #expect(object["language_hints"] as? [String] == ["ja", "en"])
-        #expect((object["context"] as? [String: Any])?["terms"] as? [String] == ["AppSync"])
+        #expect((object["context"] as? [String: Any])?["terms"] as? [String] == ["AppSync", "アップシンク"])
     }
 
     @Test func transcriptTokensAreAllFinal() throws {

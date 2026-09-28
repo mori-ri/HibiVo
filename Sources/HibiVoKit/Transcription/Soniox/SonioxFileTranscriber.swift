@@ -123,7 +123,7 @@ public struct SonioxFileTranscriber: MeetingFileTranscriber {
         var request = authorized(URLRequest(url: baseURL.appending(path: "transcriptions")), config.apiKey)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let terms = Array(config.vocabulary.prefix(200))
+        let terms = SonioxProtocol.terms(for: config)
         request.httpBody = try JSONEncoder().encode(
             CreateRequest(
                 model: model, fileID: fileID, languageHints: SonioxProtocol.languageHints(config.language),

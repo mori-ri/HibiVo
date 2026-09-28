@@ -185,6 +185,7 @@ public final class MeetingController {
                 ? settings.transcriptionModel : provider.defaultModel,
             language: settings.language,
             vocabulary: entries.map(\.preferred),
+            readings: entries.flatMap(\.readings),
             speakerDiarization: true)
 
         let microphone: AsyncStream<AudioChunk>
