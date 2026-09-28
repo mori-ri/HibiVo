@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-HibiVo は日本語優先の macOS メニューバー常駐型プッシュトゥトーク音声入力アプリ。ホットキーを押して話し、離すと、(必要に応じて LLM で整形した)テキストが直前にフォーカスしていたアプリのカーソル位置に貼り付けられる。Swift 6 / SwiftUI 製で、ビルドは SwiftPM のみ。Xcode プロジェクトは存在しない。
+HibiVo は日本語優先の macOS メニューバー常駐型音声入力アプリ。ホットキーを押して話し、もう一度押すと、(必要に応じて LLM で整形した)テキストが直前にフォーカスしていたアプリのカーソル位置に貼り付けられる。Swift 6 / SwiftUI 製で、ビルドは SwiftPM のみ。Xcode プロジェクトは存在しない。
 
 ## コマンド
 
@@ -42,10 +42,10 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 **音声入力フロー**(`Dictation/DictationController.swift`、`@MainActor` のステートマシン: idle → recording → processing → idle/error):
 
-1. `HotkeyMonitor` がメインランループ上でアクティブな CGEventTap を動かす。判定ロジックは純粋関数的な `HotkeyInterpreter`。修飾キーのトリガーはデバイス依存のフラグビットを使い、左右のキーを区別する。他キーとの同時押しや Esc でキャンセル。
-2. 押下時、`DictationContextBuilder.make(target:)` がこの発話に必要なものをすべて `DictationContext` に固定する: 対象アプリ、STT 設定とキー、そのアプリの整形モード、認証情報付きの整形プロバイダ、語彙。発話中に設定が変わっても混ざらない。
+1. `HotkeyMonitor` がメインランループ上でアクティブな CGEventTap を動かす。判定ロジックは純粋関数的な `HotkeyInterpreter`。修飾キーのトリガーはデバイス依存のフラグビットを使い、左右のキーを区別する。押し始めに他キーと同時押しした場合や Esc でキャンセル。押すと録音開始、録音中に押すと終了。`holdThreshold`(0.4 秒)以上押し続けて離した場合は離した時点で終了し(プッシュトゥトーク)、それより短ければ次に押すまで録音を続ける。
+2. 録音開始時、`DictationContextBuilder.make(target:)` がこの発話に必要なものをすべて `DictationContext` に固定する: 対象アプリ、STT 設定とキー、そのアプリの整形モード、認証情報付きの整形プロバイダ、語彙。発話中に設定が変わっても混ざらない。
 3. `AudioCaptureService`(録音ごとに新しい AVAudioEngine)が PCM16 モノラルのチャンクを `AsyncStream<AudioChunk>` として流す。ポンプタスクが発話中にそれを STT セッションへ転送する。
-4. 離したとき: 短いタップ(< 250 ms)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
+4. 録音終了時: 250 ms 未満で止めた場合(誤ったダブルタップ)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
 
 **辞書**(`Vocabulary/`): `VocabularyReplacer` は、聞き取り例(`spoken` と `aliases`)を表記(`preferred`)に置き換える。照合は `KanaFolding` で 1 文字ずつ正規化して行う(NFKC で全角英数字と半角カナを揃え、平仮名を片仮名に)。置き換えなかった部分の表記は変えない。STT には、表記(`TranscriptionConfig.vocabulary`)に加えて、聞き取り例を片仮名にした読み(`readings`)も渡す。Soniox は表記を先に、重複を除いて 200 語までを `context.terms` に入れる。Gemini には表記だけを渡す。
 

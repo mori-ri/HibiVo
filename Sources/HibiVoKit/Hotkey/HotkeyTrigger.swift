@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// The key the user holds to dictate.
+/// The key the user taps to start and stop dictation.
 public enum HotkeyTrigger: Codable, Hashable, Sendable {
     case fn
     case rightOption

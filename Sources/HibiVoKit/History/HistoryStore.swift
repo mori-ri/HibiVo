@@ -18,7 +18,7 @@ public struct HistoryRecord: Codable, Identifiable, Hashable, Sendable {
     public var bundleID: String?
     public var provider: String
     public var cleanupMode: CleanupMode
-    /// Key release → paste, in milliseconds.
+    /// Recording stop → paste, in milliseconds.
     public var latencyMs: Int
     public var status: Status
     public var errorMessage: String?

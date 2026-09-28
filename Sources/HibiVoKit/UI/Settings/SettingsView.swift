@@ -17,13 +17,13 @@ struct GeneralSettingsView: View {
                 if let launchError { NoteRow(launchError, color: .red) }
             }
             SettingsSection(title: "操作") {
-                PickerRow("ホットキー（押している間だけ録音）", selection: hotkeyBinding) {
+                PickerRow("ホットキー（押すと録音開始、もう一度押すと終了）", selection: hotkeyBinding) {
                     ForEach(HotkeyTrigger.presets, id: \.self) { Text($0.displayName).tag($0) }
                 }
                 if env.settings.hotkey == .fn {
                     NoteRow("システム設定 › キーボード の「🌐キーを押して」を「何もしない」にしてください。")
                 }
-                NoteRow("Esc で録音を取り消せます。")
+                NoteRow("押し続けて話し、離して終了することもできます。Esc で録音を取り消せます。止め忘れた録音は 10 分で自動的に終了します。")
             }
             SettingsSection(title: "音声") {
                 PickerRow("マイク", selection: $settings.microphoneUID) {

@@ -2,8 +2,8 @@ import Foundation
 
 /// Wire format for Gemini Live transcription (`gemini-3.5-transcribe-live` over BidiGenerateContent).
 ///
-/// Push-to-talk maps onto manual activity detection: `activityStart` when the session is ready,
-/// `activityEnd` on key-up, after which the server emits the finalized `inputTranscription`.
+/// Toggle dictation maps onto manual activity detection: `activityStart` when the session is ready,
+/// `activityEnd` when recording stops, after which the server emits the finalized `inputTranscription`.
 enum GeminiLiveProtocol {
     static let endpoint = URL(
         string:

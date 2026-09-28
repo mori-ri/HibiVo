@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import OSLog
 
-/// Listens for the global push-to-talk key via a CGEventTap.
+/// Listens for the global dictation hotkey via a CGEventTap.
 ///
 /// An active (non listen-only) tap is used so the shortcut keystroke itself can be swallowed.
 /// It requires the Accessibility permission. The tap is installed on the main run loop, so the

@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// What a raw keyboard event means for push-to-talk.
+/// What a raw keyboard event means for the dictation hotkey.
 public enum HotkeyAction: Equatable, Sendable {
     case pressed
     case released
@@ -25,7 +25,7 @@ public struct KeyEvent: Sendable {
     }
 }
 
-/// Turns key events into push-to-talk actions, tracking whether the trigger is held.
+/// Turns key events into hotkey actions, tracking whether the trigger is held.
 ///
 /// Modifier triggers use device-dependent flag bits so that e.g. holding Left Option
 /// does not mask the release of Right Option.
