@@ -4,19 +4,9 @@ import Testing
 @testable import HibiVoKit
 
 @Suite struct AppModeRulesTests {
-    @Test(arguments: [
-        ("com.apple.Terminal", CleanupMode.prompt),
-        ("com.todesktop.230313mzl4w4u92", .prompt),
-        ("com.microsoft.VSCode", .prompt),
-        ("com.openai.chat", .prompt),
-        ("com.tinyspeck.slackmacgap", .natural),
-        ("com.microsoft.teams2", .natural),
-        ("com.microsoft.Outlook", .business),
-        ("com.apple.mail", .business),
-        ("com.apple.Safari", .natural),
-    ])
-    func builtInDefaults(bundleID: String, expected: CleanupMode) {
-        #expect(AppModeRules.mode(for: bundleID, overrides: [], default: .natural) == expected)
+    @Test func appsWithoutUserSettingUseDefault() {
+        #expect(AppModeRules.mode(for: "com.tinyspeck.slackmacgap", overrides: [], default: .business) == .business)
+        #expect(AppModeRules.mode(for: "com.apple.Terminal", overrides: [], default: .natural) == .natural)
     }
 
     @Test func userOverrideWinsAndMatchingIsCaseInsensitive() {
@@ -37,6 +27,29 @@ import Testing
         #expect(SettingsStore(defaults: defaults).cleanupMode(for: "com.tinyspeck.slackmacgap") == .business)
         settings.setMode(nil, bundleID: "com.tinyspeck.slackmacgap", name: "Slack")
         #expect(settings.cleanupMode(for: "com.tinyspeck.slackmacgap") == .natural)
+    }
+
+    @MainActor @Test func initialModesAreSeededOnceAndCanBeRemoved() {
+        let defaults = UserDefaults(suiteName: "AppModeRulesTests-\(UUID())")!
+        let settings = SettingsStore(defaults: defaults)
+        #expect(settings.appModeOverrides == AppModeRules.initialOverrides)
+        #expect(settings.cleanupMode(for: "com.apple.Terminal") == .prompt)
+        #expect(settings.cleanupMode(for: "com.apple.mail") == .business)
+
+        settings.setMode(nil, bundleID: "com.apple.Terminal", name: "Terminal")
+        #expect(settings.cleanupMode(for: "com.apple.Terminal") == .natural)
+        let reloaded = SettingsStore(defaults: defaults)
+        #expect(reloaded.appModeOverrides.map(\.bundleID) == ["com.apple.mail"])
+    }
+
+    @MainActor @Test func seedingKeepsExistingUserSettings() throws {
+        let defaults = UserDefaults(suiteName: "AppModeRulesTests-\(UUID())")!
+        let saved = [AppModeOverride(bundleID: "com.apple.mail", name: "Mail", mode: .raw)]
+        defaults.set(try JSONEncoder().encode(saved), forKey: "appModeOverrides")
+        let settings = SettingsStore(defaults: defaults)
+        #expect(settings.cleanupMode(for: "com.apple.mail") == .raw)
+        #expect(settings.cleanupMode(for: "com.apple.Terminal") == .prompt)
+        #expect(settings.appModeOverrides.count == 2)
     }
 
     @MainActor @Test func contextUsesModeOfTargetApp() throws {

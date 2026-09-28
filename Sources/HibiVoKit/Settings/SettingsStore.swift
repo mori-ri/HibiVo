@@ -56,6 +56,7 @@ public final class SettingsStore {
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
         usdJPYRate = defaults.object(forKey: "usdJPYRate") as? Double ?? UsagePricing.defaultUSDJPYRate
+        seedAppModeOverrides()
     }
 
     /// Cleanup mode for the app that will receive the text.
@@ -66,6 +67,16 @@ public final class SettingsStore {
     public func setMode(_ mode: CleanupMode?, bundleID: String, name: String) {
         appModeOverrides.removeAll { $0.bundleID == bundleID }
         if let mode { appModeOverrides.append(AppModeOverride(bundleID: bundleID, name: name, mode: mode)) }
+    }
+
+    /// Adds the initial per-app modes once, keeping any the user already set. Earlier versions applied them as
+    /// fixed rules that couldn't be removed; seeding them makes them ordinary, deletable entries.
+    private func seedAppModeOverrides() {
+        guard !defaults.bool(forKey: "appModeOverridesSeeded") else { return }
+        let existing = Set(appModeOverrides.map { $0.bundleID.lowercased() })
+        let missing = AppModeRules.initialOverrides.filter { !existing.contains($0.bundleID.lowercased()) }
+        if !missing.isEmpty { appModeOverrides += missing }
+        defaults.set(true, forKey: "appModeOverridesSeeded")
     }
 
     private func save<T: Encodable>(_ value: T, _ key: String) {

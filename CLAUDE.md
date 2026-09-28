@@ -64,7 +64,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
   - `BedrockCleanupProvider`: `anthropic.` を含むモデル ID は Anthropic のリクエストボディで InvokeModel を使う。それ以外のモデル(GLM、MiniMax、GPT など)は Converse API を使う。認証は Bedrock API キー(Bearer)か、自前の `AWSSigV4`(CryptoKit 実装、AWS テストスイートのベクタで検証済み)で署名する IAM キー。
 - プロバイダ種別、デフォルトモデル、Keychain のアカウント名は `CleanupProviderKind` / `SecretAccount`(`TextCleanupProvider.swift`)に集約されている。
 
-**アプリ別モード**: `AppModeRules` は次の順でモードを解決する: ユーザーの上書き設定 → 組み込みのバンドル ID 別デフォルト(ターミナル/IDE/ChatGPT → Prompt、Slack/Teams → Natural、Mail/Outlook → Business)→ グローバルデフォルト。
+**アプリ別モード**: `AppModeRules` は、ユーザーのアプリ別設定(`appModeOverrides`)→ グローバルデフォルトの順でモードを解決する。初回起動時に `AppModeRules.initialOverrides`(Terminal → Prompt、Mail → Business)を一度だけ設定に追加する(`appModeOverridesSeeded`)。追加した後は通常の項目として変更・削除できる。
 
 **挿入**(`Insertion/`): Electron/ブラウザ/ターミナルとの互換性のため、AX での値設定ではなくクリップボード + ⌘V(仮想キー 0x09)を使う。
 - `ClipboardManager` はすべてのアイテム × すべてのタイプをスナップショットし、自身の書き込みには `org.nspasteboard.TransientType` を付ける。
