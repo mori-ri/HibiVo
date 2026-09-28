@@ -40,6 +40,17 @@ struct MockCleanupProvider: TextCleanupProvider {
     @Test func promptModeForbidsInventedRequirements() {
         let prompt = CleanupPromptBuilder.systemPrompt(mode: .prompt, vocabulary: [], appName: nil)
         #expect(prompt.contains("ユーザーが言っていない要件"))
+        #expect(prompt.contains("語尾・口調は変えない"))
+        #expect(prompt.contains("\n- 「えー」"))
+    }
+
+    @Test func businessKeepsWordingAndBreaksLines() {
+        let business = CleanupPromptBuilder.systemPrompt(mode: .business, vocabulary: [], appName: nil)
+        #expect(business.contains("言い回し・語順・語尾は話者のまま残し"))
+        #expect(business.contains("本文は 1 文ごとに改行"))
+        #expect(business.contains("\n- 「えー」"))
+        let natural = CleanupPromptBuilder.systemPrompt(mode: .natural, vocabulary: [], appName: nil)
+        #expect(!natural.contains("1 文ごとに改行"))
     }
 
     @Test func userMessageWrapsTranscript() {
