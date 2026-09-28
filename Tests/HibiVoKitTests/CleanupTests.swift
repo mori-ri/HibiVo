@@ -205,4 +205,50 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(VocabularyReplacer.apply(entries, to: "特に何もなし😀") == "特に何もなし😀")
         #expect(VocabularyReplacer.apply([], to: "abc") == "abc")
     }
+
+    @Test func hiraganaSpokenFormMatchesKatakanaOutput() {
+        let hibivo = [VocabularyEntry(preferred: "HibiVo", spoken: "ひびぼ")]
+        #expect(VocabularyReplacer.apply(hibivo, to: "ヒビボの進捗です") == "HibiVoの進捗です")
+        #expect(VocabularyReplacer.apply(hibivo, to: "ひびぼの進捗です") == "HibiVoの進捗です")
+        // Mixed scripts within one word, as STT sometimes splits a name.
+        #expect(VocabularyReplacer.apply(hibivo, to: "ヒビぼ") == "HibiVo")
+    }
+
+    @Test func katakanaSpokenFormMatchesHiraganaOutput() {
+        #expect(VocabularyReplacer.apply(entries, to: "くろーどこーどで書く") == "Claude Codeで書く")
+    }
+
+    @Test func fullAndHalfWidthFormsMatch() {
+        // Full-width Latin letters and half-width katakana fold to the registered form.
+        #expect(VocabularyReplacer.apply(entries, to: "ＡＷＳラムダ") == "AWS Lambda")
+        #expect(VocabularyReplacer.apply([VocabularyEntry(preferred: "Siri", spoken: "シリ")], to: "ｼﾘに聞く") == "Siriに聞く")
+        // A half-width voiced mark joins the kana before it into one Character, so "ﾄﾞ" folds to "ド".
+        #expect(VocabularyReplacer.apply(entries, to: "ｸﾛｰﾄﾞｺｰﾄﾞ") == "Claude Code")
+    }
+
+    @Test func unreplacedTextKeepsItsScript() {
+        // Folding is only for comparison; the surrounding text is never rewritten to katakana.
+        #expect(VocabularyReplacer.apply(entries, to: "ひらがなとＡＢＣはそのまま、アップシンク") == "ひらがなとＡＢＣはそのまま、AppSync")
+    }
+
+    @Test func readingsAreKatakanaSpokenForms() {
+        let entry = VocabularyEntry(preferred: "HibiVo", spoken: "ひびぼ", aliases: ["日比保"])
+        #expect(entry.readings == ["ヒビボ", "日比保"])
+    }
+}
+
+@MainActor
+@Suite struct VocabularyHintTests {
+    @Test func dictationHintsSpellingsAndReadings() throws {
+        let settings = SettingsStore(defaults: UserDefaults(suiteName: "VocabularyHintTests-\(UUID())")!)
+        settings.transcriptionProviderID = "mock"
+        let builder = DictationContextBuilder(
+            settings: settings, secrets: MockSecrets(), transcriptionProviders: [MockTranscriptionProvider()],
+            vocabulary: {
+                [VocabularyEntry(preferred: "HibiVo", spoken: "ひびぼ"), VocabularyEntry(preferred: "Bedrock")]
+            })
+        let config = try builder.make(target: nil).transcriptionConfig
+        #expect(config.vocabulary == ["HibiVo", "Bedrock"])
+        #expect(config.readings == ["ヒビボ"])
+    }
 }

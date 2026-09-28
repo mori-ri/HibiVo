@@ -27,6 +27,20 @@ import Testing
         #expect(context["terms"] as? [String] == ["AppSync", "Bedrock"])
     }
 
+    @Test func readingsAreHintedAfterSpellingsWithoutDuplicates() throws {
+        let config = TranscriptionConfig(
+            apiKey: "k", model: "m", language: "ja", vocabulary: ["HibiVo", "AppSync"],
+            readings: ["ヒビボ", "AppSync"])
+        #expect(SonioxProtocol.terms(for: config) == ["HibiVo", "AppSync", "ヒビボ"])
+        let many = TranscriptionConfig(
+            apiKey: "k", model: "m", language: "ja", vocabulary: (0..<150).map { "v\($0)" },
+            readings: (0..<150).map { "r\($0)" })
+        let terms = SonioxProtocol.terms(for: many)
+        #expect(terms.count == 200)
+        #expect(terms.first == "v0")
+        #expect(terms.last == "r49")
+    }
+
     @Test func configOmitsContextWithoutVocabulary() throws {
         let json = try SonioxProtocol.config(
             for: TranscriptionConfig(apiKey: "k", model: "m", language: "ja"), sampleRate: 16_000)

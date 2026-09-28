@@ -47,6 +47,8 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 3. `AudioCaptureService`(録音ごとに新しい AVAudioEngine)が PCM16 モノラルのチャンクを `AsyncStream<AudioChunk>` として流す。ポンプタスクが発話中にそれを STT セッションへ転送する。
 4. 離したとき: 短いタップ(< 250 ms)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
 
+**辞書**(`Vocabulary/`): `VocabularyReplacer` は、聞き取り例(`spoken` と `aliases`)を表記(`preferred`)に置き換える。照合は `KanaFolding` で 1 文字ずつ正規化して行う(NFKC で全角英数字と半角カナを揃え、平仮名を片仮名に)。置き換えなかった部分の表記は変えない。STT には、表記(`TranscriptionConfig.vocabulary`)に加えて、聞き取り例を片仮名にした読み(`readings`)も渡す。Soniox は表記を先に、重複を除いて 200 語までを `context.terms` に入れる。Gemini には表記だけを渡す。
+
 **STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションはソケット接続前の `send` を受け付けてバッファする。実装は 2 つ。どちらもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
 - Soniox(`stt-rt-v5`): `finalize` → `<fin>` トークンを待つ。
 - Gemini(`gemini-3.5-transcribe-live`、Live API): 手動 VAD。`setupComplete` まで音声をバッファし、`activityStart` → 音声 → `activityEnd` を送る。確定した `inputTranscription` のセグメントを連結し、`turnComplete` と最後のセグメント(順序は保証されない)が揃うか、少し待って終了する。不正なキーはソケットの close 理由で届く。API キー(Keychain の `gemini`)は整形の Gemini と共通。

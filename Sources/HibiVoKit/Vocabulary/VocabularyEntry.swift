@@ -22,6 +22,11 @@ public struct VocabularyEntry: Codable, Identifiable, Hashable, Sendable {
             .filter { !$0.isEmpty && $0 != preferred }
     }
 
+    /// Spoken forms as STT hints. Katakana, because that is how STT writes a name it doesn't know.
+    public var readings: [String] {
+        spokenForms.map(KanaFolding.katakana)
+    }
+
     var promptTerm: CleanupPromptBuilder.Term {
         CleanupPromptBuilder.Term(preferred: preferred, spokenForms: spokenForms)
     }
