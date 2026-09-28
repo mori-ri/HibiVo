@@ -21,14 +21,16 @@ import Testing
     private func makeController(
         provider: MockTranscriptionProvider = MockTranscriptionProvider(),
         secrets: MockSecrets = MockSecrets(),
-        minimumHold: Duration = .zero
+        minimumDuration: Duration = .zero,
+        holdThreshold: Duration = .zero
     ) -> DictationController {
         DictationController(
             state: state, audio: audio,
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: secrets, transcriptionProviders: [provider]),
             activeApp: MockActiveApp(), inserter: inserter, ducker: ducker,
-            duckingEnabled: { settings.duckOutputWhileRecording }, minimumHold: minimumHold)
+            duckingEnabled: { settings.duckOutputWhileRecording }, minimumDuration: minimumDuration,
+            holdThreshold: holdThreshold)
     }
 
     @Test func speakersAreDuckedOnlyWhileRecording() async {
@@ -92,7 +94,7 @@ import Testing
 
     @Test func shortTapIsCancelled() async throws {
         let provider = MockTranscriptionProvider()
-        let sut = makeController(provider: provider, minimumHold: .seconds(10))
+        let sut = makeController(provider: provider, minimumDuration: .seconds(10))
         sut.handle(.pressed)
         audio.speak()
         sut.handle(.released)
@@ -113,12 +115,39 @@ import Testing
         #expect(state.phase == .idle)
     }
 
-    @Test func secondPressWhileRecordingIsIgnored() {
-        let sut = makeController()
+    @Test func shortTapKeepsRecordingUntilNextPress() async throws {
+        let provider = MockTranscriptionProvider()
+        let sut = makeController(provider: provider, holdThreshold: .seconds(10))
         sut.handle(.pressed)
-        sut.handle(.pressed)
-        #expect(audio.startCount == 1)
+        sut.handle(.released)
         #expect(state.phase == .recording)
+        audio.speak()
+        sut.handle(.pressed)
+        #expect(state.phase == .processing)
+        sut.handle(.released)  // The release after the stopping press is a no-op.
+        await sut.waitUntilIdle()
+        let session = try #require(provider.sessions.first)
+        #expect(await session.didFinish)
+        #expect(audio.startCount == 1)
+        #expect(inserter.inserted.count == 1)
+    }
+
+    @Test func longHoldStopsOnRelease() async {
+        let sut = makeController(holdThreshold: .milliseconds(20))
+        sut.handle(.pressed)
+        audio.speak()
+        try? await Task.sleep(for: .milliseconds(40))
+        sut.handle(.released)
+        #expect(state.phase == .processing)
+        await sut.waitUntilIdle()
+        #expect(inserter.inserted.count == 1)
+    }
+
+    @Test func interruptedHoldIsCancelled() {
+        let sut = makeController(holdThreshold: .seconds(10))
+        sut.handle(.pressed)
+        sut.handle(.interrupted)
+        #expect(state.phase == .idle)
     }
 
     @Test func pressWhileProcessingIsIgnored() async {

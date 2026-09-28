@@ -120,7 +120,8 @@ import Testing
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: MockSecrets(),
                 transcriptionProviders: [MockTranscriptionProvider(result: .failure(.network("x")))]),
-            activeApp: MockActiveApp(), inserter: MockInserter(), history: history, minimumHold: .zero)
+            activeApp: MockActiveApp(), inserter: MockInserter(), history: history, minimumDuration: .zero,
+            holdThreshold: .zero)
         sut.handle(.pressed)
         audio.speak()
         sut.handle(.released)
@@ -141,7 +142,8 @@ import Testing
             state: AppState(), audio: audio,
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: MockSecrets(), transcriptionProviders: [MockTranscriptionProvider()]),
-            activeApp: MockActiveApp(), inserter: MockInserter(), history: history, minimumHold: .zero)
+            activeApp: MockActiveApp(), inserter: MockInserter(), history: history, minimumDuration: .zero,
+            holdThreshold: .zero)
         sut.toggleCleanup()  // Ignored while idle.
         #expect(settings.cleanupEnabled == false)
 
@@ -176,7 +178,7 @@ import Testing
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: MockSecrets(), transcriptionProviders: [MockTranscriptionProvider()]),
             activeApp: MockActiveApp(), inserter: MockInserter(), history: history,
-            historyEnabled: { settings.historyEnabled }, minimumHold: .zero)
+            historyEnabled: { settings.historyEnabled }, minimumDuration: .zero, holdThreshold: .zero)
         sut.handle(.pressed)
         audio.speak()
         sut.handle(.released)

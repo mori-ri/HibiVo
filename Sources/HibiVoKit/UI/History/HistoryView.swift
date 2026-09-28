@@ -9,7 +9,7 @@ struct HistoryView: View {
             ContentUnavailableView {
                 Label("履歴はまだありません", systemImage: "clock")
             } description: {
-                Text("\(env.settings.hotkey.displayName) を押しながら話すと、ここに記録されます。")
+                Text("\(env.settings.hotkey.displayName) を押して話し、もう一度押すと、ここに記録されます。")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -121,7 +121,7 @@ private struct HistoryDetail: View {
                     info("アプリ", record.appName ?? "—")
                     info("STT", record.provider)
                     info("モード", record.cleanupMode.displayName)
-                    info("キーを離してから入力まで", "\(record.latencyMs) ms")
+                    info("録音終了から入力まで", "\(record.latencyMs) ms")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

@@ -142,7 +142,7 @@ private struct Sidebar: View {
             .padding(.bottom, 12)
 
             VStack(alignment: .leading, spacing: 4) {
-                Label("\(env.settings.hotkey.displayName) を押しながら話す", systemImage: "mic")
+                Label("\(env.settings.hotkey.displayName) を押して話す", systemImage: "mic")
                 if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
                     Text("バージョン \(version)").foregroundStyle(.tertiary)
                 }

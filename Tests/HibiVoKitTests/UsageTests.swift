@@ -199,12 +199,13 @@ import Testing
         settings.cleanupEnabled = false
     }
 
-    func makeController(minimumHold: Duration = .zero) -> DictationController {
+    func makeController(minimumDuration: Duration = .zero) -> DictationController {
         DictationController(
             state: state, audio: audio,
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: MockSecrets(), transcriptionProviders: [MockTranscriptionProvider()]),
-            activeApp: MockActiveApp(), inserter: MockInserter(), usage: usage, minimumHold: minimumHold)
+            activeApp: MockActiveApp(), inserter: MockInserter(), usage: usage, minimumDuration: minimumDuration,
+            holdThreshold: .zero)
     }
 
     @Test func dictationRecordsCountCharactersAndAudio() async {

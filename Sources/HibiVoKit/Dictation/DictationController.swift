@@ -1,13 +1,16 @@
 import Foundation
 import OSLog
 
-/// The push-to-talk state machine:
-/// press → record (streaming STT) → release → finish STT → cleanup → paste.
+/// The dictation state machine:
+/// press → record (streaming STT) → stop → finish STT → cleanup → paste.
+///
+/// A short tap latches recording until the next press; holding the key past `holdThreshold`
+/// works as push-to-talk and stops on release.
 @MainActor
 public final class DictationController {
     /// Peak RMS below this means nobody spoke; skip the upload and the paste.
     static let silenceThreshold: Float = 0.005
-    /// Safety cap in case a key release is ever missed.
+    /// Safety cap in case the user forgets to stop recording.
     static let maximumRecording: Duration = .seconds(600)
 
     private struct Pumped {
@@ -23,6 +26,8 @@ public final class DictationController {
         var pump: Task<Pumped, Never>
         var partials: Task<Void, Never>
         var watchdog: Task<Void, Never>
+        /// Whether the key that started this recording is still down.
+        var isHeld = true
     }
 
     private let state: AppState
@@ -37,8 +42,11 @@ public final class DictationController {
     private let microphoneUID: @MainActor () -> String?
     private let ducker: (any OutputDucking)?
     private let duckingEnabled: @MainActor () -> Bool
-    /// Releases shorter than this are treated as accidental taps.
-    private let minimumHold: Duration
+    /// Recordings stopped sooner than this are treated as an accidental double tap.
+    private let minimumDuration: Duration
+    /// Releasing the key after holding it at least this long stops recording (push-to-talk).
+    /// A shorter press keeps recording until the next press.
+    private let holdThreshold: Duration
     private let clock = ContinuousClock()
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "dictation")
 
@@ -59,7 +67,8 @@ public final class DictationController {
         microphoneUID: @escaping @MainActor () -> String? = { nil },
         ducker: (any OutputDucking)? = nil,
         duckingEnabled: @escaping @MainActor () -> Bool = { true },
-        minimumHold: Duration = .milliseconds(250)
+        minimumDuration: Duration = .milliseconds(250),
+        holdThreshold: Duration = .milliseconds(400)
     ) {
         self.state = state
         self.audio = audio
@@ -73,19 +82,21 @@ public final class DictationController {
         self.microphoneUID = microphoneUID
         self.ducker = ducker
         self.duckingEnabled = duckingEnabled
-        self.minimumHold = minimumHold
+        self.minimumDuration = minimumDuration
+        self.holdThreshold = holdThreshold
     }
 
     public func handle(_ action: HotkeyAction) {
         switch action {
+        case .pressed where state.phase == .recording: end()
         case .pressed: begin()
-        case .released: end()
+        case .released: releaseKey()
         case .interrupted, .escape: cancel()
         }
     }
 
     /// Flips AI cleanup from the HUD while recording. The HUD reflects the new setting at once,
-    /// so the utterance in progress switches too instead of keeping the value frozen at key-down.
+    /// so the utterance in progress switches too instead of keeping the value frozen at the start.
     public func toggleCleanup() {
         guard state.phase == .recording, let recording else { return }
         contextBuilder.settings.cleanupEnabled.toggle()
@@ -100,7 +111,7 @@ public final class DictationController {
     // MARK: - Recording
 
     private func begin() {
-        // A second press while recording or processing is ignored so pastes never interleave.
+        // A press while processing is ignored so pastes never interleave.
         guard !state.phase.isActive else { return }
         errorDismiss?.cancel()
 
@@ -155,9 +166,19 @@ public final class DictationController {
             watchdog: watchdog)
     }
 
+    /// Ends a push-to-talk hold; a short tap leaves recording running until the next press.
+    private func releaseKey() {
+        guard state.phase == .recording, let recording, recording.isHeld else { return }
+        if clock.now - recording.startedAt >= holdThreshold {
+            end()
+        } else {
+            self.recording?.isHeld = false
+        }
+    }
+
     private func end() {
         guard state.phase == .recording, let recording else { return }
-        if clock.now - recording.startedAt < minimumHold {
+        if clock.now - recording.startedAt < minimumDuration {
             cancel()
             return
         }
@@ -166,8 +187,8 @@ public final class DictationController {
         audio.stop()  // Finishes the audio stream, which lets `pump` drain and return.
         ducker?.restore()
         state.phase = .processing
-        let releasedAt = clock.now
-        processing = Task { await process(recording, releasedAt: releasedAt) }
+        let stoppedAt = clock.now
+        processing = Task { await process(recording, stoppedAt: stoppedAt) }
     }
 
     private func cancel() {
@@ -188,7 +209,7 @@ public final class DictationController {
 
     // MARK: - Processing
 
-    private func process(_ recording: Recording, releasedAt: ContinuousClock.Instant) async {
+    private func process(_ recording: Recording, stoppedAt: ContinuousClock.Instant) async {
         let context = recording.context
         let pumped = await recording.pump.value
         recording.partials.cancel()
@@ -208,7 +229,7 @@ public final class DictationController {
             log.error("Transcription failed: \(String(describing: error), privacy: .public)")
             recordUsage(context, audio: pumped)
             let message = Self.userFacing(error, provider: context.transcriptionProvider)
-            record(context, raw: "", cleaned: nil, releasedAt: releasedAt, status: .failed, error: message.message)
+            record(context, raw: "", cleaned: nil, stoppedAt: stoppedAt, status: .failed, error: message.message)
             show(message)
             return
         }
@@ -230,7 +251,7 @@ public final class DictationController {
         let outcome = await inserter.insert(cleaned.text, into: context.target)
         recordUsage(context, audio: pumped, inserted: cleaned.text, cleanup: cleaned)
         log.info(
-            "Release→STT \(sttDone - releasedAt), cleanup \(cleanupDone - sttDone), paste \(self.clock.now - cleanupDone)"
+            "Stop→STT \(sttDone - stoppedAt), cleanup \(cleanupDone - sttDone), paste \(self.clock.now - cleanupDone)"
         )
 
         let status: HistoryRecord.Status =
@@ -239,7 +260,7 @@ public final class DictationController {
             case .pasted: cleaned.failure == nil ? .pasted : .pastedRaw
             }
         record(
-            context, raw: raw, cleaned: cleaned.didCleanup ? cleaned.text : nil, releasedAt: releasedAt,
+            context, raw: raw, cleaned: cleaned.didCleanup ? cleaned.text : nil, stoppedAt: stoppedAt,
             status: status, error: cleaned.failure.map { String(describing: $0) })
 
         switch outcome {
@@ -250,11 +271,11 @@ public final class DictationController {
     }
 
     private func record(
-        _ context: DictationContext, raw: String, cleaned: String?, releasedAt: ContinuousClock.Instant,
+        _ context: DictationContext, raw: String, cleaned: String?, stoppedAt: ContinuousClock.Instant,
         status: HistoryRecord.Status, error: String?
     ) {
         guard historyEnabled() else { return }
-        let elapsed = clock.now - releasedAt
+        let elapsed = clock.now - stoppedAt
         history?.append(
             HistoryRecord(
                 timestamp: Date(),

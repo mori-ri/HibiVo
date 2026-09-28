@@ -20,7 +20,7 @@ public struct MenuBarContent: View {
             Button("⚠️ マイク権限を許可…") { Permissions.openMicrophoneSettings() }
         }
 
-        Text("\(env.settings.hotkey.displayName) を押しながら話す")
+        Text("\(env.settings.hotkey.displayName) を押して話す（もう一度押すと終了）")
 
         if let last = env.history.records.first(where: { !$0.finalText.isEmpty }) {
             Button("直前の結果をもう一度入力") { env.pasteAgain(last.finalText) }
