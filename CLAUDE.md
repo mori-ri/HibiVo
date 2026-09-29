@@ -84,6 +84,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - AVAudioEngine のタップブロックは `nonisolated` なコンテキストで作ること(`AudioCaptureService.makeTapBlock`)。`@MainActor` メソッド内で作ったクロージャは、Swift 6 ではリアルタイム音声スレッド上でトラップする。
 - CGEventTap の C コールバックは、`MainActor.assumeIsolated` の前にイベントのフィールドを Sendable な `KeyEvent` にコピーする。
 - ホットキーのアクションはタップコールバックの外、`Task { @MainActor }` で処理する。コールバックが遅い(Bluetooth マイクでのエンジン起動など)と macOS がタップを無効化してしまう。
+- 押し続けた時間は、処理した時刻ではなくキーイベントが起きた時刻(`HotkeyMonitor` が `NSEvent.timestamp` から求める)で測る。音声エンジンの起動中は離したイベントが待たされるため、処理時刻で測るとショートタップが長押しと判定されて録音がすぐ止まる。
 - `DictationController.waitUntilIdle()` は実行中の processing / cancel タスクを await する。テストでは sleep の代わりにこれを使う。
 
 ## 規約

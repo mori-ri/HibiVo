@@ -42,10 +42,10 @@ public final class AppEnvironment {
         let dictation = dictation
         hud = HUDController(state: state, settings: settings, onClick: { dictation.toggleCleanup() })
 
-        hotkey.onAction = { action in
+        hotkey.onAction = { action, occurredAt in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth
             // mics), and a slow callback makes the system disable the event tap.
-            Task { @MainActor in dictation.handle(action) }
+            Task { @MainActor in dictation.handle(action, at: occurredAt) }
         }
         observeRecording()
     }

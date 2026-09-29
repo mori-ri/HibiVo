@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import OSLog
@@ -9,7 +10,9 @@ import OSLog
 /// callback always runs on the main thread.
 @MainActor
 public final class HotkeyMonitor {
-    public var onAction: ((HotkeyAction) -> Void)?
+    /// Called with the action and when the key event actually happened, which can be well before the
+    /// callback runs if the main thread was busy (e.g. starting the audio engine).
+    public var onAction: ((HotkeyAction, ContinuousClock.Instant) -> Void)?
 
     private var interpreter: HotkeyInterpreter
     private var tap: CFMachPort?
@@ -74,7 +77,7 @@ public final class HotkeyMonitor {
         interpreter.reset()
     }
 
-    fileprivate func handle(type: CGEventType, event keyEvent: KeyEvent?) -> Bool {
+    fileprivate func handle(type: CGEventType, event keyEvent: KeyEvent?, occurredAt: ContinuousClock.Instant) -> Bool {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             // The system disables taps that respond slowly. Re-enable and keep the held state: if the
@@ -85,7 +88,7 @@ public final class HotkeyMonitor {
         default:
             guard let keyEvent else { return false }
             let output = interpreter.handle(keyEvent)
-            if let action = output.action { onAction?(action) }
+            if let action = output.action { onAction?(action, occurredAt) }
             return output.consume
         }
     }
@@ -106,11 +109,27 @@ private func hotkeyTapCallback(
                 isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
         default: nil
         }
+    let occurredAt = eventTime(event)
     let monitorAddress = UInt(bitPattern: userInfo)
     let consume = MainActor.assumeIsolated {
         guard let pointer = UnsafeMutableRawPointer(bitPattern: monitorAddress) else { return false }
         let monitor = Unmanaged<HotkeyMonitor>.fromOpaque(pointer).takeUnretainedValue()
-        return monitor.handle(type: type, event: keyEvent)
+        return monitor.handle(type: type, event: keyEvent, occurredAt: occurredAt)
     }
     return consume ? nil : Unmanaged.passUnretained(event)
+}
+
+/// When the key event happened, on the clock the dictation controller measures holds with.
+///
+/// Events queue up while the main thread is busy, so the callback's own time can be far too late:
+/// a short tap whose release waited behind a slow audio engine start looked like a long hold.
+/// NSEvent's timestamp shares its time base with `systemUptime`, which avoids CGEventTimestamp's
+/// unit differences across architectures.
+private func eventTime(_ event: CGEvent) -> ContinuousClock.Instant {
+    let now = ContinuousClock.now
+    guard let timestamp = NSEvent(cgEvent: event)?.timestamp, timestamp > 0 else { return now }
+    let age = ProcessInfo.processInfo.systemUptime - timestamp
+    // Anything outside this range means the timestamp is unusable; fall back to the callback time.
+    guard age > 0, age < 10 else { return now }
+    return now - .seconds(age)
 }
