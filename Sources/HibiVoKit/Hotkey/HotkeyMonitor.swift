@@ -109,7 +109,7 @@ private func hotkeyTapCallback(
                 isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
         default: nil
         }
-    let occurredAt = eventTime(event)
+    let occurredAt = keyEvent == nil ? ContinuousClock.now : eventTime(event)
     let monitorAddress = UInt(bitPattern: userInfo)
     let consume = MainActor.assumeIsolated {
         guard let pointer = UnsafeMutableRawPointer(bitPattern: monitorAddress) else { return false }
