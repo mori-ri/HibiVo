@@ -85,8 +85,9 @@ enum KanaFolding {
     }
 
     /// Characters STT puts inside a word at will: spaces (Soniox spaces out Latin words), "・" and "ー".
+    /// Line breaks are not among them, so a match never joins two lines.
     static func isSkippable(_ key: String) -> Bool {
-        key == longVowelMark || key == "・" || key.allSatisfy(\.isWhitespace)
+        key == longVowelMark || key == "・" || key == " " || key == "\t"
     }
 
     /// Whether a folded key is katakana, including the prolonged sound mark and iteration marks.

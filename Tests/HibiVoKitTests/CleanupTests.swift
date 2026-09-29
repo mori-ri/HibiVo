@@ -270,6 +270,7 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(VocabularyReplacer.apply(entries, to: "ヒビボーの話") == "HibiVoの話")
         #expect(VocabularyReplacer.apply(entries, to: "ヒ・ビ・ボ") == "HibiVo")
         #expect(VocabularyReplacer.apply(entries, to: "クロード コード と クロードコーダ") == "Claude Code と クロードコーダ")
+        #expect(VocabularyReplacer.apply(entries, to: "クロード\nコード") == "クロード\nコード")
         // Spaces and marks around a match stay where they were.
         #expect(VocabularyReplacer.apply(entries, to: "今の ヒビボ は") == "今の HibiVo は")
     }
@@ -291,7 +292,13 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(ai[0].promptTerm == .init(preferred: "AI", contextualForms: ["あい"]))
     }
 
-    @Test(arguments: ["あい", "シリ", "ｼﾘ", "ジー", "ア"])
+    @Test func formsShortOnceMarksAreSkippedAreLeftToCleanup() {
+        let entries = [VocabularyEntry(preferred: "Server", spoken: "サーバー", aliases: ["ビール"])]
+        #expect(VocabularyReplacer.apply(entries, to: "サバの味噌煮とビル") == "サバの味噌煮とビル")
+        #expect(entries[0].contextualForms == ["サーバー", "ビール"])
+    }
+
+    @Test(arguments: ["あい", "シリ", "ｼﾘ", "ジー", "ア", "サーバー", "ビ・ル"])
     func shortKanaNeedsContext(form: String) {
         #expect(VocabularyEntry.needsContext(form))
     }

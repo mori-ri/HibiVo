@@ -47,9 +47,10 @@ public struct VocabularyEntry: Codable, Identifiable, Hashable, Sendable {
     static let contextualLengthLimit = 2
 
     /// Kana-only forms of at most `contextualLengthLimit` characters. Kanji and Latin forms of the
-    /// same length are specific enough to replace.
+    /// same length are specific enough to replace. Counted by the keys the replacer matches, which skip
+    /// "ー", "・" and spaces: "サーバー" matches "サバ" and is as ambiguous as any two-kana word.
     static func needsContext(_ form: String) -> Bool {
-        let keys = KanaFolding.keys(form)
+        let keys = KanaFolding.matchKeys(form)
         return keys.count <= contextualLengthLimit && keys.allSatisfy(KanaFolding.isKatakana)
     }
 }
