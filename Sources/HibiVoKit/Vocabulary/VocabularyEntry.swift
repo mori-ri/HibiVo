@@ -22,12 +22,34 @@ public struct VocabularyEntry: Codable, Identifiable, Hashable, Sendable {
             .filter { !$0.isEmpty && $0 != preferred }
     }
 
-    /// Spoken forms as STT hints. Katakana, because that is how STT writes a name it doesn't know.
+    /// Spoken forms safe to replace without context.
+    public var replaceableForms: [String] {
+        spokenForms.filter { !Self.needsContext($0) }
+    }
+
+    /// Short kana forms such as "あい" for "AI": they are also everyday words and appear inside
+    /// other words ("あいさつ"), so only cleanup, which sees the context, may turn them into `preferred`.
+    public var contextualForms: [String] {
+        spokenForms.filter(Self.needsContext)
+    }
+
+    /// Replaceable forms as STT hints. Katakana, because that is how STT writes a name it doesn't know.
+    /// Contextual forms are left out so a hint like "アイ" doesn't pull "愛" toward katakana.
     public var readings: [String] {
-        spokenForms.map(KanaFolding.katakana)
+        replaceableForms.map(KanaFolding.katakana)
     }
 
     var promptTerm: CleanupPromptBuilder.Term {
-        CleanupPromptBuilder.Term(preferred: preferred, spokenForms: spokenForms)
+        CleanupPromptBuilder.Term(
+            preferred: preferred, spokenForms: replaceableForms, contextualForms: contextualForms)
+    }
+
+    static let contextualLengthLimit = 2
+
+    /// Kana-only forms of at most `contextualLengthLimit` characters. Kanji and Latin forms of the
+    /// same length are specific enough to replace.
+    static func needsContext(_ form: String) -> Bool {
+        let keys = KanaFolding.keys(form)
+        return keys.count <= contextualLengthLimit && keys.allSatisfy(KanaFolding.isKatakana)
     }
 }

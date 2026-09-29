@@ -30,6 +30,18 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(prompt.contains("言っていない情報を足さない"))
     }
 
+    @Test func contextualFormsAskForContext() {
+        let prompt = CleanupPromptBuilder.systemPrompt(
+            mode: .natural,
+            vocabulary: [
+                .init(preferred: "AI", contextualForms: ["あい"]),
+                .init(preferred: "Siri", spokenForms: ["シリちゃん"], contextualForms: ["シリ"]),
+            ],
+            appName: nil)
+        #expect(prompt.contains("- AI（読み: あい。同じ読みの一般的な言葉もあるため、文脈上この語を指すときだけこの表記にし、それ以外は変えない）"))
+        #expect(prompt.contains("- Siri（聞き取り例: シリちゃん。読み: シリ。"))
+    }
+
     @Test(arguments: CleanupMode.allCases)
     func everyModeForbidsAddingMeaning(mode: CleanupMode) {
         let prompt = CleanupPromptBuilder.systemPrompt(mode: mode, vocabulary: [], appName: nil)
@@ -233,7 +245,7 @@ struct MockCleanupProvider: TextCleanupProvider {
     @Test func fullAndHalfWidthFormsMatch() {
         // Full-width Latin letters and half-width katakana fold to the registered form.
         #expect(VocabularyReplacer.apply(entries, to: "ＡＷＳラムダ") == "AWS Lambda")
-        #expect(VocabularyReplacer.apply([VocabularyEntry(preferred: "Siri", spoken: "シリ")], to: "ｼﾘに聞く") == "Siriに聞く")
+        #expect(VocabularyReplacer.apply(entries, to: "ｱｯﾌﾟｼﾝｸに聞く") == "AppSyncに聞く")
         // A half-width voiced mark joins the kana before it into one Character, so "ﾄﾞ" folds to "ド".
         #expect(VocabularyReplacer.apply(entries, to: "ｸﾛｰﾄﾞｺｰﾄﾞ") == "Claude Code")
     }
@@ -247,6 +259,31 @@ struct MockCleanupProvider: TextCleanupProvider {
         let entry = VocabularyEntry(preferred: "HibiVo", spoken: "ひびぼ", aliases: ["日比保"])
         #expect(entry.readings == ["ヒビボ", "日比保"])
     }
+
+    @Test func shortKanaFormsAreLeftToCleanup() {
+        let ai = [VocabularyEntry(preferred: "AI", spoken: "あい")]
+        #expect(VocabularyReplacer.apply(ai, to: "あいさつに会いたい、あいの新曲") == "あいさつに会いたい、あいの新曲")
+        #expect(ai[0].contextualForms == ["あい"])
+        #expect(ai[0].readings.isEmpty)
+        #expect(ai[0].promptTerm == .init(preferred: "AI", contextualForms: ["あい"]))
+    }
+
+    @Test(arguments: ["あい", "シリ", "ｼﾘ", "ジー", "ア"])
+    func shortKanaNeedsContext(form: String) {
+        #expect(VocabularyEntry.needsContext(form))
+    }
+
+    @Test(arguments: ["ひびぼ", "ジェイ", "会期", "ai", "AI", "Aい"])
+    func longerOrNonKanaFormsAreReplaced(form: String) {
+        #expect(!VocabularyEntry.needsContext(form))
+    }
+
+    @Test func shortAndLongFormsSplitWithinOneEntry() {
+        let entry = VocabularyEntry(preferred: "AI", spoken: "エーアイ", aliases: ["あい"])
+        #expect(entry.replaceableForms == ["エーアイ"])
+        #expect(entry.contextualForms == ["あい"])
+        #expect(VocabularyReplacer.apply([entry], to: "エーアイとあい") == "AIとあい")
+    }
 }
 
 @MainActor
@@ -257,10 +294,13 @@ struct MockCleanupProvider: TextCleanupProvider {
         let builder = DictationContextBuilder(
             settings: settings, secrets: MockSecrets(), transcriptionProviders: [MockTranscriptionProvider()],
             vocabulary: {
-                [VocabularyEntry(preferred: "HibiVo", spoken: "ひびぼ"), VocabularyEntry(preferred: "Bedrock")]
+                [
+                    VocabularyEntry(preferred: "HibiVo", spoken: "ひびぼ"), VocabularyEntry(preferred: "Bedrock"),
+                    VocabularyEntry(preferred: "AI", spoken: "あい"),
+                ]
             })
         let config = try builder.make(target: nil).transcriptionConfig
-        #expect(config.vocabulary == ["HibiVo", "Bedrock"])
+        #expect(config.vocabulary == ["HibiVo", "Bedrock", "AI"])
         #expect(config.readings == ["ヒビボ"])
     }
 }
