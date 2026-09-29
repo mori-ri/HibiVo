@@ -47,7 +47,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 3. `AudioCaptureService`(録音ごとに新しい AVAudioEngine)が PCM16 モノラルのチャンクを `AsyncStream<AudioChunk>` として流す。ポンプタスクが発話中にそれを STT セッションへ転送する。
 4. 録音終了時: 250 ms 未満で止めた場合(誤ったダブルタップ)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
 
-**辞書**(`Vocabulary/`): `VocabularyReplacer` は、聞き取り例(`spoken` と `aliases`)を表記(`preferred`)に置き換える。照合は `KanaFolding` で 1 文字ずつ正規化して行う(NFKC で全角英数字と半角カナを揃え、平仮名を片仮名に)。置き換えなかった部分の表記は変えない。2 文字以下の仮名だけの聞き取り例(「あい」→ AI など)は一般的な言葉と区別できないため置き換えず、STT の読みにも含めない。整形プロンプトにだけ「文脈で判断する」という注記付きで渡す(`VocabularyEntry.contextualForms`)。STT には、表記(`TranscriptionConfig.vocabulary`)に加えて、聞き取り例を片仮名にした読み(`readings`)も渡す。Soniox は表記を先に、重複を除いて 200 語までを `context.terms` に入れる。Gemini には表記だけを渡す。
+**辞書**(`Vocabulary/`): `VocabularyReplacer` は、聞き取り例(`spoken` と `aliases`)を表記(`preferred`)に置き換える。照合は `KanaFolding` で 1 文字ずつ正規化して行う(NFKC で全角英数字と半角カナを揃え、平仮名を片仮名に、ヂ・ヅをジ・ズに)。語中の空白・「・」・「ー」は読み飛ばす(STT は知らない語を登録とわずかに違う片仮名で書くため)。置き換えなかった部分の表記は変えない。2 文字以下の仮名だけの聞き取り例(「あい」→ AI など)は一般的な言葉と区別できないため置き換えず、STT の読みにも含めない。整形プロンプトにだけ「文脈で判断する」という注記付きで渡す(`VocabularyEntry.contextualForms`)。STT には、表記(`TranscriptionConfig.vocabulary`)に加えて、聞き取り例を片仮名にした読み(`readings`)も渡す。Soniox は表記を先に、重複を除いて 200 語までを `context.terms` に入れる。Gemini には表記だけを渡す。
 
 **STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションはソケット接続前の `send` を受け付けてバッファする。実装は 2 つ。どちらもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
 - Soniox(`stt-rt-v5`): `finalize` → `<fin>` トークンを待つ。

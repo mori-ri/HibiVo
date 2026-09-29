@@ -255,6 +255,29 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(VocabularyReplacer.apply(entries, to: "ひらがなとＡＢＣはそのまま、アップシンク") == "ひらがなとＡＢＣはそのまま、AppSync")
     }
 
+    @Test func sameSoundingKanaMatch() {
+        let entries = [VocabularyEntry(preferred: "Kanazuchi", spoken: "カナヅチ")]
+        #expect(VocabularyReplacer.apply(entries, to: "カナズチを使う") == "Kanazuchiを使う")
+        #expect(VocabularyReplacer.apply(entries, to: "かなづち") == "Kanazuchi")
+    }
+
+    @Test func spacesAndMarksInsideAWordAreSkipped() {
+        let entries = [
+            VocabularyEntry(preferred: "HibiVo", spoken: "ヒビボー"),
+            VocabularyEntry(preferred: "Claude Code", spoken: "クロードコード"),
+        ]
+        #expect(VocabularyReplacer.apply(entries, to: "ヒビボの話") == "HibiVoの話")
+        #expect(VocabularyReplacer.apply(entries, to: "ヒビボーの話") == "HibiVoの話")
+        #expect(VocabularyReplacer.apply(entries, to: "ヒ・ビ・ボ") == "HibiVo")
+        #expect(VocabularyReplacer.apply(entries, to: "クロード コード と クロードコーダ") == "Claude Code と クロードコーダ")
+        // Spaces and marks around a match stay where they were.
+        #expect(VocabularyReplacer.apply(entries, to: "今の ヒビボ は") == "今の HibiVo は")
+    }
+
+    @Test func latinSpokenFormMatchesSpacedOutput() {
+        #expect(VocabularyReplacer.apply(entries, to: "AWS ラムダも使う") == "AWS Lambdaも使う")
+    }
+
     @Test func readingsAreKatakanaSpokenForms() {
         let entry = VocabularyEntry(preferred: "HibiVo", spoken: "ひびぼ", aliases: ["日比保"])
         #expect(entry.readings == ["ヒビボ", "日比保"])
