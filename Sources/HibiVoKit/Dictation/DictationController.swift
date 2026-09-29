@@ -86,11 +86,14 @@ public final class DictationController {
         self.holdThreshold = holdThreshold
     }
 
-    public func handle(_ action: HotkeyAction) {
+    /// - Parameter time: When the key event happened. Holds are measured between event times, not
+    ///   handling times, because a release can wait behind a slow audio engine start.
+    public func handle(_ action: HotkeyAction, at time: ContinuousClock.Instant? = nil) {
+        let time = time ?? clock.now
         switch action {
-        case .pressed where state.phase == .recording: end()
-        case .pressed: begin()
-        case .released: releaseKey()
+        case .pressed where state.phase == .recording: end(at: time)
+        case .pressed: begin(pressedAt: time)
+        case .released: releaseKey(at: time)
         case .interrupted, .escape: cancel()
         }
     }
@@ -110,13 +113,10 @@ public final class DictationController {
 
     // MARK: - Recording
 
-    private func begin() {
+    private func begin(pressedAt: ContinuousClock.Instant) {
         // A press while processing is ignored so pastes never interleave.
         guard !state.phase.isActive else { return }
         errorDismiss?.cancel()
-        // Measured before the audio engine starts, which can take a while with Bluetooth mics, so a
-        // push-to-talk hold is not mistaken for a short tap.
-        let pressedAt = clock.now
 
         let context: DictationContext
         do {
@@ -162,7 +162,8 @@ public final class DictationController {
         let watchdog = Task { [weak self] in
             try? await Task.sleep(for: Self.maximumRecording)
             guard !Task.isCancelled else { return }
-            self?.end()
+            guard let self else { return }
+            self.end(at: self.clock.now)
         }
         recording = Recording(
             context: context, session: session, startedAt: pressedAt, pump: pump, partials: partials,
@@ -170,18 +171,18 @@ public final class DictationController {
     }
 
     /// Ends a push-to-talk hold; a short tap leaves recording running until the next press.
-    private func releaseKey() {
+    private func releaseKey(at time: ContinuousClock.Instant) {
         guard state.phase == .recording, let recording, recording.isHeld else { return }
-        if clock.now - recording.startedAt >= holdThreshold {
-            end()
+        if time - recording.startedAt >= holdThreshold {
+            end(at: time)
         } else {
             self.recording?.isHeld = false
         }
     }
 
-    private func end() {
+    private func end(at time: ContinuousClock.Instant) {
         guard state.phase == .recording, let recording else { return }
-        if clock.now - recording.startedAt < minimumDuration {
+        if time - recording.startedAt < minimumDuration {
             cancel()
             return
         }

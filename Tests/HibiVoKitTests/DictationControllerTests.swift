@@ -105,6 +105,18 @@ import Testing
         #expect(await !session.didFinish)
     }
 
+    @Test func shortTapStaysLatchedWhenReleaseIsHandledLate() async {
+        // The release event queues up while the audio engine starts; its own time is what counts.
+        audio.startDelay = 0.3
+        let sut = makeController(holdThreshold: .milliseconds(200))
+        let pressedAt = ContinuousClock.now
+        sut.handle(.pressed, at: pressedAt)
+        sut.handle(.released, at: pressedAt + .milliseconds(50))
+        #expect(state.phase == .recording)
+        sut.handle(.escape)
+        await sut.waitUntilIdle()
+    }
+
     @Test func escapeCancelsRecording() async throws {
         let provider = MockTranscriptionProvider()
         let sut = makeController(provider: provider)

@@ -7,9 +7,12 @@ final class MockAudio: AudioCapturing {
     private var continuation: AsyncStream<AudioChunk>.Continuation?
     var startCount = 0
     var failStart = false
+    /// Blocks the caller like a slow engine start (Bluetooth mics) does.
+    var startDelay: TimeInterval = 0
 
     func start(sampleRate: Double, deviceUID: String?) throws -> AsyncStream<AudioChunk> {
         if failStart { throw AudioCaptureError.microphonePermissionDenied }
+        if startDelay > 0 { Thread.sleep(forTimeInterval: startDelay) }
         startCount += 1
         let (stream, continuation) = AsyncStream<AudioChunk>.makeStream()
         self.continuation = continuation
