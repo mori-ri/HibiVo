@@ -19,6 +19,8 @@ enum SonioxProtocol {
         var numChannels = 1
         var languageHints: [String]
         var context: Context?
+        /// Omitted (nil) for dictation so the request stays as it was.
+        var enableSpeakerDiarization: Bool?
 
         enum CodingKeys: String, CodingKey {
             case apiKey = "api_key"
@@ -28,6 +30,7 @@ enum SonioxProtocol {
             case numChannels = "num_channels"
             case languageHints = "language_hints"
             case context
+            case enableSpeakerDiarization = "enable_speaker_diarization"
         }
     }
 
@@ -35,9 +38,37 @@ enum SonioxProtocol {
         struct Token: Decodable {
             var text: String
             var isFinal: Bool
+            /// Present only with speaker diarization, e.g. "1".
+            var speaker: String?
+            /// Offsets from the start of the stream's audio.
+            var startMs: Int?
+            var endMs: Int?
+
             enum CodingKeys: String, CodingKey {
-                case text
+                case text, speaker
                 case isFinal = "is_final"
+                case startMs = "start_ms"
+                case endMs = "end_ms"
+            }
+
+            init(text: String, isFinal: Bool, speaker: String? = nil, startMs: Int? = nil, endMs: Int? = nil) {
+                self.text = text
+                self.isFinal = isFinal
+                self.speaker = speaker
+                self.startMs = startMs
+                self.endMs = endMs
+            }
+
+            init(from decoder: any Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                text = try c.decode(String.self, forKey: .text)
+                isFinal = try c.decodeIfPresent(Bool.self, forKey: .isFinal) ?? false
+                // Documented as a string, but accept a number too rather than dropping the whole message.
+                speaker =
+                    (try? c.decodeIfPresent(String.self, forKey: .speaker))
+                    ?? (try? c.decodeIfPresent(Int.self, forKey: .speaker)).flatMap { $0.map(String.init) }
+                startMs = try? c.decodeIfPresent(Int.self, forKey: .startMs)
+                endMs = try? c.decodeIfPresent(Int.self, forKey: .endMs)
             }
         }
 
@@ -59,17 +90,21 @@ enum SonioxProtocol {
         return Array((config.vocabulary + config.readings).filter { seen.insert($0).inserted }.prefix(200))
     }
 
+    /// Hint English as well so technical terms stay in Latin script ("AppSync", not "アップシンク").
+    static func languageHints(_ language: String) -> [String] {
+        language == "en" ? ["en"] : [language, "en"]
+    }
+
     static func config(for config: TranscriptionConfig, sampleRate: Double) throws -> String {
-        // Hint English as well so technical terms stay in Latin script ("AppSync", not "アップシンク").
-        var hints = [config.language]
-        if config.language != "en" { hints.append("en") }
+        let hints = languageHints(config.language)
         let terms = terms(for: config)
         let payload = Config(
             apiKey: config.apiKey,
             model: config.model,
             sampleRate: Int(sampleRate),
             languageHints: hints,
-            context: terms.isEmpty ? nil : .init(terms: terms))
+            context: terms.isEmpty ? nil : .init(terms: terms),
+            enableSpeakerDiarization: config.speakerDiarization ? true : nil)
         let data = try JSONEncoder().encode(payload)
         return String(decoding: data, as: UTF8.self)
     }

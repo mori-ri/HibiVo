@@ -178,6 +178,67 @@ struct CleanupSettingsView: View {
     }
 }
 
+// MARK: - Meeting
+
+struct MeetingSettingsView: View {
+    let env: AppEnvironment
+
+    var body: some View {
+        @Bindable var settings = env.settings
+        SettingsPage {
+            SettingsSection(
+                footer:
+                    "\(env.settings.hotkey.displayName) を押しながら M で開始し、もう一度 \(env.settings.hotkey.displayName) を押すと終了します。文字起こしは Soniox で行い、Markdown で保存します。"
+            ) {
+                PickerRow("文字起こしのタイミング", selection: $settings.meetingTranscriptionTiming) {
+                    ForEach(MeetingTranscriptionTiming.allCases) { Text($0.displayName).tag($0) }
+                }
+                switch env.settings.meetingTranscriptionTiming {
+                case .realtime:
+                    NoteRow("会議中に文字起こしし、数秒ごとにファイルへ書き足します。話者の区別はやや粗くなります。")
+                case .afterMeeting:
+                    NoteRow(
+                        "会議中は録音だけを行い、終了後に音声全体から文字起こしするため、話者を正確に区別できます。結果は 1 時間の会議で数分ほどで届きます。音声は終了までメモリに置くだけで保存しないため、途中でアプリが終了するとその会議は記録されません。"
+                    )
+                }
+                LabeledRow("保存先") {
+                    Button("開く…") { env.openMeetingsFolder() }
+                }
+            }
+            SettingsSection(title: "音声") {
+                ToggleRow("オンライン参加者の声(システム音声)も記録する", isOn: $settings.meetingCapturesSystemAudio)
+                if !SystemAudioCaptureService.isSupported {
+                    NoteRow("システム音声の記録には macOS 14.2 以降が必要です。", color: .red)
+                } else if env.settings.meetingCapturesSystemAudio {
+                    NoteRow(
+                        "マイクの音と混ぜて 1 本にし、全員を話者 1・2… として識別します。初回はシステムオーディオ録音の許可を求められます。スピーカーで聞くと相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあるため、イヤホンの使用をおすすめします。"
+                    )
+                    LabeledRow("システムオーディオ録音の権限") {
+                        Button("設定を開く…") { Permissions.openSystemAudioSettings() }
+                    }
+                }
+            }
+            SettingsSection(title: "議事録") {
+                ToggleRow("終了後に Claude で議事録を作成する", isOn: $settings.meetingMinutesEnabled)
+                if env.settings.meetingMinutesEnabled {
+                    PickerRow("議事録のモデル", selection: $settings.meetingMinutesModel) {
+                        ForEach(MeetingMinutesModel.allCases) { Text($0.displayName).tag($0) }
+                    }
+                    TextFieldRow("Claude Code の場所", text: $settings.claudeCodePath, prompt: "自動で検出")
+                    if let path = ClaudeCodeMinutesWriter.locate(configuredPath: env.settings.claudeCodePath) {
+                        NoteRow(
+                            "Claude Code(\(path.path))を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
+                        )
+                    } else {
+                        NoteRow(
+                            "Claude Code が見つかりません。インストールして claude.ai のアカウントでログインするか、実行ファイルの場所を入力してください。", color: .red)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Reads and writes an API key straight to the Keychain. Nothing touches UserDefaults.
 struct APIKeyField: View {
     let secrets: any SecretStore

@@ -11,15 +11,19 @@ public struct TranscriptionConfig: Sendable {
     /// How dictionary terms sound (their spoken forms, hiragana turned into katakana). Hinting these
     /// lets STT write an unfamiliar name consistently so the dictionary can then replace it.
     public var readings: [String]
+    /// Label each token with who spoke it. Only meeting transcription asks for this.
+    public var speakerDiarization: Bool
 
     public init(
-        apiKey: String, model: String, language: String, vocabulary: [String] = [], readings: [String] = []
+        apiKey: String, model: String, language: String, vocabulary: [String] = [], readings: [String] = [],
+        speakerDiarization: Bool = false
     ) {
         self.apiKey = apiKey
         self.model = model
         self.language = language
         self.vocabulary = vocabulary
         self.readings = readings
+        self.speakerDiarization = speakerDiarization
     }
 }
 

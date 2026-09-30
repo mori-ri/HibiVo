@@ -47,6 +47,17 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 3. `AudioCaptureService`(録音ごとに新しい AVAudioEngine)が PCM16 モノラルのチャンクを `AsyncStream<AudioChunk>` として流す。ポンプタスクが発話中にそれを STT セッションへ転送する。
 4. 録音終了時: 250 ms 未満で止めた場合(誤ったダブルタップ)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
 
+**ミーティングモード**(`Meeting/MeetingController.swift`): トリガー + M(`HotkeyAction.meeting`)で開始し、次のトリガーの `.released` で終了する。`.pressed`・`.interrupted`・Esc は無視する(Fn + ← などで誤って終了しないため)。
+- `AppEnvironment` は、ミーティング中は操作を `MeetingController` に回す。開始時は、トリガーの押下で始まった音声入力をキャンセルしてから開始する。
+- 音声は、マイクと、設定で有効なときはシステム音声(`SystemAudioCaptureService`)。システム音声は Core Audio の process tap(macOS 14.2 以降)を private なアグリゲートデバイスに入れて IO proc で読む。必要なのは「システムオーディオ録音」の権限だけで、拒否されていても例外は出ず、無音が届く。
+- 2 つの音源は `PCMMixer` で 1 本の PCM16 にミックスし、1 つの STT セッションに送る(料金は 1 本分)。片方が止まったときは、300 ms を超えた分を無音で埋めて送る。送信は 1 本のキューで順序を保つ。
+- STT は常に Soniox(`MeetingTranscriptionProvider`)で、話者識別(`enable_speaker_diarization`)を有効にする。辞書は音声入力と同じく、表記と読み(`readings`)をヒントとして渡す(非同期の場合も同じ)。`SonioxSession` は話者識別が有効なときだけ `events` にトークンを流し、文字列は溜めない。
+- `MeetingTranscript`(純粋関数的)が、話者の切り替わりと 4 秒以上の間で段落に分ける。`MeetingDocument` が Markdown に変換する。話者は登場順に「話者1」「話者2」… と番号を振る。再接続後のセッションの話者には新しい番号を振る。ファイルは `Application Support/HibiVo/Meetings/` に数秒ごとにアトミックに書き直す。
+- セッションが切れたら再接続する(不正なキーの場合を除く)。新しいセッションの時刻は、それまでに送った音声の長さだけずらす。話者番号はセッションごとに振り直される。
+- 「終了後にまとめて」モード(`MeetingTranscriptionTiming.afterMeeting`)では STT セッションを開かず、ミックスした PCM をメモリに溜める。終了後に `SonioxFileTranscriber`(非同期 API `stt-async-v5`: アップロード → 作成 → ポーリング → 取得 → ファイルと文字起こしの削除)で処理する。WAV はメモリ上で組み立てる。バックグラウンドで実行し、録音が終わった時点でホットキーは解放する。一時的な失敗は 3 回まで再試行する。
+- 保存後、設定で有効なら `ClaudeCodeMinutesWriter` が Claude Code CLI を `claude -p --output-format json --tools "" --strict-mcp-config --setting-sources "" --no-session-persistence --system-prompt …` で実行し、議事録を書く。ファイル名は `<開始日時>_<タイトル>.md` で、タイトルは議事録の 1 行目(`# …`)として Claude に書かせたものを `MeetingMinutesTitle` がファイル名に使える形に整える。取れなかった場合は `_議事録`。ユーザー辞書は通常の整形と同じ形式(`CleanupPromptBuilder.vocabularyLines`)で、`<vocabulary>` として文字起こしの前に渡す。サブスクリプションの枠を使うため、子プロセスの環境から `ANTHROPIC_API_KEY` を取り除き、`--bare`(OAuth を読まない)は使わない。GUI アプリは PATH を引き継がないので、実行ファイルは標準のインストール先から探す。Finder は議事録ができてから 1 回だけ開く。
+- 貼り付け・整形・ダッキングは行わない。システムのスリープは抑止し、4 時間で自動終了する。
+
 **辞書**(`Vocabulary/`): `VocabularyReplacer` は、聞き取り例(`spoken` と `aliases`)を表記(`preferred`)に置き換える。照合は `KanaFolding` で 1 文字ずつ正規化して行う(NFKC で全角英数字と半角カナを揃え、平仮名を片仮名に、ヂ・ヅをジ・ズに)。英数字と仮名の境目の空白は、あってもなくても一致とする(Soniox は英単語の前後に空白を入れるため)。「ー」「・」、それ以外の空白、改行は区別する(「バッター」と「バッタ」のように語を分けるため)。置き換えなかった部分の表記は変えない。2 文字以下の仮名だけの聞き取り例(「あい」→ AI など)は一般的な言葉と区別できないため置き換えず、STT の読みにも含めない。整形プロンプトにだけ「文脈で判断する」という注記付きで渡す(`VocabularyEntry.contextualForms`)。STT には、表記(`TranscriptionConfig.vocabulary`)に加えて、聞き取り例を片仮名にした読み(`readings`)も渡す。Soniox は表記を先に、重複を除いて 200 語までを `context.terms` に入れる。Gemini には表記だけを渡す。
 
 **STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションはソケット接続前の `send` を受け付けてバッファする。実装は 2 つ。どちらもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。

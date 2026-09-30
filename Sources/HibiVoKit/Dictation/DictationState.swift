@@ -5,11 +5,13 @@ public enum DictationPhase: Equatable, Sendable {
     case idle
     case recording
     case processing
+    /// Meeting transcription: recording until the trigger is pressed again.
+    case meeting
     case error(String)
 
     public var isActive: Bool {
         switch self {
-        case .recording, .processing: true
+        case .recording, .processing, .meeting: true
         case .idle, .error: false
         }
     }
@@ -24,6 +26,14 @@ public final class AppState {
     public var audioLevel: Float = 0
     /// Live partial transcript from streaming STT, if the provider supplies one.
     public var partialTranscript = ""
+    /// When the running meeting started; nil outside meeting mode.
+    public var meetingStartedAt: Date?
+    /// The meeting's STT connection dropped and is being re-established.
+    public var meetingReconnecting = false
+    /// Finished meetings still being transcribed in the background (after-meeting mode).
+    public var meetingTranscriptionsInProgress = 0
+    /// Saved meetings whose minutes Claude Code is still writing.
+    public var meetingMinutesInProgress = 0
     public var hasAccessibilityPermission = false
     public var hasMicrophonePermission = false
     /// Page shown in the main window; the menu bar sets it before opening the window.

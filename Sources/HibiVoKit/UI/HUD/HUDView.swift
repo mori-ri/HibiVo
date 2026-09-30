@@ -29,6 +29,8 @@ struct HUDView: View {
             LevelBars(level: state.audioLevel, colorful: settings.cleanupEnabled)
         case .processing:
             ProgressView().controlSize(.small).tint(.white)
+        case .meeting:
+            MeetingBadge(startedAt: state.meetingStartedAt ?? Date())
         case .error:
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
         case .idle:
@@ -41,9 +43,39 @@ struct HUDView: View {
         case .recording:
             settings.showLiveTranscript && !state.partialTranscript.isEmpty ? state.partialTranscript : nil
         case .processing: nil
+        case .meeting:
+            if state.meetingReconnecting {
+                "再接続中…"
+            } else if settings.showLiveTranscript, !state.partialTranscript.isEmpty {
+                state.partialTranscript
+            } else {
+                nil
+            }
         case .error(let message): message
         case .idle: nil
         }
+    }
+}
+
+/// Red dot and elapsed time, so a long meeting recording is always visibly on.
+private struct MeetingBadge: View {
+    let startedAt: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: startedAt, by: 1)) { timeline in
+            HStack(spacing: 6) {
+                Circle().fill(.red).frame(width: 8, height: 8)
+                Text(Self.elapsed(from: startedAt, to: timeline.date))
+                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+            }
+        }
+    }
+
+    static func elapsed(from start: Date, to now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(start)))
+        return seconds >= 3600
+            ? String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
+            : String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 }
 

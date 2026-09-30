@@ -63,6 +63,7 @@ public enum KeyCode {
     public static let rightOption: UInt16 = 61
     public static let fn: UInt16 = 63
     public static let v: UInt16 = 9
+    public static let m: UInt16 = 46
 
     static func displayName(_ keyCode: UInt16) -> String {
         switch keyCode {

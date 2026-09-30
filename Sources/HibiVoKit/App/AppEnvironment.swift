@@ -12,9 +12,11 @@ public final class AppEnvironment {
     public let vocabulary = VocabularyStore()
     public let history = HistoryStore()
     public let usage = UsageStore()
+    public let meetings = MeetingArchive()
     private let inserter = TextInsertionService()
     private let contextBuilder: DictationContextBuilder
     let dictation: DictationController
+    public let meeting: MeetingController
     private let hud: HUDController
     private var permissionPollTask: Task<Void, Never>?
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "app")
@@ -24,6 +26,7 @@ public final class AppEnvironment {
         hotkey = HotkeyMonitor(trigger: settings.hotkey)
         let settings = settings
         let vocabulary = vocabulary
+        let meetings = meetings
         contextBuilder = DictationContextBuilder(
             settings: settings, secrets: secrets, transcriptionProviders: transcriptionProviders,
             vocabulary: { vocabulary.activeEntries })
@@ -39,13 +42,43 @@ public final class AppEnvironment {
             microphoneUID: { settings.microphoneUID },
             ducker: SystemVolumeDucker(),
             duckingEnabled: { settings.duckOutputWhileRecording })
+        meeting = MeetingController(
+            state: state,
+            audio: AudioCaptureService(),
+            systemAudio: SystemAudioCaptureService.isSupported ? SystemAudioCaptureService() : nil,
+            settings: settings,
+            secrets: secrets,
+            provider: SonioxProvider(),
+            fileTranscriber: SonioxFileTranscriber(),
+            minutesWriter: {
+                ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
+                    ClaudeCodeMinutesWriter(executable: $0)
+                }
+            },
+            vocabulary: { vocabulary.activeEntries },
+            usage: usage,
+            onSaved: {
+                meetings.refresh()
+                NSWorkspace.shared.activateFileViewerSelecting([$0])
+            })
         let dictation = dictation
+        let meeting = meeting
         hud = HUDController(state: state, settings: settings, onClick: { dictation.toggleCleanup() })
 
         hotkey.onAction = { action, occurredAt in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth
             // mics), and a slow callback makes the system disable the event tap.
-            Task { @MainActor in dictation.handle(action, at: occurredAt) }
+            Task { @MainActor in
+                if meeting.isActive {
+                    meeting.handle(action)
+                } else if action == .meeting {
+                    // The trigger press already began a dictation; drop it and record the meeting instead.
+                    dictation.handle(action, at: occurredAt)
+                    meeting.start()
+                } else {
+                    dictation.handle(action, at: occurredAt)
+                }
+            }
         }
         observeRecording()
     }
@@ -74,7 +107,23 @@ public final class AppEnvironment {
         hotkey.trigger = trigger
     }
 
+    /// Shows the saved meeting transcripts in Finder.
+    public func openMeetingsFolder() {
+        let url = MeetingController.defaultDirectory
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(url)
+    }
+
     // MARK: - History actions
+
+    /// Opens a saved meeting file in the default app for Markdown.
+    public func openMeetingFile(_ url: URL) {
+        NSWorkspace.shared.open(url)
+    }
+
+    public func revealMeetingFile(_ url: URL) {
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
 
     /// Pastes a previous result into whatever app is frontmost.
     /// When called from our own window, hide it first so focus returns to the previous app.

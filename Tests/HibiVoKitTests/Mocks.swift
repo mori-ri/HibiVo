@@ -107,3 +107,88 @@ final class MockDucker: OutputDucking {
 
     func restore() { isDucked = false }
 }
+
+final class MockMeetingProvider: MeetingTranscriptionProvider, @unchecked Sendable {
+    let id = "mock"
+    let displayName = "Mock"
+    let sampleRate: Double = 16_000
+    let models = ["m1"]
+    let defaultModel = "m1"
+    private(set) var sessions: [MockMeetingSession] = []
+    private(set) var configs: [TranscriptionConfig] = []
+
+    func makeSession(_ config: TranscriptionConfig) -> any TranscriptionSession {
+        makeMeetingSession(config)
+    }
+
+    func makeMeetingSession(_ config: TranscriptionConfig) -> any MeetingTranscriptionSession {
+        configs.append(config)
+        let session = MockMeetingSession()
+        sessions.append(session)
+        return session
+    }
+}
+
+actor MockMeetingSession: MeetingTranscriptionSession {
+    nonisolated let partials: AsyncStream<String>
+    nonisolated let events: AsyncStream<MeetingSessionEvent>
+    private let continuation: AsyncStream<MeetingSessionEvent>.Continuation
+    private(set) var receivedBytes = 0
+    private(set) var didFinish = false
+    private(set) var didCancel = false
+
+    init() {
+        partials = AsyncStream { $0.finish() }
+        (events, continuation) = AsyncStream.makeStream()
+    }
+
+    func emit(_ event: MeetingSessionEvent) {
+        continuation.yield(event)
+        if case .ended = event { continuation.finish() }
+    }
+
+    func start() async {}
+    func send(_ pcm16: Data) async { receivedBytes += pcm16.count }
+    func finish() async throws -> String {
+        didFinish = true
+        continuation.finish()
+        return ""
+    }
+    func cancel() async {
+        didCancel = true
+        continuation.finish()
+    }
+}
+
+actor MockFileTranscriber: MeetingFileTranscriber {
+    nonisolated let model = "mock-async"
+    private var results: [Result<[MeetingToken], TranscriptionError>]
+    private(set) var calls: [(bytes: Int, sampleRate: Int, config: TranscriptionConfig)] = []
+
+    /// Each call takes the next result; the last one repeats.
+    init(_ results: [Result<[MeetingToken], TranscriptionError>]) {
+        self.results = results
+    }
+
+    func transcribe(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> [MeetingToken] {
+        calls.append((pcm16.count, sampleRate, config))
+        let result = results.count > 1 ? results.removeFirst() : results[0]
+        return try result.get()
+    }
+}
+
+actor MockMinutesWriter: MeetingMinutesWriting {
+    private let result: Result<String, MeetingMinutesError>
+    private(set) var calls: [(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String)] = []
+
+    init(_ result: Result<String, MeetingMinutesError>) {
+        self.result = result
+    }
+
+    func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
+        -> String
+    {
+        calls.append((transcript, vocabulary, model))
+        return try result.get()
+    }
+}
