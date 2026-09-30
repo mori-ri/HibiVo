@@ -6,6 +6,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
     case general
     case transcription
     case cleanup
+    case meeting
     case vocabulary
     case applications
 
@@ -18,6 +19,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         case .general: "一般"
         case .transcription: "文字起こし"
         case .cleanup: "AI 整形"
+        case .meeting: "ミーティング"
         case .vocabulary: "辞書"
         case .applications: "アプリ"
         }
@@ -30,6 +32,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         case .general: "起動、ホットキー、マイク、権限"
         case .transcription: "音声をテキストにするサービス"
         case .cleanup: "LLM で文章を読みやすく整える"
+        case .meeting: "会議の文字起こしと議事録"
         case .vocabulary: "固有名詞や専門用語の表記"
         case .applications: "アプリごとの整形モード"
         }
@@ -42,12 +45,13 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         case .general: "gearshape"
         case .transcription: "waveform"
         case .cleanup: "sparkles"
+        case .meeting: "person.2.wave.2"
         case .vocabulary: "character.book.closed"
         case .applications: "square.grid.2x2"
         }
     }
 
-    static let settings: [MainSection] = [.general, .transcription, .cleanup, .vocabulary, .applications]
+    static let settings: [MainSection] = [.general, .transcription, .cleanup, .meeting, .vocabulary, .applications]
 }
 
 /// The single app window: sidebar navigation on the left, the selected page on the right.
@@ -90,6 +94,7 @@ public struct MainWindowView: View {
             case .general: GeneralSettingsView(env: env)
             case .transcription: TranscriptionSettingsView(env: env)
             case .cleanup: CleanupSettingsView(env: env)
+            case .meeting: MeetingSettingsView(env: env)
             case .vocabulary: VocabularySettingsView(store: env.vocabulary)
             case .applications: ApplicationSettingsView(settings: env.settings)
             }
