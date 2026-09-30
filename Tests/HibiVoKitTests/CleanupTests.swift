@@ -255,6 +255,39 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(VocabularyReplacer.apply(entries, to: "ひらがなとＡＢＣはそのまま、アップシンク") == "ひらがなとＡＢＣはそのまま、AppSync")
     }
 
+    @Test func sameSoundingKanaMatch() {
+        let entries = [VocabularyEntry(preferred: "Kanazuchi", spoken: "カナヅチ")]
+        #expect(VocabularyReplacer.apply(entries, to: "カナズチを使う") == "Kanazuchiを使う")
+        #expect(VocabularyReplacer.apply(entries, to: "かなづち") == "Kanazuchi")
+    }
+
+    @Test func spaceBetweenLatinAndKanaIsOptional() {
+        #expect(VocabularyReplacer.apply(entries, to: "AWS ラムダも使う") == "AWS Lambdaも使う")
+        #expect(VocabularyReplacer.apply(entries, to: "ＡＷＳ　ラムダ") == "AWS Lambda")
+        let spaced = [VocabularyEntry(preferred: "Zip AI", spoken: "ジップ AI")]
+        #expect(VocabularyReplacer.apply(spaced, to: "ジップAIとジップ AI") == "Zip AIとZip AI")
+    }
+
+    @Test func otherSpacesAndLineBreaksAreNotSkipped() {
+        #expect(VocabularyReplacer.apply(entries, to: "A WSラムダ") == "A WSラムダ")
+        #expect(VocabularyReplacer.apply(entries, to: "AWS\nラムダ") == "AWS\nラムダ")
+        #expect(VocabularyReplacer.apply(entries, to: "クロード コード") == "クロード コード")
+    }
+
+    @Test(arguments: [
+        ("バッター", "バッタが跳ぶ"), ("ヒビボー", "ヒビボ"), ("ハートマーク", "ハトマーク"), ("サーバー", "サバ"),
+        ("ソニックス", "ゾニックス"), ("アマゾン", "アマ・ゾン"),
+    ])
+    func longVowelsMarksAndVoicingStillTellWordsApart(spoken: String, text: String) {
+        #expect(VocabularyReplacer.apply([VocabularyEntry(preferred: "X", spoken: spoken)], to: text) == text)
+    }
+
+    @Test func fourKanaFormWithLongVowelIsReplaced() {
+        let server = [VocabularyEntry(preferred: "Server", spoken: "サーバー")]
+        #expect(VocabularyReplacer.apply(server, to: "サーバーを再起動") == "Serverを再起動")
+        #expect(server[0].readings == ["サーバー"])
+    }
+
     @Test func readingsAreKatakanaSpokenForms() {
         let entry = VocabularyEntry(preferred: "HibiVo", spoken: "ひびぼ", aliases: ["日比保"])
         #expect(entry.readings == ["ヒビボ", "日比保"])
