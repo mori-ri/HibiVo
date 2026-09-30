@@ -510,7 +510,12 @@ public final class MeetingController {
         do {
             minutes = try await minutesWriter.writeMinutes(transcript: document, vocabulary: vocabulary, model: model)
         } catch {
-            log.error("Minutes failed: \(String(describing: error), privacy: .public)")
+            // `.failed` carries Claude Code's own output, which can quote the meeting; keep it out of public logs.
+            if case .failed(let text) = error as? MeetingMinutesError {
+                log.error("Minutes failed: \(text, privacy: .private)")
+            } else {
+                log.error("Minutes failed: \(String(describing: error), privacy: .public)")
+            }
             onSaved(transcriptURL)
             showUnlessBusy(
                 error as? MeetingMinutesError == .claudeCodeNotFound ? .claudeCodeNotFound : .meetingMinutesFailed)

@@ -194,6 +194,9 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
         let stdout = Pipe()
         let stderr = Pipe()
         process.standardInput = stdin
+        // If Claude Code exits before reading the whole prompt (bad flag, crash), writing the rest
+        // must fail with EPIPE rather than raise SIGPIPE, which would terminate HibiVo.
+        _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         process.standardOutput = stdout
         process.standardError = stderr
 
@@ -207,7 +210,7 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
                     Task {
                         let data = await output.value
                         let errorText = String(decoding: await errors.value.prefix(500), as: UTF8.self)
-                        if !errorText.isEmpty { log.notice("Claude Code stderr: \(errorText, privacy: .public)") }
+                        if !errorText.isEmpty { log.notice("Claude Code stderr: \(errorText, privacy: .private)") }
                         do {
                             continuation.resume(returning: try parse(data))
                         } catch {

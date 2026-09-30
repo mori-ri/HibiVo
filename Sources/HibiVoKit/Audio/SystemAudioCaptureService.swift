@@ -106,10 +106,18 @@ public final class SystemAudioCaptureService: AudioCapturing {
         format: AVAudioFormat, converter: PCMConverter, continuation: AsyncStream<AudioChunk>.Continuation
     ) -> AudioDeviceIOBlock {
         { _, inputData, _, _, _ in
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, bufferListNoCopy: inputData, deallocator: nil),
-                let chunk = converter.convert(buffer)
-            else { return }
-            continuation.yield(chunk)
+            // The aggregate's input also carries the clock device's own input streams when it has
+            // any (a USB headset is one device with a mic and speakers). The tap's mono stream is
+            // added after the sub-device streams, so read only the last buffer.
+            let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inputData))
+            guard let tapBuffer = buffers.last else { return }
+            var list = AudioBufferList(mNumberBuffers: 1, mBuffers: tapBuffer)
+            let chunk = withUnsafePointer(to: &list) { pointer -> AudioChunk? in
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: format, bufferListNoCopy: pointer, deallocator: nil)
+                else { return nil }
+                return converter.convert(buffer)
+            }
+            if let chunk { continuation.yield(chunk) }
         }
     }
 

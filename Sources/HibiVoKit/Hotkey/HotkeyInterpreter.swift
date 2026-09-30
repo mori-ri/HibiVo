@@ -62,6 +62,10 @@ public struct HotkeyInterpreter: Sendable {
             swallowMeetingKeyUp = false
             return Output(action: nil, consume: true)
         }
+        // Holding the M that toggled a meeting must not type "mmm" into the focused app.
+        if event.kind == .keyDown, event.keyCode == KeyCode.m, event.isRepeat, swallowMeetingKeyUp {
+            return Output(action: nil, consume: true)
+        }
 
         switch trigger {
         case .fn:

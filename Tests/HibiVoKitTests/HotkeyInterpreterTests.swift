@@ -111,6 +111,16 @@ import Testing
         #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: 0)).action == .released)
     }
 
+    @Test func heldMAfterTogglingIsSwallowed() {
+        var sut = HotkeyInterpreter(trigger: .fn)
+        _ = sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: fnDown))
+        #expect(sut.handle(KeyEvent(kind: .keyDown, keyCode: KeyCode.m, flags: fnDown)).action == .meeting)
+        let repeatM = KeyEvent(kind: .keyDown, keyCode: KeyCode.m, flags: fnDown, isRepeat: true)
+        #expect(sut.handle(repeatM) == .init(action: nil, consume: true))
+        #expect(
+            sut.handle(KeyEvent(kind: .keyUp, keyCode: KeyCode.m, flags: fnDown)) == .init(action: nil, consume: true))
+    }
+
     @Test func mWithoutTriggerIsIgnored() {
         var sut = HotkeyInterpreter(trigger: .fn)
         #expect(
