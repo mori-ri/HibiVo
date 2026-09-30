@@ -22,9 +22,13 @@ public struct HistoryRecord: Codable, Identifiable, Hashable, Sendable {
     public var latencyMs: Int
     public var status: Status
     public var errorMessage: String?
+    /// The text as the user fixed it afterwards in the history.
+    public var correctedText: String?
 
     /// What was (or would have been) inserted.
-    public var finalText: String { cleanedTranscript ?? rawTranscript }
+    public var insertedText: String { cleanedTranscript ?? rawTranscript }
+    /// The latest version of the text: the user's correction, else what was inserted.
+    public var finalText: String { correctedText ?? insertedText }
 }
 
 /// Recent dictations, newest first. Audio is never stored.

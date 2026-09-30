@@ -10,6 +10,7 @@ import Testing
     let audio = MockAudio()
     let inserter = MockInserter()
     let ducker = MockDucker()
+    let watcher = MockCorrectionWatcher()
 
     init() {
         let defaults = UserDefaults(suiteName: "DictationControllerTests-\(UUID())")!
@@ -28,7 +29,7 @@ import Testing
             state: state, audio: audio,
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: secrets, transcriptionProviders: [provider]),
-            activeApp: MockActiveApp(), inserter: inserter, ducker: ducker,
+            activeApp: MockActiveApp(), inserter: inserter, correctionWatcher: watcher, ducker: ducker,
             duckingEnabled: { settings.duckOutputWhileRecording }, minimumDuration: minimumDuration,
             holdThreshold: holdThreshold)
     }
@@ -80,6 +81,31 @@ import Testing
         #expect(provider.lastConfig?.apiKey == "test-key")
         #expect(inserter.inserted.map(\.text) == ["今日の15時からAWSのAppSyncについて打ち合わせをします"])
         #expect(inserter.inserted.first?.target?.name == "Slack")
+    }
+
+    @Test func pastedTextIsWatchedForCorrectionsUntilTheNextDictation() async {
+        let sut = makeController()
+        sut.handle(.pressed)
+        #expect(watcher.stopCount == 1)
+        audio.speak()
+        sut.handle(.released)
+        await sut.waitUntilIdle()
+        #expect(watcher.watched.map(\.inserted) == ["今日の15時からAWSのAppSyncについて打ち合わせをします"])
+        #expect(watcher.watched.first?.target?.name == "Slack")
+        sut.handle(.pressed)
+        #expect(watcher.stopCount == 2)
+        sut.handle(.escape)
+        await sut.waitUntilIdle()
+    }
+
+    @Test func copiedTextIsNotWatched() async {
+        inserter.outcome = .copiedOnly(reason: "test")
+        let sut = makeController()
+        sut.handle(.pressed)
+        audio.speak()
+        sut.handle(.released)
+        await sut.waitUntilIdle()
+        #expect(watcher.watched.isEmpty)
     }
 
     @Test func copiedOnlyOutcomeIsExplained() async {

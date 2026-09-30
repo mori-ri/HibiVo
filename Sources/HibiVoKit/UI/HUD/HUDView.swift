@@ -33,6 +33,8 @@ struct HUDView: View {
             MeetingBadge(startedAt: state.meetingStartedAt ?? Date())
         case .error:
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+        case .idle where !state.learnedVocabulary.isEmpty:
+            Image(systemName: "character.book.closed.fill")
         case .idle:
             EmptyView()
         }
@@ -52,6 +54,10 @@ struct HUDView: View {
                 nil
             }
         case .error(let message): message
+        case .idle where !state.learnedVocabulary.isEmpty:
+            "辞書に追加: "
+                + state.learnedVocabulary.map { "\($0.correction.original) → \($0.correction.corrected)" }
+                .joined(separator: "、") + "（クリックで取り消し）"
         case .idle: nil
         }
     }

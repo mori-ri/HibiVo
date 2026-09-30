@@ -192,3 +192,12 @@ actor MockMinutesWriter: MeetingMinutesWriting {
         return try result.get()
     }
 }
+
+@MainActor
+final class MockCorrectionWatcher: CorrectionWatching {
+    private(set) var watched: [(inserted: String, target: TargetApplication?)] = []
+    private(set) var stopCount = 0
+
+    func watch(inserted: String, target: TargetApplication?) { watched.append((inserted, target)) }
+    func stop() { stopCount += 1 }
+}

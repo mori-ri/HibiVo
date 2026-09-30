@@ -95,7 +95,7 @@ public struct MainWindowView: View {
             case .transcription: TranscriptionSettingsView(env: env)
             case .cleanup: CleanupSettingsView(env: env)
             case .meeting: MeetingSettingsView(env: env)
-            case .vocabulary: VocabularySettingsView(store: env.vocabulary)
+            case .vocabulary: VocabularySettingsView(store: env.vocabulary, settings: env.settings)
             case .applications: ApplicationSettingsView(settings: env.settings)
             }
         }

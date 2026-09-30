@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 /// A small non-activating floating panel that never steals focus. It takes clicks only while
-/// recording, to toggle AI cleanup; otherwise clicks pass through to the app underneath.
+/// recording, to toggle AI cleanup, and while it shows learned words, to undo them; otherwise
+/// clicks pass through to the app underneath.
 @MainActor
 public final class HUDController {
     private let state: AppState
@@ -37,6 +38,7 @@ public final class HUDController {
             _ = state.phase
             _ = state.partialTranscript
             _ = state.meetingReconnecting
+            _ = state.learnedVocabulary
             _ = settings.showLiveTranscript
         } onChange: { [weak self] in
             Task { @MainActor in
@@ -48,6 +50,10 @@ public final class HUDController {
 
     private func update() {
         switch state.phase {
+        case .idle where !state.learnedVocabulary.isEmpty:
+            panel.ignoresMouseEvents = false
+            layout()
+            panel.orderFrontRegardless()
         case .idle:
             panel.orderOut(nil)
         case .recording, .processing, .meeting, .error:

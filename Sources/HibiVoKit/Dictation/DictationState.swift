@@ -34,6 +34,8 @@ public final class AppState {
     public var meetingTranscriptionsInProgress = 0
     /// Saved meetings whose minutes Claude Code is still writing.
     public var meetingMinutesInProgress = 0
+    /// Words just learned from the user's corrections, shown in the HUD until dismissed or undone.
+    public var learnedVocabulary: [VocabularyLearning] = []
     public var hasAccessibilityPermission = false
     public var hasMicrophonePermission = false
     /// Page shown in the main window; the menu bar sets it before opening the window.

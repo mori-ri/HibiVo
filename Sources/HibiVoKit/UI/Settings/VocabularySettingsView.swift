@@ -2,6 +2,7 @@ import SwiftUI
 
 struct VocabularySettingsView: View {
     let store: VocabularyStore
+    @Bindable var settings: SettingsStore
     @State private var selection = Set<VocabularyEntry.ID>()
     @State private var preferred = ""
     @State private var spoken = ""
@@ -59,6 +60,17 @@ struct VocabularySettingsView: View {
                 Label(Self.contextualNote, systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("入力後に直した言葉を辞書に追加する", isOn: $settings.learnsFromCorrections)
+                Text(
+                    "入力した直後に、誤認識された言葉を書き直すと、その言葉を辞書に追加します。追加したときは画面下に表示され、"
+                        + "クリックで取り消せます。入力欄の内容はアクセシビリティ機能で読み取り、保存も送信もしません。"
+                        + "内容を読み取れないアプリ（ターミナルなど）では、履歴の「修正」から追加できます。"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 28)

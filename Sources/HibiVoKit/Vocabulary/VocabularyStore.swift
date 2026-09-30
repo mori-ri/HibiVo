@@ -36,4 +36,54 @@ public final class VocabularyStore {
         entries.removeAll { ids.contains($0.id) }
         file.save(entries)
     }
+
+    // MARK: - Learning from corrections
+
+    /// Adds a corrected word: as a spoken form of the entry already spelled `corrected`, or as a new
+    /// entry. Returns nil, changing nothing, when `canLearn` is false.
+    @discardableResult
+    public func learn(_ correction: VocabularyCorrection) -> VocabularyLearning? {
+        guard canLearn(correction) else { return nil }
+        guard var entry = entries.first(where: { $0.preferred == correction.corrected }) else {
+            let entry = VocabularyEntry(preferred: correction.corrected, spoken: correction.original)
+            add(entry)
+            return VocabularyLearning(correction: correction, change: .added(entry.id))
+        }
+        let previous = entry
+        if entry.spoken.trimmingCharacters(in: .whitespaces).isEmpty {
+            entry.spoken = correction.original
+        } else {
+            entry.aliases.append(correction.original)
+        }
+        update(entry)
+        return VocabularyLearning(correction: correction, change: .extended(previous: previous))
+    }
+
+    /// False when the dictionary already turns `original` into `corrected`, or when `original` is a
+    /// registered spelling or another entry's spoken form, which would make two entries fight over
+    /// the same text.
+    public func canLearn(_ correction: VocabularyCorrection) -> Bool {
+        let key = KanaFolding.matchKeys(correction.original)
+        let covers = { (form: String) in KanaFolding.matchKeys(form) == key }
+        return !entries.contains { covers($0.preferred) || $0.spokenForms.contains(where: covers) }
+    }
+
+    /// Reverts a `learn`. Edits the user made to the entry since are lost with it.
+    public func undo(_ learning: VocabularyLearning) {
+        switch learning.change {
+        case .added(let id): remove(ids: [id])
+        case .extended(let previous): update(previous)
+        }
+    }
+}
+
+/// What `VocabularyStore.learn` changed, so it can be undone.
+public struct VocabularyLearning: Sendable, Equatable {
+    public enum Change: Sendable, Equatable {
+        case added(VocabularyEntry.ID)
+        case extended(previous: VocabularyEntry)
+    }
+
+    public var correction: VocabularyCorrection
+    public var change: Change
 }
