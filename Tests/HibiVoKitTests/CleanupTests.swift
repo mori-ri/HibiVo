@@ -261,22 +261,31 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(VocabularyReplacer.apply(entries, to: "かなづち") == "Kanazuchi")
     }
 
-    @Test func spacesAndMarksInsideAWordAreSkipped() {
-        let entries = [
-            VocabularyEntry(preferred: "HibiVo", spoken: "ヒビボー"),
-            VocabularyEntry(preferred: "Claude Code", spoken: "クロードコード"),
-        ]
-        #expect(VocabularyReplacer.apply(entries, to: "ヒビボの話") == "HibiVoの話")
-        #expect(VocabularyReplacer.apply(entries, to: "ヒビボーの話") == "HibiVoの話")
-        #expect(VocabularyReplacer.apply(entries, to: "ヒ・ビ・ボ") == "HibiVo")
-        #expect(VocabularyReplacer.apply(entries, to: "クロード コード と クロードコーダ") == "Claude Code と クロードコーダ")
-        #expect(VocabularyReplacer.apply(entries, to: "クロード\nコード") == "クロード\nコード")
-        // Spaces and marks around a match stay where they were.
-        #expect(VocabularyReplacer.apply(entries, to: "今の ヒビボ は") == "今の HibiVo は")
+    @Test func spaceBetweenLatinAndKanaIsOptional() {
+        #expect(VocabularyReplacer.apply(entries, to: "AWS ラムダも使う") == "AWS Lambdaも使う")
+        #expect(VocabularyReplacer.apply(entries, to: "ＡＷＳ　ラムダ") == "AWS Lambda")
+        let spaced = [VocabularyEntry(preferred: "Zip AI", spoken: "ジップ AI")]
+        #expect(VocabularyReplacer.apply(spaced, to: "ジップAIとジップ AI") == "Zip AIとZip AI")
     }
 
-    @Test func latinSpokenFormMatchesSpacedOutput() {
-        #expect(VocabularyReplacer.apply(entries, to: "AWS ラムダも使う") == "AWS Lambdaも使う")
+    @Test func otherSpacesAndLineBreaksAreNotSkipped() {
+        #expect(VocabularyReplacer.apply(entries, to: "A WSラムダ") == "A WSラムダ")
+        #expect(VocabularyReplacer.apply(entries, to: "AWS\nラムダ") == "AWS\nラムダ")
+        #expect(VocabularyReplacer.apply(entries, to: "クロード コード") == "クロード コード")
+    }
+
+    @Test(arguments: [
+        ("バッター", "バッタが跳ぶ"), ("ヒビボー", "ヒビボ"), ("ハートマーク", "ハトマーク"), ("サーバー", "サバ"),
+        ("ソニックス", "ゾニックス"), ("アマゾン", "アマ・ゾン"),
+    ])
+    func longVowelsMarksAndVoicingStillTellWordsApart(spoken: String, text: String) {
+        #expect(VocabularyReplacer.apply([VocabularyEntry(preferred: "X", spoken: spoken)], to: text) == text)
+    }
+
+    @Test func fourKanaFormWithLongVowelIsReplaced() {
+        let server = [VocabularyEntry(preferred: "Server", spoken: "サーバー")]
+        #expect(VocabularyReplacer.apply(server, to: "サーバーを再起動") == "Serverを再起動")
+        #expect(server[0].readings == ["サーバー"])
     }
 
     @Test func readingsAreKatakanaSpokenForms() {
@@ -292,13 +301,7 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(ai[0].promptTerm == .init(preferred: "AI", contextualForms: ["あい"]))
     }
 
-    @Test func formsShortOnceMarksAreSkippedAreLeftToCleanup() {
-        let entries = [VocabularyEntry(preferred: "Server", spoken: "サーバー", aliases: ["ビール"])]
-        #expect(VocabularyReplacer.apply(entries, to: "サバの味噌煮とビル") == "サバの味噌煮とビル")
-        #expect(entries[0].contextualForms == ["サーバー", "ビール"])
-    }
-
-    @Test(arguments: ["あい", "シリ", "ｼﾘ", "ジー", "ア", "サーバー", "ビ・ル"])
+    @Test(arguments: ["あい", "シリ", "ｼﾘ", "ジー", "ア"])
     func shortKanaNeedsContext(form: String) {
         #expect(VocabularyEntry.needsContext(form))
     }

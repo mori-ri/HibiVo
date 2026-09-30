@@ -7,13 +7,14 @@ import Foundation
 ///
 /// Matching ignores the difference between hiragana and katakana and between full- and half-width
 /// forms, because STT picks its own script: a spoken form registered as "ひびぼ" also catches
-/// "ヒビボ" and "ﾋﾋﾞﾎﾞ". It also tolerates the small spelling differences STT makes in a word it
-/// doesn't know: "ヂ"/"ジ" and "ヅ"/"ズ" are the same, and spaces, "・" and "ー" inside the word are
-/// skipped, so "ミカヅキ" catches "ミカズキ" and "AWSラムダ" catches "AWS ラムダ". Raw mode
-/// and failed cleanup have no LLM to fix a near miss, so this pass alone has to turn the hinted
-/// katakana reading back into the preferred spelling. Text that isn't replaced is left exactly as it
-/// was. Short kana forms (`VocabularyEntry.contextualForms`) are never replaced here; cleanup decides
-/// them in context.
+/// "ヒビボ" and "ﾋﾋﾞﾎﾞ". It also tolerates two differences STT makes in a word it doesn't know:
+/// "ヂ"/"ジ" and "ヅ"/"ズ" are the same, and a space where Latin letters meet kana is optional, so
+/// "ミカヅキ" catches "ミカズキ" and "AWSラムダ" catches "AWS ラムダ" (Soniox spaces out Latin words).
+/// Raw mode and failed cleanup have no LLM to fix a near miss, so this pass alone has to turn the
+/// hinted katakana reading back into the preferred spelling. "ー" and "・" are not ignored: they tell
+/// words apart ("バッター" and "バッタ"). Text that isn't replaced is left exactly as it was. Short
+/// kana forms (`VocabularyEntry.contextualForms`) are never replaced here; cleanup decides them in
+/// context.
 public enum VocabularyReplacer {
     public static func apply(_ entries: [VocabularyEntry], to text: String) -> String {
         let rules =
@@ -29,13 +30,11 @@ public enum VocabularyReplacer {
         var result = ""
         var index = 0
         scan: while index < characters.count {
-            if !KanaFolding.isSkippable(keys[index]) {
-                for rule in rules {
-                    guard let end = match(rule.from, in: keys, at: index) else { continue }
-                    result += rule.to
-                    index = end
-                    continue scan
-                }
+            for rule in rules {
+                guard let end = match(rule.from, in: keys, at: index) else { continue }
+                result += rule.to
+                index = end
+                continue scan
             }
             result.append(characters[index])
             index += 1
@@ -43,19 +42,17 @@ public enum VocabularyReplacer {
         return result
     }
 
-    /// The index just past `rule` matched at `start`, skipping spaces and marks between its characters.
+    /// The index just past `rule` matched at `start`, skipping spaces where Latin letters meet kana.
     private static func match(_ rule: [String], in keys: [String], at start: Int) -> Int? {
         var index = start
-        for (offset, key) in rule.enumerated() {
-            if offset > 0 {
-                while index < keys.count, KanaFolding.isSkippable(keys[index]) { index += 1 }
+        var previous: String?
+        for key in rule {
+            if let previous, KanaFolding.isScriptBoundary(previous, key) {
+                while index < keys.count, KanaFolding.isSpace(keys[index]) { index += 1 }
             }
             guard index < keys.count, keys[index] == key else { return nil }
             index += 1
-        }
-        // A long vowel mark after the last kana still belongs to the word ("ヒビボー" for "ヒビボ").
-        if let last = rule.last, KanaFolding.isKatakana(last) {
-            while index < keys.count, keys[index] == KanaFolding.longVowelMark { index += 1 }
+            previous = key
         }
         return index
     }
@@ -77,17 +74,31 @@ enum KanaFolding {
         string.map(key)
     }
 
-    static let longVowelMark = "ー"
-
-    /// Keys a registered form is matched by: `keys` without the characters matching skips over.
+    /// Keys a registered form is matched by: `keys` without the optional spaces where Latin letters
+    /// meet kana, so "AWS ラムダ" and "AWSラムダ" match the same text. Other spaces are kept.
     static func matchKeys(_ string: String) -> [String] {
-        keys(string).filter { !isSkippable($0) }
+        let keys = keys(string)
+        return keys.indices.compactMap { index in
+            guard isSpace(keys[index]) else { return keys[index] }
+            let before = keys[..<index].last { !isSpace($0) }
+            let after = keys[(index + 1)...].first { !isSpace($0) }
+            if let before, let after, isScriptBoundary(before, after) { return nil }
+            return keys[index]
+        }
     }
 
-    /// Characters STT puts inside a word at will: spaces (Soniox spaces out Latin words), "・" and "ー".
-    /// Line breaks are not among them, so a match never joins two lines.
-    static func isSkippable(_ key: String) -> Bool {
-        key == longVowelMark || key == "・" || key == " " || key == "\t"
+    /// Spaces only; a line break is never skipped, so a match never joins two lines.
+    static func isSpace(_ key: String) -> Bool {
+        key == " " || key == "\t"
+    }
+
+    /// Whether one side is a Latin letter or digit and the other isn't (and neither is a space).
+    static func isScriptBoundary(_ lhs: String, _ rhs: String) -> Bool {
+        !isSpace(lhs) && !isSpace(rhs) && isLatin(lhs) != isLatin(rhs)
+    }
+
+    static func isLatin(_ key: String) -> Bool {
+        key.unicodeScalars.allSatisfy { $0.isASCII && CharacterSet.alphanumerics.contains($0) }
     }
 
     /// Whether a folded key is katakana, including the prolonged sound mark and iteration marks.
