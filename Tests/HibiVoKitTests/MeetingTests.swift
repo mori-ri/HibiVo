@@ -690,3 +690,32 @@ import Testing
         #expect(MeetingMinutesTitle.split("# ///\n本文").title == nil)
     }
 }
+
+@Suite struct MeetingArchiveTests {
+    let directory = URL(fileURLWithPath: "/m")
+    let utc = TimeZone(identifier: "UTC")!
+
+    @Test func pairsTranscriptsWithTheirMinutesNewestFirst() {
+        let records = MeetingArchive.records(
+            fileNames: [
+                "2026-09-27_14-00-05.md", "2026-09-27_14-00-05_リリース日程.md",
+                "2026-09-28_09-30-00.md", ".DS_Store", "メモ.md", "2026-09-27_14-00-05.txt",
+            ],
+            in: directory, timeZone: utc)
+        #expect(records.map(\.id) == ["2026-09-28_09-30-00", "2026-09-27_14-00-05"])
+        #expect(records[0].minutesURL == nil)
+        #expect(records[0].primaryURL?.lastPathComponent == "2026-09-28_09-30-00.md")
+        #expect(records[1].title == "リリース日程")
+        #expect(records[1].transcriptURL?.path == "/m/2026-09-27_14-00-05.md")
+        #expect(records[1].primaryURL?.path == "/m/2026-09-27_14-00-05_リリース日程.md")
+        #expect(records[1].startedAt == Date(timeIntervalSince1970: 1_790_517_605))
+    }
+
+    @Test func fallbackMinutesHaveNoTitleAndMinutesSurviveADeletedTranscript() {
+        let records = MeetingArchive.records(fileNames: ["2026-09-27_14-00-05_議事録.md"], in: directory, timeZone: utc)
+        #expect(records.count == 1)
+        #expect(records[0].title == nil)
+        #expect(records[0].transcriptURL == nil)
+        #expect(records[0].primaryURL?.lastPathComponent == "2026-09-27_14-00-05_議事録.md")
+    }
+}

@@ -12,6 +12,7 @@ public final class AppEnvironment {
     public let vocabulary = VocabularyStore()
     public let history = HistoryStore()
     public let usage = UsageStore()
+    public let meetings = MeetingArchive()
     private let inserter = TextInsertionService()
     private let contextBuilder: DictationContextBuilder
     let dictation: DictationController
@@ -25,6 +26,7 @@ public final class AppEnvironment {
         hotkey = HotkeyMonitor(trigger: settings.hotkey)
         let settings = settings
         let vocabulary = vocabulary
+        let meetings = meetings
         contextBuilder = DictationContextBuilder(
             settings: settings, secrets: secrets, transcriptionProviders: transcriptionProviders,
             vocabulary: { vocabulary.activeEntries })
@@ -55,7 +57,10 @@ public final class AppEnvironment {
             },
             vocabulary: { vocabulary.activeEntries },
             usage: usage,
-            onSaved: { NSWorkspace.shared.activateFileViewerSelecting([$0]) })
+            onSaved: {
+                meetings.refresh()
+                NSWorkspace.shared.activateFileViewerSelecting([$0])
+            })
         let dictation = dictation
         let meeting = meeting
         hud = HUDController(state: state, settings: settings, onClick: { dictation.toggleCleanup() })
@@ -110,6 +115,15 @@ public final class AppEnvironment {
     }
 
     // MARK: - History actions
+
+    /// Opens a saved meeting file in the default app for Markdown.
+    public func openMeetingFile(_ url: URL) {
+        NSWorkspace.shared.open(url)
+    }
+
+    public func revealMeetingFile(_ url: URL) {
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
 
     /// Pastes a previous result into whatever app is frontmost.
     /// When called from our own window, hide it first so focus returns to the previous app.
