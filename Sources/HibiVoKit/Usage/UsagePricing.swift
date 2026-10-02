@@ -25,6 +25,9 @@ public enum UsagePricing {
     /// Gemini 3.5 Transcribe Live: Google's blended estimate of $0.009 per minute of audio
     /// (audio input tokens plus transcript output tokens).
     static let geminiLiveTranscribePerMinute = 0.009
+    /// MAI-Transcribe-2 launch price of $0.10 per hour (announced through 2026); 1.5 is $0.36 per hour.
+    static let maiTranscribe2PerHour = 0.10
+    static let maiTranscribe15PerHour = 0.36
 
     /// Anthropic list prices. Checked in order, so longer IDs come before their prefixes.
     static let claudeRates: [(prefix: String, rate: TokenRate)] = [
@@ -102,6 +105,9 @@ public enum UsagePricing {
         case "soniox":
             usage.seconds / 3600 * (usage.model.contains("async") ? sonioxAsyncPerHour : sonioxRealtimePerHour)
         case "gemini": usage.seconds / 60 * geminiLiveTranscribePerMinute
+        case "mai-transcribe":
+            usage.seconds / 3600
+                * (usage.model.hasPrefix("MAI-Transcribe-1.5") ? maiTranscribe15PerHour : maiTranscribe2PerHour)
         default: nil
         }
     }

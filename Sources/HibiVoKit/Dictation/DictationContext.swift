@@ -46,6 +46,9 @@ public struct DictationContextBuilder {
         guard let apiKey = secrets.secret(for: provider.id), !apiKey.isEmpty else {
             throw .missingAPIKey(provider: provider.displayName)
         }
+        let endpoint =
+            provider.requiresEndpoint ? settings.azureSpeechEndpoint.trimmingCharacters(in: .whitespaces) : ""
+        if provider.requiresEndpoint, endpoint.isEmpty { throw .missingEndpoint(provider: provider.displayName) }
         let entries = vocabulary()
         let config = TranscriptionConfig(
             apiKey: apiKey,
@@ -54,7 +57,8 @@ public struct DictationContextBuilder {
                 ? settings.transcriptionModel : provider.defaultModel,
             language: settings.language,
             vocabulary: entries.map(\.preferred),
-            readings: entries.flatMap(\.readings))
+            readings: entries.flatMap(\.readings),
+            endpoint: endpoint)
 
         return DictationContext(
             target: target, transcriptionProvider: provider, transcriptionConfig: config,

@@ -14,6 +14,7 @@ scripts/test.sh --filter HotkeyInterpreterTests        # 1 スイートのみ
 scripts/test.sh --filter "DictationControllerTests/shortTapIsCancelled"   # 1 テストのみ
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter SonioxIntegration           # 実際の Soniox エンドポイントに接続 (オプトイン)
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter GeminiIntegration           # 実際の Gemini エンドポイントに接続 (オプトイン、GEMINI_API_KEY)
+HIBIVO_INTEGRATION=1 MAI_TRANSCRIBE_ENDPOINT=eastus scripts/test.sh --filter MAITranscribeIntegration   # 実際の Azure Speech に接続 (オプトイン、AZURE_SPEECH_KEY)
 
 scripts/run.sh                          # debug ビルド → build/HibiVo.app → 起動 (起動中のアプリは終了させる)
 CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署名
@@ -60,9 +61,10 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 **辞書**(`Vocabulary/`): `VocabularyReplacer` は、聞き取り例(`spoken` と `aliases`)を表記(`preferred`)に置き換える。照合は `KanaFolding` で 1 文字ずつ正規化して行う(NFKC で全角英数字と半角カナを揃え、平仮名を片仮名に、ヂ・ヅをジ・ズに)。英数字と仮名の境目の空白は、あってもなくても一致とする(Soniox は英単語の前後に空白を入れるため)。「ー」「・」、それ以外の空白、改行は区別する(「バッター」と「バッタ」のように語を分けるため)。置き換えなかった部分の表記は変えない。2 文字以下の仮名だけの聞き取り例(「あい」→ AI など)は一般的な言葉と区別できないため置き換えず、STT の読みにも含めない。整形プロンプトにだけ「文脈で判断する」という注記付きで渡す(`VocabularyEntry.contextualForms`)。STT には、表記(`TranscriptionConfig.vocabulary`)に加えて、聞き取り例を片仮名にした読み(`readings`)も渡す。Soniox は表記を先に、重複を除いて 200 語までを `context.terms` に入れる。Gemini には表記だけを渡す。
 
-**STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションはソケット接続前の `send` を受け付けてバッファする。実装は 2 つ。どちらもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
+**STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションはソケット接続前の `send` を受け付けてバッファする。ストリーミングの実装は 2 つ。どちらもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
 - Soniox(`stt-rt-v5`): `finalize` → `<fin>` トークンを待つ。
 - Gemini(`gemini-3.5-transcribe-live`、Live API): 手動 VAD。`setupComplete` まで音声をバッファし、`activityStart` → 音声 → `activityEnd` を送る。確定した `inputTranscription` のセグメントを連結し、`turnComplete` と最後のセグメント(順序は保証されない)が揃うか、少し待って終了する。不正なキーはソケットの close 理由で届く。API キー(Keychain の `gemini`)は整形の Gemini と共通。
+- MAI-Transcribe(`MAI-Transcribe-2` / `1.5`): Azure Speech の fast transcription(`enhancedMode`)。バッチ専用なので、セッションは PCM をメモリに溜め、`finish()` で WAV と `definition`(`locales` は設定の言語 1 つ、`transcribeStyle: verbatim`、`phraseList` は Soniox と同じ表記 + 読み)を multipart で 1 回 POST する。途中経過は出ない。エンドポイントは `SettingsStore.azureSpeechEndpoint`(URL・ホスト・リージョンのいずれか)で、`requiresEndpoint` なプロバイダは未設定なら録音前に `missingEndpoint` を出す。キーは Keychain の `mai-transcribe`。
 
 **整形 (Cleanup)**(`Cleanup/`):
 - `TextCleanupProvider.complete(system:user:model:)`。Bedrock はキーペアが必要なため、各プロバイダは自身の認証情報を持って生成される。

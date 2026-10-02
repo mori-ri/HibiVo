@@ -13,10 +13,12 @@ public struct TranscriptionConfig: Sendable {
     public var readings: [String]
     /// Label each token with who spoke it. Only meeting transcription asks for this.
     public var speakerDiarization: Bool
+    /// Where to send audio, for providers whose service lives in the user's own cloud resource.
+    public var endpoint: String
 
     public init(
         apiKey: String, model: String, language: String, vocabulary: [String] = [], readings: [String] = [],
-        speakerDiarization: Bool = false
+        speakerDiarization: Bool = false, endpoint: String = ""
     ) {
         self.apiKey = apiKey
         self.model = model
@@ -24,6 +26,7 @@ public struct TranscriptionConfig: Sendable {
         self.vocabulary = vocabulary
         self.readings = readings
         self.speakerDiarization = speakerDiarization
+        self.endpoint = endpoint
     }
 }
 
@@ -44,8 +47,14 @@ public protocol TranscriptionProvider: Sendable {
     var sampleRate: Double { get }
     var models: [String] { get }
     var defaultModel: String { get }
+    /// Whether `TranscriptionConfig.endpoint` must be set (from `SettingsStore.azureSpeechEndpoint`).
+    var requiresEndpoint: Bool { get }
 
     func makeSession(_ config: TranscriptionConfig) -> any TranscriptionSession
+}
+
+extension TranscriptionProvider {
+    public var requiresEndpoint: Bool { false }
 }
 
 /// One utterance of streaming recognition.

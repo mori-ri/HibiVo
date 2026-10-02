@@ -125,6 +125,14 @@ struct TranscriptionSettingsView: View {
                     if provider.id == SecretAccount.gemini {
                         NoteRow("Google AI Studio の API キーを使います。AI 整形の Google Gemini と共通です。")
                     }
+                    if provider.requiresEndpoint {
+                        TextFieldRow(
+                            "エンドポイント", text: $settings.azureSpeechEndpoint,
+                            prompt: "https://<リソース名>.cognitiveservices.azure.com")
+                        NoteRow(
+                            "Azure の Speech リソースのキーと、エンドポイント URL かリージョン（eastus など）を入力します。MAI-Transcribe は話し終えてからまとめて文字起こしするため、録音中の文字起こしは表示されません。"
+                        )
+                    }
                 }
                 PickerRow("言語", selection: $settings.language) {
                     Text("日本語").tag("ja")

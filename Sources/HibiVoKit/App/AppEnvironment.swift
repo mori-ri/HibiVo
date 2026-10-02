@@ -8,7 +8,9 @@ public final class AppEnvironment {
     public let settings: SettingsStore
     public let hotkey: HotkeyMonitor
     public let secrets: any SecretStore = KeychainService()
-    public let transcriptionProviders: [any TranscriptionProvider] = [SonioxProvider(), GeminiLiveProvider()]
+    public let transcriptionProviders: [any TranscriptionProvider] = [
+        SonioxProvider(), GeminiLiveProvider(), MAITranscribeProvider(),
+    ]
     public let vocabulary = VocabularyStore()
     public let history = HistoryStore()
     public let usage = UsageStore()

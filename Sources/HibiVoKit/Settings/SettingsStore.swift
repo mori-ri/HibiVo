@@ -16,6 +16,10 @@ public final class SettingsStore {
     /// Empty means the provider's default model.
     public var transcriptionModel: String { didSet { defaults.set(transcriptionModel, forKey: "transcriptionModel") } }
     public var language: String { didSet { defaults.set(language, forKey: "language") } }
+    /// Azure Speech resource endpoint URL or region (e.g. `eastus`) for MAI-Transcribe.
+    public var azureSpeechEndpoint: String {
+        didSet { defaults.set(azureSpeechEndpoint, forKey: "azureSpeechEndpoint") }
+    }
 
     public var cleanupEnabled: Bool { didSet { defaults.set(cleanupEnabled, forKey: "cleanupEnabled") } }
     public var cleanupProviderID: String { didSet { defaults.set(cleanupProviderID, forKey: "cleanupProviderID") } }
@@ -58,6 +62,7 @@ public final class SettingsStore {
         transcriptionProviderID = defaults.string(forKey: "transcriptionProviderID") ?? "soniox"
         transcriptionModel = defaults.string(forKey: "transcriptionModel") ?? ""
         language = defaults.string(forKey: "language") ?? "ja"
+        azureSpeechEndpoint = defaults.string(forKey: "azureSpeechEndpoint") ?? ""
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
         cleanupProviderID = defaults.string(forKey: "cleanupProviderID") ?? "anthropic"
         cleanupModel = defaults.string(forKey: "cleanupModel") ?? ""
