@@ -18,7 +18,8 @@ public enum CleanupOutputGuard {
         let maxRatio = mode == .prompt || mode == .custom ? 3.0 : 2.0
         if Double(text.count) > Double(rawCount) * maxRatio + 40 { return nil }
         // …or silently dropping most of it. Short inputs are legitimately shortened a lot by filler removal.
-        if rawCount >= 30, Double(text.count) < Double(rawCount) * 0.25 { return nil }
+        // Custom instructions may ask for a summary; the raw transcript stays in the history.
+        if mode != .custom, rawCount >= 30, Double(text.count) < Double(rawCount) * 0.25 { return nil }
         return text
     }
 

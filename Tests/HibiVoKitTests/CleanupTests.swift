@@ -127,6 +127,12 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(CleanupOutputGuard.validate("了解。", raw: raw, mode: .natural) == nil)
     }
 
+    @Test func customModeMayShortenALot() {
+        let raw = String(repeating: "明日の会議では予算とスケジュールについて話します。", count: 4)
+        #expect(CleanupOutputGuard.validate("- 予算", raw: raw, mode: .natural) == nil)
+        #expect(CleanupOutputGuard.validate("- 予算", raw: raw, mode: .custom) == "- 予算")
+    }
+
     @Test func allowsShortInputToShrink() {
         #expect(CleanupOutputGuard.validate("はい。", raw: "えーと、はい", mode: .natural) == "はい。")
     }
