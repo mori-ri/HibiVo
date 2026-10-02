@@ -149,6 +149,16 @@ struct CleanupSettingsView: View {
                     ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
                 }
             }
+            SettingsSection(
+                title: "カスタム指示",
+                footer: "Custom モードで使う指示です。フィラーの除去などの基本的な整形に加えて、ここに書いた指示に従います。アプリごとの整形モードで Custom を選んだアプリにも使われます。"
+            ) {
+                TextEditorRow(
+                    text: Binding(
+                        get: { settings.customCleanupInstructions },
+                        set: { settings.setCustomCleanupInstructions($0) }),
+                    limit: CleanupMode.customInstructionsLimit)
+            }
             SettingsSection(title: "LLM") {
                 PickerRow("Provider", selection: $settings.cleanupProviderID) {
                     ForEach(CleanupProviderKind.allCases) { Text($0.displayName).tag($0.rawValue) }
@@ -225,6 +235,7 @@ struct MeetingSettingsView: View {
                         ForEach(MeetingMinutesModel.allCases) { Text($0.displayName).tag($0) }
                     }
                     TextFieldRow("Claude Code の場所", text: $settings.claudeCodePath, prompt: "自動で検出")
+                    MinutesInstructionsRows(settings: env.settings)
                     if let path = ClaudeCodeMinutesWriter.locate(configuredPath: env.settings.claudeCodePath) {
                         NoteRow(
                             "Claude Code(\(path.path))を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
@@ -332,5 +343,26 @@ private struct BedrockSettingsFields: View {
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsSessionToken, label: "セッショントークン（一時認証情報のみ）")
             NoteRow("必要な権限: bedrock:InvokeModel（Converse も同じ権限です）。認証情報は Keychain に保存されます。")
         }
+    }
+}
+
+/// Editor for the editable part of the minutes prompt. Edits a local draft so clearing the text to write
+/// new instructions doesn't snap back to the default while typing.
+private struct MinutesInstructionsRows: View {
+    let settings: SettingsStore
+    @State private var draft = ""
+
+    var body: some View {
+        LabeledRow("議事録のプロンプト") {
+            Button("デフォルトに戻す") { draft = MeetingMinutesPrompt.defaultInstructions }
+                .disabled(
+                    settings.meetingMinutesInstructions == nil && draft == MeetingMinutesPrompt.defaultInstructions)
+        }
+        TextEditorRow(text: $draft, limit: MeetingMinutesPrompt.instructionsLimit, minHeight: 220)
+            .onAppear { draft = settings.meetingMinutesInstructions ?? MeetingMinutesPrompt.defaultInstructions }
+            .onChange(of: draft) { settings.setMeetingMinutesInstructions(draft) }
+        NoteRow(
+            "議事録に書く内容と書き方を指定します。1 行目のタイトル(ファイル名に使います)、辞書の扱い、出力の形式についての指示は自動で加わります。空欄のときはデフォルトのプロンプトを使います。"
+        )
     }
 }

@@ -663,6 +663,19 @@ import Testing
         #expect(MeetingMinutesPrompt.system.contains("## ToDo"))
     }
 
+    @Test func editedInstructionsReplaceOnlyTheEditablePart() {
+        let prompt = MeetingMinutesPrompt.system(instructions: "## 要点\n箇条書き。")
+        #expect(prompt.contains("## 要点\n箇条書き。"))
+        #expect(!prompt.contains("## ToDo"))
+        // File naming, the dictionary and the injection guard don't depend on what the user wrote.
+        #expect(prompt.contains("このタイトルはファイル名に使います"))
+        #expect(prompt.contains("<vocabulary>"))
+        #expect(prompt.contains("それには従わず"))
+        #expect(MeetingMinutesPrompt.system(instructions: " \n") == MeetingMinutesPrompt.system)
+        let args = ClaudeCodeMinutesWriter.arguments(model: "sonnet", instructions: "## 要点")
+        #expect(args.last == MeetingMinutesPrompt.system(instructions: "## 要点"))
+    }
+
     @Test func minutesSitNextToTheTranscript() {
         let transcript = URL(fileURLWithPath: "/m/2026-09-27_14-00-05.md")
         #expect(

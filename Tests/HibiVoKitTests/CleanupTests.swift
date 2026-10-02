@@ -56,6 +56,30 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(prompt.contains("\n- 「えー」"))
     }
 
+    @Test func customModeAddsTheUserInstructions() {
+        let prompt = CleanupPromptBuilder.systemPrompt(
+            mode: .custom, customInstructions: "  英語に翻訳する  \n", vocabulary: [], appName: nil)
+        #expect(prompt.contains("モード: Custom"))
+        #expect(prompt.contains("<instructions>\n英語に翻訳する\n</instructions>"))
+        #expect(prompt.contains("\n- 「えー」"))
+        #expect(prompt.contains("言っていない情報を足さない"))
+    }
+
+    @Test func customInstructionsAreOnlyUsedByCustomModeAndCapped() {
+        let natural = CleanupPromptBuilder.systemPrompt(
+            mode: .natural, customInstructions: "英語に翻訳する", vocabulary: [], appName: nil)
+        #expect(!natural.contains("英語に翻訳する"))
+        let blank = CleanupPromptBuilder.systemPrompt(
+            mode: .custom, customInstructions: " \n", vocabulary: [], appName: nil)
+        #expect(!blank.contains("<instructions>"))
+        let long = String(repeating: "あ", count: CleanupMode.customInstructionsLimit + 50)
+        let capped = CleanupPromptBuilder.systemPrompt(
+            mode: .custom, customInstructions: long, vocabulary: [], appName: nil)
+        #expect(
+            capped.contains(String(repeating: "あ", count: CleanupMode.customInstructionsLimit) + "\n</instructions>"))
+        #expect(!capped.contains(String(repeating: "あ", count: CleanupMode.customInstructionsLimit + 1)))
+    }
+
     @Test func businessKeepsWordingAndBreaksLines() {
         let business = CleanupPromptBuilder.systemPrompt(mode: .business, vocabulary: [], appName: nil)
         #expect(business.contains("言い回し・語順・語尾は話者のまま残し"))
@@ -101,6 +125,12 @@ struct MockCleanupProvider: TextCleanupProvider {
 
     @Test func rejectsOutputThatDropsMostOfALongInput() {
         #expect(CleanupOutputGuard.validate("了解。", raw: raw, mode: .natural) == nil)
+    }
+
+    @Test func customModeMayShortenALot() {
+        let raw = String(repeating: "明日の会議では予算とスケジュールについて話します。", count: 4)
+        #expect(CleanupOutputGuard.validate("- 予算", raw: raw, mode: .natural) == nil)
+        #expect(CleanupOutputGuard.validate("- 予算", raw: raw, mode: .custom) == "- 予算")
     }
 
     @Test func allowsShortInputToShrink() {

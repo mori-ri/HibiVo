@@ -52,7 +52,7 @@ public final class AppEnvironment {
             fileTranscriber: SonioxFileTranscriber(),
             minutesWriter: {
                 ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
-                    ClaudeCodeMinutesWriter(executable: $0)
+                    ClaudeCodeMinutesWriter(executable: $0, instructions: settings.meetingMinutesInstructions ?? "")
                 }
             },
             vocabulary: { vocabulary.activeEntries },
@@ -154,7 +154,8 @@ public final class AppEnvironment {
         let outcome = await CleanupCoordinator(timeout: .seconds(20)).run(
             .init(
                 raw: record.rawTranscript, mode: mode,
-                vocabulary: vocabulary.activeEntries.map(\.promptTerm), appName: record.appName),
+                vocabulary: vocabulary.activeEntries.map(\.promptTerm), appName: record.appName,
+                customInstructions: cleanup.customInstructions),
             provider: cleanup.provider, model: cleanup.model)
         if let tokens = outcome.usage, let provider = cleanup.provider {
             usage.record(UsageEvent(cleanup: CleanupUsage(provider, model: cleanup.model, tokens: tokens)))

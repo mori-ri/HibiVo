@@ -14,10 +14,12 @@ public enum CleanupOutputGuard {
 
         // Guard against the model answering the transcript or inventing content.
         let rawCount = raw.count
-        let maxRatio = mode == .prompt ? 3.0 : 2.0
+        // Custom instructions may legitimately lengthen the text, e.g. translating Japanese into English.
+        let maxRatio = mode == .prompt || mode == .custom ? 3.0 : 2.0
         if Double(text.count) > Double(rawCount) * maxRatio + 40 { return nil }
         // …or silently dropping most of it. Short inputs are legitimately shortened a lot by filler removal.
-        if rawCount >= 30, Double(text.count) < Double(rawCount) * 0.25 { return nil }
+        // Custom instructions may ask for a summary; the raw transcript stays in the history.
+        if mode != .custom, rawCount >= 30, Double(text.count) < Double(rawCount) * 0.25 { return nil }
         return text
     }
 

@@ -25,6 +25,10 @@ public final class SettingsStore {
     public var bedrockRegion: String { didSet { defaults.set(bedrockRegion, forKey: "bedrockRegion") } }
     public var bedrockAuth: BedrockAuthMethod { didSet { save(bedrockAuth, "bedrockAuth") } }
     public var defaultCleanupMode: CleanupMode { didSet { save(defaultCleanupMode, "defaultCleanupMode") } }
+    /// What the Custom mode asks the model to do. Use `setCustomCleanupInstructions` to keep it within the limit.
+    public private(set) var customCleanupInstructions: String {
+        didSet { defaults.set(customCleanupInstructions, forKey: "customCleanupInstructions") }
+    }
     /// Whether dictation results are kept in the local history.
     public var historyEnabled: Bool { didSet { defaults.set(historyEnabled, forKey: "historyEnabled") } }
     /// Whether speaker volume is lowered while recording.
@@ -45,6 +49,11 @@ public final class SettingsStore {
         didSet { defaults.set(meetingMinutesEnabled, forKey: "meetingMinutesEnabled") }
     }
     public var meetingMinutesModel: MeetingMinutesModel { didSet { save(meetingMinutesModel, "meetingMinutesModel") } }
+    /// The editable part of the minutes prompt; nil means the built-in default, so improvements to it
+    /// reach everyone who hasn't customized it. Use `setMeetingMinutesInstructions` to change it.
+    public private(set) var meetingMinutesInstructions: String? {
+        didSet { defaults.set(meetingMinutesInstructions, forKey: "meetingMinutesInstructions") }
+    }
     /// Path to the `claude` executable; empty means look in the standard install locations.
     public var claudeCodePath: String { didSet { defaults.set(claudeCodePath, forKey: "claudeCodePath") } }
     public var appModeOverrides: [AppModeOverride] { didSet { save(appModeOverrides, "appModeOverrides") } }
@@ -65,6 +74,8 @@ public final class SettingsStore {
         bedrockAuth = Self.load("bedrockAuth", from: defaults) ?? .apiKey
         openAIBaseURL = defaults.string(forKey: "openAIBaseURL") ?? OpenAICompatibleCleanupProvider.defaultBaseURL
         defaultCleanupMode = Self.load("defaultCleanupMode", from: defaults) ?? .natural
+        customCleanupInstructions = String(
+            (defaults.string(forKey: "customCleanupInstructions") ?? "").prefix(CleanupMode.customInstructionsLimit))
         historyEnabled = defaults.object(forKey: "historyEnabled") as? Bool ?? true
         duckOutputWhileRecording = defaults.object(forKey: "duckOutputWhileRecording") as? Bool ?? true
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
@@ -75,6 +86,8 @@ public final class SettingsStore {
             defaults.object(forKey: "meetingMinutesEnabled") as? Bool
             ?? (ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil)
         meetingMinutesModel = Self.load("meetingMinutesModel", from: defaults) ?? .sonnet
+        meetingMinutesInstructions = defaults.string(forKey: "meetingMinutesInstructions")
+            .map { String($0.prefix(MeetingMinutesPrompt.instructionsLimit)) }
         claudeCodePath = defaults.string(forKey: "claudeCodePath") ?? ""
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
         usdJPYRate = defaults.object(forKey: "usdJPYRate") as? Double ?? UsagePricing.defaultUSDJPYRate
@@ -84,6 +97,23 @@ public final class SettingsStore {
     /// Cleanup mode for the app that will receive the text.
     public func cleanupMode(for bundleID: String?) -> CleanupMode {
         AppModeRules.mode(for: bundleID, overrides: appModeOverrides, default: defaultCleanupMode)
+    }
+
+    /// Stores the Custom mode's instructions, cut to `CleanupMode.customInstructionsLimit` characters.
+    public func setCustomCleanupInstructions(_ text: String) {
+        customCleanupInstructions = String(text.prefix(CleanupMode.customInstructionsLimit))
+    }
+
+    /// Stores the minutes prompt's editable part, cut to `MeetingMinutesPrompt.instructionsLimit` characters.
+    /// nil, blank or the default text goes back to following the default.
+    public func setMeetingMinutesInstructions(_ text: String?) {
+        let text = text.map { String($0.prefix(MeetingMinutesPrompt.instructionsLimit)) }
+        let isDefault =
+            text.map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || $0 == MeetingMinutesPrompt.defaultInstructions
+            } ?? true
+        meetingMinutesInstructions = isDefault ? nil : text
     }
 
     public func setMode(_ mode: CleanupMode?, bundleID: String, name: String) {
