@@ -52,7 +52,7 @@ public final class AppEnvironment {
             fileTranscriber: SonioxFileTranscriber(),
             minutesWriter: {
                 ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
-                    ClaudeCodeMinutesWriter(executable: $0)
+                    ClaudeCodeMinutesWriter(executable: $0, instructions: settings.meetingMinutesInstructions ?? "")
                 }
             },
             vocabulary: { vocabulary.activeEntries },
