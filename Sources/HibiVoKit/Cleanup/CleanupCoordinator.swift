@@ -20,6 +20,8 @@ public struct CleanupCoordinator: Sendable {
         public var mode: CleanupMode
         public var vocabulary: [CleanupPromptBuilder.Term]
         public var appName: String?
+        /// Used only by `.custom`.
+        public var customInstructions: String = ""
     }
 
     public var timeout: Duration
@@ -37,7 +39,8 @@ public struct CleanupCoordinator: Sendable {
         guard !model.isEmpty else { return fallback(raw, .missingModel) }
 
         let system = CleanupPromptBuilder.systemPrompt(
-            mode: request.mode, vocabulary: request.vocabulary, appName: request.appName)
+            mode: request.mode, customInstructions: request.customInstructions, vocabulary: request.vocabulary,
+            appName: request.appName)
         let user = CleanupPromptBuilder.userMessage(transcript: raw)
 
         do {

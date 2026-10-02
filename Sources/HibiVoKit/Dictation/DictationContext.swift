@@ -8,6 +8,8 @@ public struct DictationContext: Sendable {
         /// nil when cleanup is off or the selected provider has no credentials.
         public var provider: (any TextCleanupProvider)?
         public var model: String
+        /// Instructions for `.custom`, frozen with the rest so an edit mid-utterance doesn't apply halfway.
+        public var customInstructions: String = ""
     }
 
     public var target: TargetApplication?
@@ -66,7 +68,8 @@ public struct DictationContextBuilder {
         return DictationContext.Cleanup(
             mode: settings.cleanupEnabled ? settings.cleanupMode(for: target?.bundleID) : .raw,
             provider: settings.cleanupEnabled ? makeCleanupProvider(kind) : nil,
-            model: settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel)
+            model: settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel,
+            customInstructions: settings.customCleanupInstructions)
     }
 
     private func makeCleanupProvider(_ kind: CleanupProviderKind) -> (any TextCleanupProvider)? {

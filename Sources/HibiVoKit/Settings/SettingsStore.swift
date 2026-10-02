@@ -25,6 +25,10 @@ public final class SettingsStore {
     public var bedrockRegion: String { didSet { defaults.set(bedrockRegion, forKey: "bedrockRegion") } }
     public var bedrockAuth: BedrockAuthMethod { didSet { save(bedrockAuth, "bedrockAuth") } }
     public var defaultCleanupMode: CleanupMode { didSet { save(defaultCleanupMode, "defaultCleanupMode") } }
+    /// What the Custom mode asks the model to do. Use `setCustomCleanupInstructions` to keep it within the limit.
+    public private(set) var customCleanupInstructions: String {
+        didSet { defaults.set(customCleanupInstructions, forKey: "customCleanupInstructions") }
+    }
     /// Whether dictation results are kept in the local history.
     public var historyEnabled: Bool { didSet { defaults.set(historyEnabled, forKey: "historyEnabled") } }
     /// Whether speaker volume is lowered while recording.
@@ -65,6 +69,8 @@ public final class SettingsStore {
         bedrockAuth = Self.load("bedrockAuth", from: defaults) ?? .apiKey
         openAIBaseURL = defaults.string(forKey: "openAIBaseURL") ?? OpenAICompatibleCleanupProvider.defaultBaseURL
         defaultCleanupMode = Self.load("defaultCleanupMode", from: defaults) ?? .natural
+        customCleanupInstructions = String(
+            (defaults.string(forKey: "customCleanupInstructions") ?? "").prefix(CleanupMode.customInstructionsLimit))
         historyEnabled = defaults.object(forKey: "historyEnabled") as? Bool ?? true
         duckOutputWhileRecording = defaults.object(forKey: "duckOutputWhileRecording") as? Bool ?? true
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
@@ -84,6 +90,11 @@ public final class SettingsStore {
     /// Cleanup mode for the app that will receive the text.
     public func cleanupMode(for bundleID: String?) -> CleanupMode {
         AppModeRules.mode(for: bundleID, overrides: appModeOverrides, default: defaultCleanupMode)
+    }
+
+    /// Stores the Custom mode's instructions, cut to `CleanupMode.customInstructionsLimit` characters.
+    public func setCustomCleanupInstructions(_ text: String) {
+        customCleanupInstructions = String(text.prefix(CleanupMode.customInstructionsLimit))
     }
 
     public func setMode(_ mode: CleanupMode?, bundleID: String, name: String) {

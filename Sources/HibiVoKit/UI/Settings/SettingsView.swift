@@ -149,6 +149,16 @@ struct CleanupSettingsView: View {
                     ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
                 }
             }
+            SettingsSection(
+                title: "カスタム指示",
+                footer: "Custom モードで使う指示です。フィラーの除去などの基本的な整形に加えて、ここに書いた指示に従います。アプリごとの整形モードで Custom を選んだアプリにも使われます。"
+            ) {
+                TextEditorRow(
+                    text: Binding(
+                        get: { settings.customCleanupInstructions },
+                        set: { settings.setCustomCleanupInstructions($0) }),
+                    limit: CleanupMode.customInstructionsLimit)
+            }
             SettingsSection(title: "LLM") {
                 PickerRow("Provider", selection: $settings.cleanupProviderID) {
                     ForEach(CleanupProviderKind.allCases) { Text($0.displayName).tag($0.rawValue) }

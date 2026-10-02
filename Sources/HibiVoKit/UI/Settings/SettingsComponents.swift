@@ -169,3 +169,33 @@ struct NoteRow: View {
         }
     }
 }
+
+/// Multi-line text with a character counter. Input past `limit` is cut off.
+struct TextEditorRow: View {
+    @Binding var text: String
+    let limit: Int
+    var minHeight: CGFloat = 100
+
+    var body: some View {
+        SettingsRow {
+            VStack(alignment: .trailing, spacing: 4) {
+                TextEditor(text: limited)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .padding(6)
+                    .frame(minHeight: minHeight)
+                    .background(Theme.cardFill)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Theme.cardStroke))
+                Text("\(text.count) / \(limit) 文字")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(text.count >= limit ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            }
+        }
+    }
+
+    private var limited: Binding<String> {
+        Binding(get: { text }, set: { text = String($0.prefix(limit)) })
+    }
+}

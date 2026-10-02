@@ -66,6 +66,22 @@ import Testing
         settings.cleanupEnabled = false
         #expect(try builder.make(target: terminal).cleanup.mode == .raw)
     }
+
+    @MainActor @Test func customInstructionsAreCappedPersistedAndFrozenInTheContext() throws {
+        let defaults = UserDefaults(suiteName: "AppModeRulesTests-\(UUID())")!
+        let settings = SettingsStore(defaults: defaults)
+        settings.transcriptionProviderID = "mock"
+        settings.setCustomCleanupInstructions(String(repeating: "あ", count: CleanupMode.customInstructionsLimit + 10))
+        #expect(settings.customCleanupInstructions.count == CleanupMode.customInstructionsLimit)
+        settings.setCustomCleanupInstructions("箇条書きにする")
+        #expect(SettingsStore(defaults: defaults).customCleanupInstructions == "箇条書きにする")
+
+        let builder = DictationContextBuilder(
+            settings: settings, secrets: MockSecrets(), transcriptionProviders: [MockTranscriptionProvider()])
+        let context = try builder.make(target: nil)
+        settings.setCustomCleanupInstructions("変更後")
+        #expect(context.cleanup.customInstructions == "箇条書きにする")
+    }
 }
 
 @MainActor

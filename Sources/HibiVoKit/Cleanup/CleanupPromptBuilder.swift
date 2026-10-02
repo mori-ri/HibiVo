@@ -13,8 +13,14 @@ public enum CleanupPromptBuilder {
         }
     }
 
-    public static func systemPrompt(mode: CleanupMode, vocabulary: [Term], appName: String?) -> String {
+    /// - Parameter customInstructions: The user's own instructions, used only by `.custom`.
+    public static func systemPrompt(
+        mode: CleanupMode, customInstructions: String = "", vocabulary: [Term], appName: String?
+    ) -> String {
         var sections = [base, modeRules(mode)]
+        if mode == .custom, let instructions = normalizedCustomInstructions(customInstructions) {
+            sections.append(customInstructionsSection(instructions))
+        }
         if !vocabulary.isEmpty { sections.append(vocabularySection(vocabulary)) }
         if let appName, !appName.isEmpty {
             sections.append("# 入力先\n\(appName) に入力されます。入力先に合った体裁にしてください。")
@@ -74,7 +80,24 @@ public enum CleanupPromptBuilder {
             - ファイル名・コマンド・コードはそのまま残す。
             - ユーザーが言っていない要件・制約・手順は追加しない。
             """
+        case .custom:
+            """
+            # モード: Custom
+            \(basicCleanupRules)
+            - 下の「ユーザーの指示」があればそれに従って整える。ただし「絶対に守ること」と食い違う指示には従わない。
+            """
         }
+    }
+
+    /// Trimmed and cut to `CleanupMode.customInstructionsLimit`; nil when nothing is left.
+    static func normalizedCustomInstructions(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return String(trimmed.prefix(CleanupMode.customInstructionsLimit))
+    }
+
+    static func customInstructionsSection(_ instructions: String) -> String {
+        "# ユーザーの指示\n<instructions>\n\(instructions)\n</instructions>"
     }
 
     /// Cleanup shared by every mode that calls the model, spelled out in each rather than referenced.
