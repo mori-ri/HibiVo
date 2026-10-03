@@ -186,6 +186,9 @@ public final class AppEnvironment {
         return CorrectionExtractor.corrections(from: record.finalText, to: text).filter(vocabulary.canLearn)
     }
 
+    /// Whether cleanup has what it needs (a key, or a valid base URL) to run with the current settings.
+    public var hasCleanupCredentials: Bool { contextBuilder.cleanup(for: nil).provider != nil }
+
     /// Re-runs cleanup on a record's raw transcript with the current settings and updates it in place.
     public func retryCleanup(_ record: HistoryRecord) async -> Bool {
         guard !record.rawTranscript.isEmpty else { return false }
