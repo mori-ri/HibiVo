@@ -400,3 +400,35 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(config.readings == ["ヒビボ"])
     }
 }
+
+@Suite struct TrailingPeriodTests {
+    @Test(arguments: [
+        ("AppSync。", "AppSync"), ("会議資料。", "会議資料"), ("AWS Lambda。", "AWS Lambda"), ("Lambda.", "Lambda"),
+        ("テスト。\n", "テスト"),
+    ])
+    func dropsPeriodAfterLoneWord(input: String, expected: String) {
+        #expect(TrailingPeriod.trimmed(input) == expected)
+    }
+
+    @Test(arguments: [
+        "了解しました。", "ありがとう。", "明日、会議資料。", "資料を確認。次は会議。", "This is Lambda.", "3.14.",
+        "本日の議題は来期の予算計画と人員配置の見直しについて。", "改行\nあり。", "AppSync",
+    ])
+    func keepsSentences(input: String) {
+        #expect(TrailingPeriod.trimmed(input) == input)
+    }
+
+    @Test func dictationPathDropsPeriodInEveryMode() async {
+        let coordinator = CleanupCoordinator()
+        let raw = await coordinator.run(
+            transcript: "AppSync。", vocabulary: [], mode: .raw, appName: nil, customInstructions: "",
+            provider: nil, model: "m")
+        #expect(raw.raw == "AppSync。")
+        #expect(raw.outcome.text == "AppSync")
+        let cleaned = await coordinator.run(
+            transcript: "えーとアップシンク", vocabulary: [], mode: .natural, appName: nil, customInstructions: "",
+            provider: MockCleanupProvider(result: .success("AppSync。")), model: "m")
+        #expect(cleaned.outcome.text == "AppSync")
+        #expect(cleaned.outcome.didCleanup)
+    }
+}

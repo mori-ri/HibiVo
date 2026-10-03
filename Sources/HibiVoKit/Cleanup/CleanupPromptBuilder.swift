@@ -105,7 +105,7 @@ public enum CleanupPromptBuilder {
     static let basicCleanupRules = """
         - 「えー」「あの」「その」「えっと」などのフィラーを除く。
         - 言い直しは最後に言い直した内容を採用する（例: 「明日の、いや明後日の」→「明後日の」）。
-        - 不要な繰り返しを除き、句読点を補う。
+        - 不要な繰り返しを除き、句読点を補う。ただし単語や短い語句だけのときは文末に「。」を付けない。
         """
 
     static func vocabularySection(_ terms: [Term]) -> String {
