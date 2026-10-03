@@ -6,6 +6,11 @@
 //
 // Keys come from the environment (ANTHROPIC_API_KEY, GEMINI_API_KEY, AWS_BEARER_TOKEN_BEDROCK) or,
 // failing that, from HibiVo's Keychain items (macOS asks once to allow access).
+//
+// `--provider claude-code` and `--judge-provider claude-code` go through the Claude Code CLI instead,
+// so they count against the user's Claude subscription rather than API billing. The CLI's start-up
+// time doesn't fit the 5 s production timeout, so pair it with --cleanup-timeout-s and read latency
+// from those runs as CLI overhead, not as what the app would see.
 
 import CryptoKit
 import Foundation
@@ -23,6 +28,8 @@ struct Options: Sendable {
     var concurrency = 4
     /// Ceiling on one case, cleanup and judge together. Cleanup itself still stops at 5 s like production.
     var caseTimeout: Duration = .seconds(120)
+    /// CleanupCoordinator's timeout. 5 s is production; raise it only for the CLI provider.
+    var cleanupTimeout: Duration = .seconds(5)
     /// Where the judge runs: "anthropic" (Claude API) or "bedrock" (InvokeModel with HibiVo's Bedrock API key).
     var judgeProvider = "bedrock"
     var judgeModel = ""
@@ -47,9 +54,11 @@ struct Options: Sendable {
             case "--limit": options.limit = Int(value(arg))
             case "--concurrency": options.concurrency = max(1, Int(value(arg)) ?? 4)
             case "--timeout-s": options.caseTimeout = .seconds(Int(value(arg)) ?? 120)
+            case "--cleanup-timeout-s": options.cleanupTimeout = .seconds(Int(value(arg)) ?? 5)
             case "--judge-provider": options.judgeProvider = value(arg)
             case "--judge-model": options.judgeModel = value(arg)
             case "--cases": options.caseFiles = value(arg).split(separator: ",").map(String.init)
+            case "--flow": options.flowDir = value(arg)
             case "--approve-harness": options.approveHarness = true
             default: fail("unknown option \(arg)")
             }
@@ -145,6 +154,8 @@ func makeProvider(_ options: Options) -> any TextCleanupProvider {
         return BedrockCleanupProvider(
             region: region,
             authentication: .iam(AWSCredentials(accessKeyID: id, secretAccessKey: key, sessionToken: token)))
+    case "claude-code":
+        return ClaudeCodeProvider(cli: ClaudeCodeCLI.locate())
     case "echo":
         // Harness self-test: pastes the transcript unchanged. Should fail the cleanup criteria.
         return FixedProvider(reply: nil)
@@ -171,6 +182,107 @@ struct FixedProvider: TextCleanupProvider {
     }
 }
 
+// MARK: - Claude Code CLI
+
+/// Runs `claude -p` with no tools, MCP servers, settings or session, like the meeting-minutes writer.
+struct ClaudeCodeCLI: Sendable {
+    let executable: URL
+
+    static func locate() -> ClaudeCodeCLI {
+        let candidates = [
+            "~/.local/bin/claude", "~/.claude/local/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude",
+        ]
+        guard
+            let url = candidates.map({ URL(fileURLWithPath: NSString(string: $0).expandingTildeInPath) })
+                .first(where: { FileManager.default.isExecutableFile(atPath: $0.path) })
+        else { fail("Claude Code CLI not found") }
+        return ClaudeCodeCLI(executable: url)
+    }
+
+    struct Reply: Sendable {
+        var text: String
+        /// The `structured_output` object when --json-schema was given, serialized.
+        var structured: Data?
+        var models: [String]
+        var usage: TokenUsage
+    }
+
+    func run(system: String, user: String, model: String, extra: [String] = []) async throws -> Reply {
+        let process = Process()
+        process.executableURL = executable
+        process.arguments =
+            [
+                "-p", "--output-format", "json", "--model", model, "--tools", "", "--strict-mcp-config",
+                "--setting-sources", "", "--no-session-persistence", "--system-prompt", system,
+            ] + extra
+        var environment = ProcessInfo.processInfo.environment
+        // Use the subscription login, not an API key, and don't look like a nested session.
+        for key in ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"] {
+            environment.removeValue(forKey: key)
+        }
+        process.environment = environment
+        let directory = FileManager.default.temporaryDirectory.appending(path: "hibivo-eval-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        process.currentDirectoryURL = directory
+        let stdin = Pipe()
+        let stdout = Pipe()
+        process.standardInput = stdin
+        process.standardOutput = stdout
+        process.standardError = FileHandle.nullDevice
+        _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        try process.run()
+        let input = Data(user.utf8)
+        let data = await Task.detached {
+            try? stdin.fileHandleForWriting.write(contentsOf: input)
+            try? stdin.fileHandleForWriting.close()
+            let data = stdout.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return data
+        }.value
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CleanupError.invalidResponse
+        }
+        let text = json["result"] as? String ?? ""
+        if json["is_error"] as? Bool == true {
+            throw ClaudeCodeFailure(message: String(text.prefix(300)))
+        }
+        let usage = json["usage"] as? [String: Any] ?? [:]
+        func tokens(_ key: String) -> Int { usage[key] as? Int ?? 0 }
+        return Reply(
+            text: text,
+            structured: (json["structured_output"] as? [String: Any]).flatMap {
+                try? JSONSerialization.data(withJSONObject: $0)
+            },
+            models: (json["modelUsage"] as? [String: Any]).map { Array($0.keys).sorted() } ?? [],
+            usage: TokenUsage(
+                input: tokens("input_tokens") + tokens("cache_creation_input_tokens")
+                    + tokens("cache_read_input_tokens"),
+                output: tokens("output_tokens")))
+    }
+}
+
+struct ClaudeCodeFailure: Error {
+    var message: String
+}
+
+struct ClaudeCodeProvider: TextCleanupProvider {
+    let id = "claude-code"
+    let displayName = "Claude Code"
+    let defaultModel = "haiku"
+    let cli: ClaudeCodeCLI
+
+    func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
+        do {
+            let reply = try await cli.run(system: system, user: user, model: model)
+            return CleanupCompletion(text: reply.text, usage: reply.usage)
+        } catch is ClaudeCodeFailure {
+            throw CleanupError.invalidResponse
+        }
+    }
+}
+
 // MARK: - Judge
 
 struct Judge: Sendable {
@@ -191,6 +303,7 @@ struct Judge: Sendable {
     enum Transport: Sendable {
         case anthropic(apiKey: String)
         case bedrock(region: String, apiKey: String)
+        case claudeCode(ClaudeCodeCLI)
     }
 
     let transport: Transport
@@ -236,6 +349,44 @@ struct Judge: Sendable {
         ]
     }
 
+    func gradeWithCLI(_ cli: ClaudeCodeCLI, user: String) async throws -> Verdict {
+        let schema = try JSONSerialization.data(withJSONObject: Self.schema)
+        let reply: ClaudeCodeCLI.Reply
+        do {
+            reply = try await cli.run(
+                system: Self.system.replacingOccurrences(of: "record_verdict ツールで記録してください", with: "JSON で返してください"),
+                user: user, model: model,
+                extra: ["--json-schema", String(decoding: schema, as: UTF8.self), "--effort", "medium"])
+        } catch let failure as ClaudeCodeFailure {
+            throw Failure(message: "judge (Claude Code): \(failure.message)", retryable: true)
+        }
+        let object =
+            reply.structured.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            ?? reply.text.firstIndex(of: "{").flatMap { start in
+                reply.text.lastIndex(of: "}").flatMap { end in
+                    try? JSONSerialization.jsonObject(with: Data(reply.text[start...end].utf8)) as? [String: Any]
+                }
+            }
+        guard let verdict = object else {
+            throw Failure(
+                message: "judge (Claude Code) returned no verdict: \(reply.text.prefix(300))", retryable: false)
+        }
+        return try Self.verdict(from: verdict, model: reply.models.joined(separator: "+"), usage: reply.usage)
+    }
+
+    static func verdict(from verdict: [String: Any], model: String, usage: TokenUsage) throws -> Verdict {
+        var passes: [String: Bool] = [:]
+        var reasons: [String: String] = [:]
+        for criterion in criteria {
+            guard let pass = verdict["\(criterion)_pass"] as? Bool else {
+                throw Failure(message: "judge: missing \(criterion)_pass", retryable: false)
+            }
+            passes[criterion] = pass
+            reasons[criterion] = verdict["\(criterion)_reason"] as? String ?? ""
+        }
+        return Verdict(passes: passes, reasons: reasons, model: model, usage: usage)
+    }
+
     func grade(instructions: String, transcript: String, pasted: String, notes: String) async throws -> Verdict {
         let user = """
             <cleaner_instructions>
@@ -254,6 +405,9 @@ struct Judge: Sendable {
             \(notes.isEmpty ? "なし" : notes)
             </case_notes>
             """
+        if case .claudeCode(let cli) = transport {
+            return try await gradeWithCLI(cli, user: user)
+        }
         var body: [String: Any] = [
             "max_tokens": 8000,
             "system": Self.system,
@@ -279,6 +433,8 @@ struct Judge: Sendable {
             request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
             request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        case .claudeCode:
+            fatalError("handled above")
         case .bedrock(let region, let apiKey):
             body["anthropic_version"] = "bedrock-2023-05-31"
             let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
@@ -325,18 +481,9 @@ struct Judge: Sendable {
                 message: "judge returned no verdict (stop \(stop), blocks \(types)): \(input.prefix(400))",
                 retryable: false)
         }
-        var passes: [String: Bool] = [:]
-        var reasons: [String: String] = [:]
-        for criterion in Self.criteria {
-            guard let pass = verdict["\(criterion)_pass"] as? Bool else {
-                throw Failure(message: "judge: missing \(criterion)_pass", retryable: false)
-            }
-            passes[criterion] = pass
-            reasons[criterion] = verdict["\(criterion)_reason"] as? String ?? ""
-        }
         let usage = json["usage"] as? [String: Any] ?? [:]
-        return Verdict(
-            passes: passes, reasons: reasons, model: json["model"] as? String ?? model,
+        return try Self.verdict(
+            from: verdict, model: json["model"] as? String ?? model,
             usage: TokenUsage(
                 input: usage["input_tokens"] as? Int ?? 0, output: usage["output_tokens"] as? Int ?? 0))
     }
@@ -357,6 +504,9 @@ func makeJudge(_ options: inout Options) -> Judge {
         let region = ProcessInfo.processInfo.environment["AWS_REGION"] ?? BedrockCleanupProvider.defaultRegion
         if options.judgeModel.isEmpty { options.judgeModel = "global.anthropic.claude-opus-5-5" }
         return Judge(transport: .bedrock(region: region, apiKey: key), model: options.judgeModel)
+    case "claude-code":
+        if options.judgeModel.isEmpty { options.judgeModel = "opus" }
+        return Judge(transport: .claudeCode(ClaudeCodeCLI.locate()), model: options.judgeModel)
     default:
         fail("unknown judge provider \(options.judgeProvider)")
     }
@@ -449,7 +599,7 @@ func backoff(_ attempt: Int) async {
 func runCase(
     _ evalCase: EvalCase, rep: Int, options: Options, provider: any TextCleanupProvider, judge: Judge
 ) async throws -> CaseOutput {
-    let coordinator = CleanupCoordinator()
+    let coordinator = CleanupCoordinator(timeout: options.cleanupTimeout)
     var retries = 0
     var cleanup: (raw: String, outcome: CleanupOutcome)
     var latency: Double

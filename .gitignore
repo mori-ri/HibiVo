@@ -14,5 +14,5 @@ build/
 .claude/hillclimb/**/inputs-review.md
 .claude/hillclimb/**/report.html
 .claude/hillclimb/**/trajectory/
-.claude/hillclimb/cleanup/*/
+.claude/hillclimb/*/*/
 .claude/hillclimb/**/.harness-approved
