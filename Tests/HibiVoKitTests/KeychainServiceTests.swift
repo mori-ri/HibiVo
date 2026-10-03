@@ -10,9 +10,14 @@ struct KeychainServiceTests {
         let storage = MemoryKeychainStorage([KeychainService.bundleAccount: String(decoding: data, as: UTF8.self)])
         let store = KeychainService(storage: storage)
         #expect(store.secret(for: "soniox") == "speech")
+        let firstLoad = storage.readAccounts()
         #expect(store.secret(for: SecretAccount.gemini) == "cleanup")
-        #expect(store.secret(for: "soniox") == "speech")
-        #expect(storage.readAccounts() == [KeychainService.bundleAccount])
+        #expect(store.secret(for: SecretAccount.anthropic) == nil)
+        #expect(storage.readAccounts() == firstLoad)
+        // Only accounts missing from the bundle are looked up as legacy items.
+        #expect(firstLoad.filter { $0 == KeychainService.bundleAccount }.count == 1)
+        #expect(!firstLoad.contains("soniox"))
+        #expect(!firstLoad.contains(SecretAccount.gemini))
     }
 
     @Test func failedUpdatePreservesSavedAndCachedKeys() throws {
@@ -72,14 +77,34 @@ struct KeychainServiceTests {
         #expect(store.secret(for: SecretAccount.awsSessionToken) == nil)
     }
 
-    @Test func deniedLegacyReadDoesNotCommitOrDeleteAnyKeys() {
+    @Test func deniedLegacyReadSkipsOnlyThatKeyUntilALaterLaunch() throws {
         let storage = MemoryKeychainStorage(["soniox": "speech", SecretAccount.gemini: "cleanup"])
         storage.failRead(SecretAccount.gemini)
-        let before = storage.snapshot()
         let store = KeychainService(storage: storage)
-        #expect(store.secret(for: "soniox") == nil)
-        #expect(throws: KeychainService.Failure.self) { try store.setSecret("new", for: "soniox") }
-        #expect(storage.snapshot() == before)
+        #expect(store.secret(for: "soniox") == "speech")
+        #expect(store.secret(for: SecretAccount.gemini) == nil)
+        try store.setSecret("new", for: SecretAccount.anthropic)
+        #expect(store.secret(for: SecretAccount.anthropic) == "new")
+        // Not retried within the same launch, so access is asked for at most once.
+        #expect(storage.readAccounts().filter { $0 == SecretAccount.gemini }.count == 1)
+        #expect(storage.snapshot()["soniox"] == nil)
+        #expect(storage.snapshot()[SecretAccount.gemini] == Data("cleanup".utf8))
+
+        storage.allowRead(SecretAccount.gemini)
+        let relaunched = KeychainService(storage: storage)
+        #expect(relaunched.secret(for: SecretAccount.gemini) == "cleanup")
+        #expect(relaunched.secret(for: "soniox") == "speech")
+        #expect(relaunched.secret(for: SecretAccount.anthropic) == "new")
+        #expect(storage.snapshot()[SecretAccount.gemini] == nil)
+    }
+
+    @Test func savingAKeyRemovesItsDeniedLegacyItem() throws {
+        let storage = MemoryKeychainStorage([SecretAccount.gemini: "old"])
+        storage.failRead(SecretAccount.gemini)
+        let store = KeychainService(storage: storage)
+        try store.setSecret(nil, for: SecretAccount.gemini)
+        storage.allowRead(SecretAccount.gemini)
+        #expect(KeychainService(storage: storage).secret(for: SecretAccount.gemini) == nil)
     }
 
     @Test func failedMigrationWritePreservesOriginals() {
@@ -98,17 +123,26 @@ struct KeychainServiceTests {
         #expect(storage.snapshot()["soniox"] == Data("speech".utf8))
     }
 
-    @Test func corruptOrDeniedBundleIsNeverOverwritten() {
-        for denied in [false, true] {
-            let storage = MemoryKeychainStorage([KeychainService.bundleAccount: "invalid-json", "soniox": "old"])
-            if denied { storage.failRead(KeychainService.bundleAccount) }
-            let before = storage.snapshot()
-            let store = KeychainService(storage: storage)
-            #expect(store.secret(for: "soniox") == nil)
-            #expect(throws: (any Error).self) { try store.setSecret("new", for: "soniox") }
-            #expect(storage.snapshot() == before)
-            #expect(!storage.readAccounts().contains("soniox"))
-        }
+    @Test func deniedBundleIsNeverOverwritten() {
+        let storage = MemoryKeychainStorage([KeychainService.bundleAccount: "{}", "soniox": "old"])
+        storage.failRead(KeychainService.bundleAccount)
+        let before = storage.snapshot()
+        let store = KeychainService(storage: storage)
+        #expect(store.secret(for: "soniox") == nil)
+        #expect(throws: KeychainService.Failure.self) { try store.setSecret("new", for: "soniox") }
+        #expect(storage.snapshot() == before)
+        #expect(!storage.readAccounts().contains("soniox"))
+    }
+
+    @Test func corruptBundleIsKeptOnReadButReplacedBySaving() throws {
+        let storage = MemoryKeychainStorage([KeychainService.bundleAccount: "invalid-json"])
+        let before = storage.snapshot()
+        let store = KeychainService(storage: storage)
+        #expect(store.secret(for: "soniox") == nil)
+        #expect(storage.snapshot() == before)
+        try store.setSecret("new", for: "soniox")
+        #expect(store.secret(for: "soniox") == "new")
+        #expect(KeychainService(storage: storage).secret(for: "soniox") == "new")
     }
 
     @Test func concurrentUpdatesThroughCopiesDoNotLoseKeys() async {
@@ -153,6 +187,12 @@ private final class MemoryKeychainStorage: KeychainItemStorage, @unchecked Senda
         lock.lock()
         defer { lock.unlock() }
         deniedReads.insert(account)
+    }
+
+    func allowRead(_ account: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        deniedReads.remove(account)
     }
 
     func failWrite(_ account: String) {

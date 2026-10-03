@@ -48,11 +48,12 @@ public struct KeychainService: SecretStore {
             try state.storage.write(value.map { Data($0.utf8) }, account: account)
             return
         }
-        var keys = try state.loadBundle()
+        var keys = try state.loadBundle(replacingCorrupt: true)
         keys[account] = value
-        // Keep even an empty bundle: absence means legacy migration is still needed.
         try state.storage.write(JSONEncoder().encode(keys), account: Self.bundleAccount)
         state.cachedBundle = keys
+        // A legacy item left behind (e.g. once denied) would otherwise come back after this save.
+        try? state.storage.write(nil, account: account)
     }
 
     /// Serialize read-modify-write operations, including copies of this service.
@@ -63,32 +64,41 @@ public struct KeychainService: SecretStore {
 
         init(storage: any KeychainItemStorage) { self.storage = storage }
 
-        func loadBundle() throws -> [String: String] {
+        /// `replacingCorrupt` lets an explicit save start over when the bundle can't be decoded; its contents
+        /// are lost either way, and refusing would leave no way to store keys again.
+        func loadBundle(replacingCorrupt: Bool = false) throws -> [String: String] {
             if let cachedBundle { return cachedBundle }
-            if let data = try storage.read(KeychainService.bundleAccount) {
-                // Never overwrite an unreadable or corrupt bundle with an empty dictionary.
-                let keys = try JSONDecoder().decode([String: String].self, from: data)
-                cachedBundle = keys
-                return keys
-            }
             var keys: [String: String] = [:]
-            for account in KeychainService.bundledAccounts {
-                if let data = try storage.read(account) {
-                    guard let value = String(data: data, encoding: .utf8) else {
-                        throw Failure(status: errSecDecode)
-                    }
-                    keys[account] = value
+            var corrupt = false
+            // A denied bundle read throws, so it is never overwritten with partial keys.
+            if let data = try storage.read(KeychainService.bundleAccount) {
+                do {
+                    keys = try JSONDecoder().decode([String: String].self, from: data)
+                } catch {
+                    guard replacingCorrupt else { throw error }
+                    corrupt = true
                 }
             }
-            guard !keys.isEmpty else {
-                cachedBundle = keys
-                return keys
+            // Migrate legacy items not yet in the bundle. An unreadable one (e.g. access denied) is skipped and
+            // left in place for a later launch, so it never blocks the other keys.
+            var migrated: [String] = []
+            for account in KeychainService.bundledAccounts where keys[account] == nil {
+                guard let data = try? storage.read(account), let value = String(data: data, encoding: .utf8) else {
+                    continue
+                }
+                keys[account] = value
+                migrated.append(account)
             }
-            // Commit all keys before removing any originals. A denied read aborts migration.
-            try storage.write(JSONEncoder().encode(keys), account: KeychainService.bundleAccount)
-            for account in keys.keys {
-                // A failed cleanup leaves a redundant legacy item, never loses the saved key.
-                try? storage.write(nil, account: account)
+            if !migrated.isEmpty {
+                // Commit all keys before removing any originals.
+                try storage.write(JSONEncoder().encode(keys), account: KeychainService.bundleAccount)
+                for account in migrated {
+                    // A failed cleanup leaves a redundant legacy item, never loses the saved key.
+                    try? storage.write(nil, account: account)
+                }
+            } else if corrupt {
+                // The stored bundle still differs from `keys`; let the caller's write settle it.
+                return keys
             }
             cachedBundle = keys
             return keys
