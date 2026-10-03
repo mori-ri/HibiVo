@@ -20,13 +20,8 @@ public struct MenuBarContent: View {
             Button("⚠️ マイク権限を許可…") { Permissions.openMicrophoneSettings() }
         }
 
-        Text("\(env.settings.hotkey.displayName) を押して話す（もう一度押すと終了）")
-
         if env.state.phase == .meeting {
             Button("ミーティングの文字起こしを終了") { env.meeting.stop() }
-        } else {
-            Button("ミーティングの文字起こしを開始(\(env.settings.hotkey.displayName) + M)") { env.meeting.start() }
-                .disabled(env.state.phase.isActive)
         }
         if env.state.meetingTranscriptionsInProgress > 0 {
             Text("ミーティングを文字起こし中…")
@@ -34,15 +29,12 @@ public struct MenuBarContent: View {
         if env.state.meetingMinutesInProgress > 0 {
             Text("議事録を作成中…")
         }
-        Button("ミーティングの記録を開く…") { env.openMeetingsFolder() }
 
         if let last = env.history.records.first(where: { !$0.finalText.isEmpty }) {
             Button("直前の結果をもう一度入力") { env.pasteAgain(last.finalText) }
         }
-        Button("履歴…") { open(.history) }
-            .keyboardShortcut("y")
 
-        Divider()
+        if hasStatusItems { Divider() }
 
         Toggle("AI で整形", isOn: cleanupBinding)
         Picker("整形モード", selection: modeBinding) {
@@ -52,12 +44,14 @@ public struct MenuBarContent: View {
             Text("システム既定").tag(String?.none)
             ForEach(AudioDeviceCatalog.inputDevices()) { Text($0.name).tag(Optional($0.uid)) }
         }
-        Button("設定…") { open(.general) }
-            .keyboardShortcut(",")
 
         Divider()
 
-        Button("利用状況…") { open(.usage) }
+        Button("ホーム…") { open(.home) }
+        Button("履歴…") { open(.history) }
+            .keyboardShortcut("y")
+        Button("設定…") { open(.general) }
+            .keyboardShortcut(",")
         Button("フィードバック・要望を送る…") { ProjectLinks.open(ProjectLinks.newFeedback) }
 
         Divider()
@@ -66,6 +60,14 @@ public struct MenuBarContent: View {
             .keyboardShortcut("r")
         Button("HibiVo を終了") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+
+    /// Whether anything shows above the toggles, so the menu doesn't open on a separator.
+    private var hasStatusItems: Bool {
+        let state = env.state
+        return !state.hasAccessibilityPermission || !state.hasMicrophonePermission || state.phase == .meeting
+            || state.meetingTranscriptionsInProgress > 0 || state.meetingMinutesInProgress > 0
+            || env.history.records.contains { !$0.finalText.isEmpty }
     }
 
     /// A menu-bar-only app has to activate itself or the window opens behind the frontmost app.

@@ -281,7 +281,7 @@ private struct VocabularyRow: View {
 }
 
 /// Leading tile: a text cursor for words the user typed, the logo gradient with sparkles for learned ones.
-private struct OriginIcon: View {
+struct OriginIcon: View {
     let origin: VocabularyEntry.Origin
 
     var body: some View {

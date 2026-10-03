@@ -1,6 +1,7 @@
 import SwiftUI
 
 public enum MainSection: String, CaseIterable, Identifiable, Sendable {
+    case home
     case history
     case usage
     case general
@@ -14,6 +15,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
+        case .home: "ホーム"
         case .history: "履歴"
         case .usage: "利用状況"
         case .general: "一般"
@@ -21,13 +23,14 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         case .cleanup: "AI 整形"
         case .meeting: "ミーティング"
         case .vocabulary: "辞書"
-        case .applications: "アプリ"
+        case .applications: "アプリ別モード"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .history: "これまでに入力したテキスト"
+        case .home: "利用状況のまとめと使い方"
+        case .history: "入力したテキストを、この Mac に最大 \(HistoryStore.limit) 件保存します。音声は保存しません"
         case .usage: "利用回数、話した時間、API 料金の目安"
         case .general: "起動、ホットキー、マイク、権限"
         case .transcription: "音声をテキストにするサービス"
@@ -40,6 +43,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
 
     var symbol: String {
         switch self {
+        case .home: "house"
         case .history: "clock"
         case .usage: "chart.bar"
         case .general: "gearshape"
@@ -51,7 +55,8 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    static let settings: [MainSection] = [.general, .transcription, .cleanup, .meeting, .vocabulary, .applications]
+    /// In the order a dictation passes through them, then meetings.
+    static let settings: [MainSection] = [.general, .transcription, .vocabulary, .cleanup, .applications, .meeting]
 }
 
 /// The single app window: sidebar navigation on the left, the selected page on the right.
@@ -83,12 +88,13 @@ public struct MainWindowView: View {
         VStack(alignment: .leading, spacing: 0) {
             PageHeader(section: section) {
                 switch section {
-                case .history: HistoryHeaderActions(history: env.history)
+                case .history: HistoryHeaderActions(history: env.history, settings: env.settings)
                 case .usage: UsageHeaderActions(usage: env.usage)
                 default: EmptyView()
                 }
             }
             switch section {
+            case .home: HomeView(env: env)
             case .history: HistoryView(env: env)
             case .usage: UsageView(env: env)
             case .general: GeneralSettingsView(env: env)
@@ -123,6 +129,7 @@ private struct Sidebar: View {
             .padding(.bottom, 24)
 
             VStack(alignment: .leading, spacing: 2) {
+                item(.home)
                 item(.history)
                 item(.usage)
                 Text("設定")
@@ -146,16 +153,13 @@ private struct Sidebar: View {
             .padding(.horizontal, 10)
             .padding(.bottom, 12)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Label("\(env.settings.hotkey.displayName) を押して話す", systemImage: "mic")
-                if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
-                    Text("バージョン \(version)").foregroundStyle(.tertiary)
-                }
+            if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+                Text("バージョン \(version)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 16)
             }
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 18)
-            .padding(.bottom, 16)
         }
         .frame(maxHeight: .infinity, alignment: .top)
     }

@@ -106,7 +106,7 @@ struct UsageView: View {
                         .labelsHidden()
                         .fixedSize()
                         DailyChart(series: series, metric: metric, period: period, yenPerUSD: rate)
-                            .frame(height: 200)
+                            .frame(height: 240)
                     }
                     .padding(.vertical, 6)
                 }
@@ -135,7 +135,7 @@ struct UsageHeaderActions: View {
 
 // MARK: - Stat tiles
 
-private struct StatTiles: View {
+struct StatTiles: View {
     let days: [DailyUsage]
     let estimate: UsagePricing.Estimate
     let yenPerUSD: Double
@@ -162,7 +162,7 @@ private struct StatTiles: View {
     }
 }
 
-private struct StatTile: View {
+struct StatTile: View {
     let title: String
     let value: String
     let caption: String?
@@ -194,7 +194,7 @@ private struct StatTile: View {
 
 // MARK: - Chart
 
-private struct DailyChart: View {
+struct DailyChart: View {
     let series: [(date: Date, usage: DailyUsage)]
     let metric: UsageMetric
     let period: UsagePeriod
@@ -221,14 +221,18 @@ private struct DailyChart: View {
                     .foregroundStyle(.secondary.opacity(0.25))
                     .lineStyle(StrokeStyle(lineWidth: 1))
                     .zIndex(-1)
+                    // Above the plot, in the space `topInset` keeps free, so it covers neither the
+                    // bars nor what sits above the chart.
                     .annotation(
                         position: .top, spacing: 4,
                         overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
                     ) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(selected.date, format: .dateTime.month().day().weekday())
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            if showsDate {
+                                Text(selected.date, format: .dateTime.month().day().weekday())
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                             Text(metric.format(selected.value))
                                 .font(.system(size: 12, weight: .semibold))
                                 .monospacedDigit()
@@ -240,6 +244,7 @@ private struct DailyChart: View {
             }
         }
         .chartXSelection(value: $hovered)
+        .padding(.top, topInset)
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: period.labelStride)) {
                 AxisValueLabel(format: .dateTime.month(.defaultDigits).day(), centered: true)
@@ -255,6 +260,12 @@ private struct DailyChart: View {
         }
         .accessibilityLabel("日別の\(metric.title)")
     }
+
+    /// The axis labels every day only in the week view; longer periods skip days, so the label names it.
+    private var showsDate: Bool { period.labelStride > 1 }
+
+    /// Room for the hover label.
+    private var topInset: CGFloat { showsDate ? 44 : 28 }
 
     private func axisLabel(_ value: Double) -> String {
         switch metric {

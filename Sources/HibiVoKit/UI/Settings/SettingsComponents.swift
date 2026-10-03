@@ -170,32 +170,112 @@ struct NoteRow: View {
     }
 }
 
-/// Multi-line text with a character counter. Input past `limit` is cut off.
-struct TextEditorRow: View {
-    @Binding var text: String
+/// A long prompt: a one-line preview in the card, edited in a sheet so it doesn't take over the page.
+struct PromptEditorRow: View {
+    let title: String
+    /// The saved text.
+    let text: String
     let limit: Int
-    var minHeight: CGFloat = 100
+    /// Shown in the row when `text` is empty.
+    var placeholder = "未設定"
+    /// Offered as "デフォルトに戻す" in the sheet when set.
+    var defaultText: String? = nil
+    /// What the prompt is for, shown above the editor.
+    var explanation: String? = nil
+    let onSave: (String) -> Void
+    @State private var isEditing = false
 
     var body: some View {
-        SettingsRow {
-            VStack(alignment: .trailing, spacing: 4) {
-                TextEditor(text: limited)
-                    .font(.body)
-                    .scrollContentBackground(.hidden)
-                    .padding(6)
-                    .frame(minHeight: minHeight)
-                    .background(Theme.cardFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Theme.cardStroke))
-                Text("\(text.count) / \(limit) 文字")
+        LabeledRow {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(preview ?? placeholder)
                     .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(text.count >= limit ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
+        } control: {
+            Button("編集…") { isEditing = true }
+        }
+        .sheet(isPresented: $isEditing) {
+            PromptEditorSheet(
+                title: title, initialText: text, limit: limit, defaultText: defaultText, explanation: explanation,
+                onSave: onSave)
         }
     }
 
+    private var preview: String? {
+        text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
+    }
+}
+
+/// Edits a draft; nothing is stored until "保存".
+private struct PromptEditorSheet: View {
+    let title: String
+    let limit: Int
+    let defaultText: String?
+    let explanation: String?
+    let onSave: (String) -> Void
+    @State private var draft: String
+    @Environment(\.dismiss) private var dismiss
+
+    init(
+        title: String, initialText: String, limit: Int, defaultText: String?, explanation: String?,
+        onSave: @escaping (String) -> Void
+    ) {
+        self.title = title
+        self.limit = limit
+        self.defaultText = defaultText
+        self.explanation = explanation
+        self.onSave = onSave
+        _draft = State(initialValue: initialText)
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+            if let explanation {
+                Text(explanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            TextEditor(text: limited)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Theme.cardFill, in: shape)
+                .overlay(shape.strokeBorder(Theme.cardStroke))
+            HStack {
+                if let defaultText {
+                    Button("デフォルトに戻す") { draft = defaultText }
+                        .disabled(draft == defaultText)
+                }
+                Text("\(draft.count) / \(limit) 文字")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(draft.count >= limit ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                Spacer()
+                Button("キャンセル") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("保存") {
+                    onSave(draft)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 560, idealWidth: 600, minHeight: 420, idealHeight: 480)
+    }
+
     private var limited: Binding<String> {
-        Binding(get: { text }, set: { text = String($0.prefix(limit)) })
+        Binding(get: { draft }, set: { draft = String($0.prefix(limit)) })
     }
 }
