@@ -66,6 +66,7 @@ struct HomeView: View {
             let provider = providers.first(where: { $0.id == env.settings.transcriptionProviderID })
                 ?? providers.first
         else { return nil }
+        guard hasKey(for: provider) else { return (provider.displayName, Self.missingKey) }
         return (provider.displayName, Self.model(env.settings.transcriptionModel, of: provider))
     }
 
@@ -73,6 +74,8 @@ struct HomeView: View {
         let settings = env.settings
         guard settings.cleanupEnabled else { return nil }
         let kind = CleanupProviderKind(rawValue: settings.cleanupProviderID) ?? .anthropic
+        // Without credentials every dictation is pasted raw, so don't present the model as in use.
+        guard env.hasCleanupCredentials else { return (kind.displayName, Self.missingKey) }
         let model = settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel
         return (kind.displayName, model.isEmpty ? "モデル未設定" : model)
     }
@@ -84,10 +87,17 @@ struct HomeView: View {
             let stt = transcribers.first(where: { $0.provider.id == settings.meetingTranscriptionProviderID })
                 ?? transcribers.first
         else { return nil }
+        guard hasKey(for: stt.provider) else { return (stt.provider.displayName, Self.missingKey) }
         if settings.meetingTranscriptionTiming == .afterMeeting, let file = stt.fileTranscriber {
             return (stt.provider.displayName, file.model)
         }
         return (stt.provider.displayName, Self.model(settings.transcriptionModel, of: stt.provider))
+    }
+
+    private static let missingKey = "API キー未設定"
+
+    private func hasKey(for provider: any TranscriptionProvider) -> Bool {
+        !provider.requiresAPIKey || env.secrets.secret(for: provider.id)?.isEmpty == false
     }
 
     /// A model saved for another provider falls back to this one's default, as `DictationContextBuilder` does.
