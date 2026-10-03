@@ -56,6 +56,8 @@ struct SettingsSection<Content: View>: View {
 
 /// One row inside a `SettingsSection`.
 struct SettingsRow<Content: View>: View {
+    /// Where the separator starts; rows led by an icon start it past the icon.
+    var separatorInset: CGFloat = 14
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -64,7 +66,7 @@ struct SettingsRow<Content: View>: View {
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
             .overlay(alignment: .top) {
-                Theme.separator.frame(height: 1).padding(.leading, 14)
+                Theme.separator.frame(height: 1).padding(.leading, separatorInset)
             }
     }
 }
@@ -213,7 +215,7 @@ struct PromptEditorRow: View {
 }
 
 /// Edits a draft; nothing is stored until "保存".
-private struct PromptEditorSheet: View {
+struct PromptEditorSheet: View {
     let title: String
     let limit: Int
     let defaultText: String?

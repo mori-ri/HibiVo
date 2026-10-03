@@ -4,7 +4,7 @@
 
 - Push-to-Talk（既定は右 Option。Fn / 右 Command / ⌃Space も選べます）
 - 話している間にストリーミングで文字起こし（Soniox または Google Gemini）するので、録音を終えたらすぐ入力されます
-- LLM で整形（Raw / Natural / Business / Prompt）。アプリごとにモードを自動で切り替えます
+- LLM で整形（Raw / Natural / Business / Prompt / Custom）。アプリごとにモードを自動で切り替えます
 - 元のアプリのカーソル位置へ貼り付け、クリップボードは元に戻します
 - ユーザー辞書（表記と聞き取り例を登録。聞き取り例は平仮名・片仮名、全角・半角を区別せずに置き換え、STT のヒントにも使います）、履歴（コピー / もう一度入力 / 整形やり直し）
 - ミーティングモード: ホットキー + M で録音を続け、マイクとシステム音声（オンライン参加者の声）を話者識別付きで文字起こしして Markdown に保存（Soniox）
@@ -73,6 +73,8 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 | メニュー › 直前の結果をもう一度入力 | 最後の結果を現在のアプリへ貼り付け |
 
 整形に失敗したときやタイムアウトしたとき（5 秒）は、文字起こし結果をそのまま入力します。
+
+整形のモード（Raw / Natural / Business / Prompt / Custom）の違いと出力例は [AI 整形のモード](docs/cleanup-modes.md) を参照してください。
 
 社名や専門用語は辞書に登録しておくと正しく入力されます。入力直後に誤認識を直すと、その言葉が自動で辞書に登録されます。詳しくは [辞書](docs/dictionary.md) を参照してください。
 
