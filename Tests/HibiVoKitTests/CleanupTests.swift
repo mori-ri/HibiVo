@@ -205,9 +205,9 @@ struct MockCleanupProvider: TextCleanupProvider {
 
 @Suite struct CleanupProviderWireTests {
     @Test func anthropicRequestShape() throws {
-        let body = AnthropicCleanupProvider.makeRequest(system: "sys", user: "usr", model: "claude-opus-5")
+        let body = AnthropicCleanupProvider.makeRequest(system: "sys", user: "usr", model: "claude-opus-5-5")
         let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
-        #expect(json["model"] as? String == "claude-opus-5")
+        #expect(json["model"] as? String == "claude-opus-5-5")
         #expect(json["system"] as? String == "sys")
         #expect(json["max_tokens"] as? Int != nil)
         #expect((json["output_config"] as? [String: Any])?["effort"] as? String == "low")
@@ -215,6 +215,23 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(json["temperature"] == nil)
         let messages = try #require(json["messages"] as? [[String: Any]])
         #expect(messages.first?["role"] as? String == "user")
+    }
+
+    // Short dictations need a fast reply, so every provider defaults to its lightweight model.
+    @Test func defaultModelsFavorLatency() {
+        #expect(CleanupProviderKind.anthropic.defaultModel == "claude-haiku-4-5")
+        #expect(AnthropicCleanupProvider(apiKey: "k").defaultModel == "claude-haiku-4-5")
+        #expect(CleanupProviderKind.bedrock.defaultModel == "global.anthropic.claude-haiku-4-5-20251001-v1:0")
+        #expect(CleanupProviderKind.gemini.defaultModel == "gemini-3.5-flash-lite")
+    }
+
+    @Test(arguments: ["claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"])
+    func requestAsksForServerSideFallbacks(model: String) {
+        #expect(AnthropicCleanupProvider.makeRequest(system: "s", user: "u", model: model).fallbacks == "default")
+    }
+
+    @Test func olderSonnetOmitsFallbacks() {
+        #expect(AnthropicCleanupProvider.makeRequest(system: "s", user: "u", model: "claude-sonnet-5").fallbacks == nil)
     }
 
     @Test func haikuRequestOmitsEffortAndFallbacks() throws {

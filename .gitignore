@@ -8,3 +8,11 @@ build/
 
 # Editor
 .vscode/
+
+# Eval data derived from local history (never commit)
+*.local.jsonl
+.claude/hillclimb/**/inputs-review.md
+.claude/hillclimb/**/report.html
+.claude/hillclimb/**/trajectory/
+.claude/hillclimb/*/*/
+.claude/hillclimb/**/.harness-approved

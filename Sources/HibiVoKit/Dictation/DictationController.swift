@@ -249,12 +249,9 @@ public final class DictationController {
             return
         }
 
-        let raw = VocabularyReplacer.apply(context.vocabulary, to: transcript)
-        let cleaned = await cleanup.run(
-            .init(
-                raw: raw, mode: context.cleanup.mode,
-                vocabulary: context.vocabulary.map(\.promptTerm), appName: context.target?.name,
-                customInstructions: context.cleanup.customInstructions),
+        let (raw, cleaned) = await cleanup.run(
+            transcript: transcript, vocabulary: context.vocabulary, mode: context.cleanup.mode,
+            appName: context.target?.name, customInstructions: context.cleanup.customInstructions,
             provider: context.cleanup.provider, model: context.cleanup.model)
         let cleanupDone = clock.now
 

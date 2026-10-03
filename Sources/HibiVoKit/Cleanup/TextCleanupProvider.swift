@@ -70,10 +70,10 @@ public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
 
     public var defaultModel: String {
         switch self {
-        case .anthropic: "claude-opus-5"
+        case .anthropic: "claude-haiku-4-5"
         case .openAICompatible: ""
-        case .bedrock: "anthropic.claude-opus-5"
-        case .gemini: "gemini-3.8-flash"
+        case .bedrock: "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+        case .gemini: "gemini-3.5-flash-lite"
         }
     }
 }

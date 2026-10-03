@@ -11,7 +11,7 @@ public struct GeminiCleanupProvider: TextCleanupProvider {
     private let urlSession: URLSession
     static let endpoint = URL(string: "https://generativelanguage.googleapis.com/v1beta/interactions")!
 
-    public static let suggestedModels = ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
+    public static let suggestedModels = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
 
     public init(apiKey: String, urlSession: URLSession = .shared) {
         self.apiKey = apiKey

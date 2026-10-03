@@ -65,7 +65,7 @@ import Testing
     }
 
     @Test func bodyUsesBedrockAnthropicVersionWithoutModelOrFallbacks() throws {
-        let body = BedrockCleanupProvider.makeInvokeBody(system: "sys", user: "usr", model: "anthropic.claude-opus-5")
+        let body = BedrockCleanupProvider.makeInvokeBody(system: "sys", user: "usr", model: "anthropic.claude-opus-5-5")
         let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
         #expect(json["anthropic_version"] as? String == "bedrock-2023-05-31")
         #expect(json["model"] == nil)
@@ -94,7 +94,7 @@ import Testing
         let cleanup = builder([SecretAccount.awsAccessKeyID: "AK", SecretAccount.awsSecretAccessKey: "SK"])
             .cleanup(for: nil)
         #expect(cleanup.provider?.id == "bedrock")
-        #expect(cleanup.model == "anthropic.claude-opus-5")
+        #expect(cleanup.model == "global.anthropic.claude-haiku-4-5-20251001-v1:0")
     }
 
     @Test(arguments: ["minimax.minimax-m2.5", "zai.glm-4.7-flash", "zai.glm-4.7", "global.openai.gpt-6-luna"])

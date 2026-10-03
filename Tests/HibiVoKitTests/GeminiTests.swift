@@ -152,7 +152,7 @@ import Testing
         #expect(builder([:]).cleanup(for: nil).provider == nil)
         let cleanup = builder([GeminiLiveProvider().id: "key"]).cleanup(for: nil)
         #expect(cleanup.provider?.id == "gemini")
-        #expect(cleanup.model == "gemini-3.8-flash")
+        #expect(cleanup.model == "gemini-3.5-flash-lite")
     }
 
     @MainActor @Test func modelSavedForAnotherProviderFallsBackToDefault() throws {

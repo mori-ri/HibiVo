@@ -4,7 +4,7 @@ import Foundation
 public struct AnthropicCleanupProvider: TextCleanupProvider {
     public let id = "anthropic"
     public let displayName = "Anthropic (Claude)"
-    public let defaultModel = "claude-opus-5"
+    public let defaultModel = CleanupProviderKind.anthropic.defaultModel
 
     private let apiKey: String
     private let urlSession: URLSession
@@ -30,7 +30,8 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         var messages: [Message]
         /// Cleanup is a light rewrite; low effort keeps latency down on models that think adaptively.
         var outputConfig: OutputConfig?
-        /// Server-side fallback when a safety classifier declines (Opus 5 / Fable 5.1).
+        /// Server-side fallback when a safety classifier declines (Opus 5 and later, Fable 5,
+        /// Sonnet 5.5). Not sent on Bedrock, which doesn't take it.
         var fallbacks: String?
 
         enum CodingKeys: String, CodingKey {
@@ -82,7 +83,8 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         let name = model.range(of: "anthropic.").map { String(model[$0.upperBound...]) } ?? model
         let supportsEffort = !name.hasPrefix("claude-haiku")
         let supportsFallbacks =
-            allowFallbacks && (name.hasPrefix("claude-opus-5") || name.hasPrefix("claude-fable-5"))
+            allowFallbacks
+            && ["claude-opus-5", "claude-fable-5", "claude-sonnet-5-5"].contains { name.hasPrefix($0) }
         return Request(
             model: model,
             system: system,
