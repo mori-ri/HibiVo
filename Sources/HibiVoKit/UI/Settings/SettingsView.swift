@@ -332,6 +332,8 @@ struct APIKeyField: View {
     let label: String
     @State private var value = ""
     @State private var saved = false
+    @State private var savedValue = ""
+    @State private var saveFailed = false
 
     var body: some View {
         LabeledRow(label) {
@@ -345,19 +347,30 @@ struct APIKeyField: View {
         }
         .onAppear { load() }
         .onChange(of: account) { load() }
-        .onChange(of: value) { saved = value == (secrets.secret(for: account) ?? "") }
+        .onChange(of: value) { saved = value == savedValue }
+        .alert("認証情報を保存できませんでした", isPresented: $saveFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("キーチェーンの状態やアクセス許可を確認して、もう一度保存してください。")
+        }
     }
 
     private func load() {
         value = secrets.secret(for: account) ?? ""
+        savedValue = value
         saved = true
     }
 
     private func save() {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        try? secrets.setSecret(trimmed.isEmpty ? nil : trimmed, for: account)
-        value = trimmed
-        saved = true
+        do {
+            try secrets.setSecret(trimmed.isEmpty ? nil : trimmed, for: account)
+            savedValue = trimmed
+            value = trimmed
+            saved = true
+        } catch {
+            saveFailed = true
+        }
     }
 }
 
