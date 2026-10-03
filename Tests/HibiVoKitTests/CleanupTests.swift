@@ -404,7 +404,7 @@ struct MockCleanupProvider: TextCleanupProvider {
 @Suite struct TrailingPeriodTests {
     @Test(arguments: [
         ("AppSync。", "AppSync"), ("会議資料。", "会議資料"), ("AWS Lambda。", "AWS Lambda"), ("Lambda.", "Lambda"),
-        ("テスト。\n", "テスト"),
+        ("テスト。\n", "テスト"), ("会議の資料。", "会議の資料"), ("お客様。", "お客様"),
     ])
     func dropsPeriodAfterLoneWord(input: String, expected: String) {
         #expect(TrailingPeriod.trimmed(input) == expected)
@@ -412,7 +412,8 @@ struct MockCleanupProvider: TextCleanupProvider {
 
     @Test(arguments: [
         "了解しました。", "ありがとう。", "明日、会議資料。", "資料を確認。次は会議。", "This is Lambda.", "3.14.",
-        "本日の議題は来期の予算計画と人員配置の見直しについて。", "改行\nあり。", "AppSync",
+        "本日の議題は来期の予算計画と人員配置の見直しについて。", "改行\nあり。", "AppSync", "次回は来週。", "今日は雨。",
+        "東京で開催。",
     ])
     func keepsSentences(input: String) {
         #expect(TrailingPeriod.trimmed(input) == input)
