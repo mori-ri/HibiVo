@@ -87,7 +87,7 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(Set(outputs).count == CleanupMode.allCases.count - 1)
         // Raw doesn't call the model, so its sample is the utterance itself.
         #expect(CleanupMode.raw.sampleOutput == CleanupSample.spoken)
-        #expect(CleanupMode.allCases.allSatisfy { !$0.summary.isEmpty && !$0.shortName.isEmpty })
+        #expect(CleanupMode.allCases.allSatisfy { !$0.summary.isEmpty })
         // The cleaned samples drop the filler and the self-correction.
         for mode in CleanupMode.allCases where mode != .raw {
             guard let output = mode.sampleOutput else { continue }

@@ -24,17 +24,6 @@ public enum CleanupMode: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 extension CleanupMode {
-    /// The English half of `displayName`, short enough for a segmented control.
-    public var shortName: String {
-        switch self {
-        case .raw: "Raw"
-        case .natural: "Natural"
-        case .business: "Business"
-        case .prompt: "Prompt"
-        case .custom: "Custom"
-        }
-    }
-
     /// One line on what the mode does, shown next to its sample.
     public var summary: String {
         switch self {
