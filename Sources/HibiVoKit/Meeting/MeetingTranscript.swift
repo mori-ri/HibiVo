@@ -90,6 +90,7 @@ public struct MeetingTranscript: Equatable, Sendable {
 public enum MeetingDocument {
     /// Something worth telling the reader about how the audio was captured.
     public enum Notice: Equatable, Sendable {
+        case microphoneUnavailable
         case systemAudioUnavailable
         case systemAudioSilent
     }
@@ -111,6 +112,8 @@ public enum MeetingDocument {
         lines.append("- 話者は音声から自動で推定しています。番号は実際の人物と一致しないことがあります。")
         for notice in notices {
             switch notice {
+            case .microphoneUnavailable:
+                lines.append("- マイクの切り替え後に録音を再開できなかったため、ミーティングの記録を終了しました。")
             case .systemAudioUnavailable:
                 lines.append("- システム音声を取得できなかったため、オンライン参加者の声は記録されていません。")
             case .systemAudioSilent:

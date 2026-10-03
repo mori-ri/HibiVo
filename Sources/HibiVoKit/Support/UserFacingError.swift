@@ -1,6 +1,7 @@
 /// Errors phrased for the user, never raw status codes.
 public enum UserFacingError: Error, Equatable, Sendable {
     case microphoneUnavailable
+    case meetingMicrophoneLost
     case missingAPIKey(provider: String)
     case invalidAPIKey(provider: String)
     case transcriptionFailed
@@ -18,6 +19,7 @@ public enum UserFacingError: Error, Equatable, Sendable {
 
     public var message: String {
         switch self {
+        case .meetingMicrophoneLost: "マイクの録音を再開できなかったため、ミーティングを終了しました"
         case .microphoneUnavailable: "マイクを使用できません"
         case .missingAPIKey(let provider): "\(provider) の API Key が未設定です"
         case .invalidAPIKey(let provider): "\(provider) の API Key が正しくありません"

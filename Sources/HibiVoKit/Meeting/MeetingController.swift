@@ -51,6 +51,7 @@ public final class MeetingController {
         var mixer: PCMMixer?
         /// System audio was asked for but could not be started.
         var systemAudioUnavailable = false
+        var microphoneUnavailable = false
         /// Loudest system-audio chunk; exactly 0 suggests the permission is missing.
         var systemPeak: Float = 0
         var systemBytes = 0
@@ -293,7 +294,7 @@ public final class MeetingController {
     private func pump(_ stream: AsyncStream<AudioChunk>, as input: PCMMixer.Input, into meeting: Meeting) -> Task<
         Void, Never
     > {
-        Task { [state] in
+        Task { [weak self, state] in
             for await chunk in stream {
                 switch input {
                 case .microphone:
@@ -306,6 +307,10 @@ public final class MeetingController {
                 let ready = meeting.mixer == nil ? chunk.pcm16 : meeting.mixer?.push(chunk.pcm16, from: input)
                 if let ready { meeting.outgoingContinuation.yield(ready) }
             }
+            guard input == .microphone, !meeting.isStopping, let self, self.meeting === meeting else { return }
+            meeting.microphoneUnavailable = true
+            meeting.failure = .meetingMicrophoneLost
+            self.stop()
         }
     }
 
@@ -395,7 +400,7 @@ public final class MeetingController {
 
         var saved = false
         let document = markdown(meeting, ended: true)
-        if meeting.transcript.isEmpty {
+        if meeting.transcript.isEmpty && !meeting.microphoneUnavailable {
             await writer.remove(meeting.fileURL)
         } else {
             saved = await writer.write(document, to: meeting.fileURL)
@@ -424,14 +429,35 @@ public final class MeetingController {
         self.meeting = nil
         state.meetingStartedAt = nil
         state.partialTranscript = ""
-        state.phase = .idle
+        if let failure = meeting.failure { show(failure) } else { state.phase = .idle }
         guard meeting.bytes > 0, let fileTranscriber else {
-            show(.nothingRecognized)
+            if meeting.microphoneUnavailable {
+                let document = markdown(meeting, ended: true)
+                transcriptions.append(
+                    Task {
+                        if await writer.write(document, to: meeting.fileURL) {
+                            onSaved(meeting.fileURL)
+                        } else {
+                            showUnlessBusy(.meetingSaveFailed)
+                        }
+                    })
+            } else {
+                show(.nothingRecognized)
+            }
             return
         }
         state.meetingTranscriptionsInProgress += 1
         log.info("Meeting stopped; transcribing \(self.milliseconds(meeting.bytes) / 1000) s of audio")
-        transcriptions.append(Task { await transcribe(meeting, with: fileTranscriber) })
+        transcriptions.append(
+            Task {
+                // Preserve the capture failure even if the later API request cannot transcribe the audio.
+                if meeting.microphoneUnavailable {
+                    if !(await writer.write(markdown(meeting, ended: true), to: meeting.fileURL)) {
+                        showUnlessBusy(.meetingSaveFailed)
+                    }
+                }
+                await transcribe(meeting, with: fileTranscriber)
+            })
     }
 
     private func transcribe(_ meeting: Meeting, with transcriber: any MeetingFileTranscriber) async {
@@ -465,7 +491,7 @@ public final class MeetingController {
                     provider: provider.id, model: transcriber.model,
                     seconds: Double(milliseconds(audio.count)) / 1000)))
         meeting.transcript.apply(tokens)
-        guard !meeting.transcript.isEmpty else {
+        guard !meeting.transcript.isEmpty || meeting.microphoneUnavailable else {
             showUnlessBusy(.nothingRecognized)
             return
         }
@@ -561,6 +587,7 @@ public final class MeetingController {
     private func markdown(_ meeting: Meeting, ended: Bool) -> String {
         var notices: [MeetingDocument.Notice] = []
         if meeting.systemAudioUnavailable { notices.append(.systemAudioUnavailable) }
+        if meeting.microphoneUnavailable { notices.append(.microphoneUnavailable) }
         // A denied permission yields exact digital silence rather than an error. Only judge at the end:
         // the other side may simply not have spoken yet.
         if ended, meeting.mixer != nil, meeting.systemBytes > 0, meeting.systemPeak == 0 {
