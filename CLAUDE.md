@@ -14,7 +14,7 @@ scripts/test.sh --filter HotkeyInterpreterTests        # 1 スイートのみ
 scripts/test.sh --filter "DictationControllerTests/shortTapIsCancelled"   # 1 テストのみ
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter SonioxIntegration           # 実際の Soniox エンドポイントに接続 (オプトイン)
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter GeminiIntegration           # 実際の Gemini エンドポイントに接続 (オプトイン、GEMINI_API_KEY)
-scripts/eval.sh --variant baseline --provider bedrock --model <id>    # 整形の品質評価 (実際の API と Claude の判定、有料)。結果は .claude/hillclimb/cleanup/
+scripts/eval.sh --variant baseline --provider bedrock --model <id>    # 整形の品質評価 (実際の API と Claude の判定、有料)。結果は .claude/hillclimb/cleanup/。--provider apple で macOS 標準
 
 scripts/run.sh                          # debug ビルド → build/HibiVo.app → 起動 (起動中のアプリは終了させる)
 CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署名
@@ -76,6 +76,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
   - Anthropic Messages(`output_config.effort: low`、Opus 5 以降・Fable 5 系・Sonnet 5.5 向けにサーバー側 `fallbacks`)。
   - OpenAI 互換の chat completions。
   - Gemini Interactions API(`thinking_level: low`、`store: false`)。既定は `gemini-3.5-flash-lite`。
+  - macOS 標準(`AppleIntelligenceCleanupProvider`、Foundation Models framework、macOS 26 以降で Apple Intelligence がオンのとき)。API キー不要で端末内で処理する。既定にはしない(約 3B と小さく、M1 では 5 秒のタイムアウトを超えることが多いため)。ガードレールは `permissiveContentTransformations`。使えないときはプロバイダが nil になる。録音開始時に `TextCleanupProvider.prewarm()` でモデルを読み込んでおく。
   - `BedrockCleanupProvider`: `anthropic.` を含むモデル ID は Anthropic のリクエストボディで InvokeModel を使う。それ以外のモデル(GLM、MiniMax、GPT など)は Converse API を使う。認証は Bedrock API キー(Bearer)か、自前の `AWSSigV4`(CryptoKit 実装、AWS テストスイートのベクタで検証済み)で署名する IAM キー。
 - プロバイダ種別、デフォルトモデル、Keychain のアカウント名は `CleanupProviderKind` / `SecretAccount`(`TextCleanupProvider.swift`)に集約されている。
 

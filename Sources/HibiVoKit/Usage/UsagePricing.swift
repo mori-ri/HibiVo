@@ -110,6 +110,8 @@ public enum UsagePricing {
     /// `day` (`yyyy-MM-dd`) picks time-limited prices; nil means today.
     public static func rate(provider: String, model: String, region: String? = nil, day: String? = nil) -> TokenRate? {
         switch CleanupProviderKind(rawValue: provider) {
+        // Runs on the Mac.
+        case .apple: TokenRate(input: 0, output: 0)
         case .anthropic: claudeRate(model)
         case .bedrock: bedrockRate(model: model, region: region)
         case .gemini: geminiRate(model, day: day ?? Date().formatted(.iso8601.year().month().day()))
