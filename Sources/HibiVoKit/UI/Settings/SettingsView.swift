@@ -123,20 +123,12 @@ struct CleanupSettingsView: View {
     var body: some View {
         @Bindable var settings = env.settings
         SettingsPage {
-            SettingsSection(
-                footer:
-                    "整形に失敗したときは、文字起こし結果をそのまま入力します。Custom モードでは、基本的な整形に加えて指示に従います。アプリ別モードで Custom を選んだアプリにも使われます。"
-            ) {
+            SettingsSection(footer: "整形に失敗したときは、文字起こし結果をそのまま入力します。") {
                 ToggleRow("AI で文章を整える", isOn: $settings.cleanupEnabled)
-                PickerRow("既定のモード", selection: $settings.defaultCleanupMode) {
-                    ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
-                }
-                PromptEditorRow(
-                    title: "Custom モードの指示", text: settings.customCleanupInstructions,
-                    limit: CleanupMode.customInstructionsLimit,
-                    explanation: "フィラーの除去などの基本的な整形に加えて、ここに書いた指示に従います。",
-                    onSave: settings.setCustomCleanupInstructions)
             }
+            CleanupModeSection(
+                mode: $settings.defaultCleanupMode, customInstructions: settings.customCleanupInstructions,
+                onSaveCustomInstructions: settings.setCustomCleanupInstructions)
             SettingsSection(title: "LLM") {
                 PickerRow("Provider", selection: $settings.cleanupProviderID) {
                     ForEach(CleanupProviderKind.allCases) { Text($0.displayName).tag($0.rawValue) }
@@ -163,6 +155,111 @@ struct CleanupSettingsView: View {
                 }
             }
         }
+    }
+}
+
+/// Picks the default mode from a list that explains each one, with a sample of the selected mode's output.
+private struct CleanupModeSection: View {
+    @Binding var mode: CleanupMode
+    let customInstructions: String
+    let onSaveCustomInstructions: (String) -> Void
+    @State private var hovered: CleanupMode?
+    @State private var isEditingInstructions = false
+
+    var body: some View {
+        SettingsSection(
+            title: "既定のモード",
+            footer:
+                "サンプルは例です。実際の出力は、話した内容や使うモデルによって変わります。Custom の指示は、アプリ別モードで Custom を選んだアプリにも使われます。"
+        ) {
+            ForEach(CleanupMode.allCases) { option in
+                row(option)
+            }
+        }
+        .sheet(isPresented: $isEditingInstructions) {
+            PromptEditorSheet(
+                title: "Custom モードの指示", initialText: customInstructions,
+                limit: CleanupMode.customInstructionsLimit, defaultText: nil,
+                explanation: "フィラーの除去などの基本的な整形に加えて、ここに書いた指示に従います。",
+                onSave: onSaveCustomInstructions)
+        }
+    }
+
+    private func row(_ option: CleanupMode) -> some View {
+        let isSelected = option == mode
+        return SettingsRow(separatorInset: 44) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                        .font(.system(size: 15))
+                        .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(option.displayName)
+                            .fontWeight(isSelected ? .semibold : .regular)
+                        Text(option.summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if option == .custom, let preview = instructionsPreview {
+                            Text("指示: \(preview)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
+                    Spacer(minLength: 12)
+                    if option == .custom {
+                        Button("指示を編集…") { isEditingInstructions = true }
+                    }
+                }
+                if isSelected, let output = option.sampleOutput {
+                    sample(output)
+                        .padding(.leading, 30)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { mode = option }
+        }
+        .background(hovered == option && !isSelected ? Theme.hover : .clear)
+        .onHover { hovered = $0 ? option : (hovered == option ? nil : hovered) }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { mode = option }
+    }
+
+    private func sample(_ output: String) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+        return VStack(alignment: .leading, spacing: 0) {
+            sampleText("話した言葉", CleanupSample.spoken, secondary: true)
+            Theme.separator.frame(height: 1)
+            sampleText("整形後", output)
+        }
+        .overlay(shape.strokeBorder(Theme.cardStroke))
+        .clipShape(shape)
+    }
+
+    private func sampleText(_ title: String, _ text: String, secondary: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundStyle(secondary ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var instructionsPreview: String? {
+        customInstructions.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
     }
 }
 

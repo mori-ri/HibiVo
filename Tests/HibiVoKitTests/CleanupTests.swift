@@ -80,6 +80,22 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(!capped.contains(String(repeating: "あ", count: CleanupMode.customInstructionsLimit + 1)))
     }
 
+    @Test func everyBuiltInModeHasADistinctSample() {
+        // Custom has none: its output depends on the user's instructions.
+        #expect(CleanupMode.custom.sampleOutput == nil)
+        let outputs = CleanupMode.allCases.compactMap(\.sampleOutput)
+        #expect(Set(outputs).count == CleanupMode.allCases.count - 1)
+        // Raw doesn't call the model, so its sample is the utterance itself.
+        #expect(CleanupMode.raw.sampleOutput == CleanupSample.spoken)
+        #expect(CleanupMode.allCases.allSatisfy { !$0.summary.isEmpty && !$0.shortName.isEmpty })
+        // The cleaned samples drop the filler and the self-correction.
+        for mode in CleanupMode.allCases where mode != .raw {
+            guard let output = mode.sampleOutput else { continue }
+            #expect(!output.contains("えーと"))
+            #expect(!output.contains("ボタン"))
+        }
+    }
+
     @Test func businessKeepsWordingAndBreaksLines() {
         let business = CleanupPromptBuilder.systemPrompt(mode: .business, vocabulary: [], appName: nil)
         #expect(business.contains("言い回し・語順・語尾は話者のまま残し"))
