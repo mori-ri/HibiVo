@@ -39,7 +39,7 @@ public final class AppState {
     public var hasAccessibilityPermission = false
     public var hasMicrophonePermission = false
     /// Page shown in the main window; the menu bar sets it before opening the window.
-    public var mainSection: MainSection = .history
+    public var mainSection: MainSection = .home
 
     public init() {}
 }

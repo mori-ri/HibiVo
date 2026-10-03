@@ -9,7 +9,7 @@ struct ApplicationSettingsView: View {
         SettingsPage {
             SettingsSection(
                 title: "アプリごとの整形モード",
-                footer: "一覧にないアプリは「既定のモード」（AI 整形ページ）を使います。"
+                footer: "一覧にないアプリは、AI 整形の「既定のモード」を使います。"
             ) {
                 if rows.isEmpty {
                     Text("まだありません。下の「アプリを追加」から追加できます。").foregroundStyle(.secondary)

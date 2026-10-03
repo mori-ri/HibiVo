@@ -37,40 +37,53 @@ struct HistoryView: View {
                 ContentUnavailableView {
                     Label("履歴はまだありません", systemImage: "clock")
                 } description: {
-                    Text("\(env.settings.hotkey.displayName) を押して話し、もう一度押すと、ここに記録されます。")
+                    if env.settings.historyEnabled {
+                        Text("\(env.settings.hotkey.displayName) を押して話し、もう一度押すと、ここに記録されます。")
+                    } else {
+                        Text("履歴の保存がオフになっています。右上のスイッチでオンにすると、入力したテキストがここに記録されます。")
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                HStack(spacing: 0) {
-                    List(items, selection: $selection) { item in
-                        switch item {
-                        case .dictation(let record): HistoryRow(record: record)
-                        case .meeting(let record):
-                            MeetingRow(record: record, isRecording: isRecording(record))
-                                .contextMenu { MeetingActions(env: env, record: record) }
-                        }
+                VStack(alignment: .leading, spacing: 0) {
+                    if !env.settings.historyEnabled {
+                        Label("履歴は保存されていません。新しい入力は記録されません。", systemImage: "pause.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 24)
+                            .padding(.top, 8)
                     }
-                    .scrollContentBackground(.hidden)
-                    .frame(width: 280)
-                    Theme.separator.frame(width: 1)
-                    Group {
-                        switch items.first(where: { $0.id == selection }) {
-                        case .dictation(let record): HistoryDetail(env: env, record: record).id(record.id)
-                        case .meeting(let record):
-                            MeetingDetail(env: env, record: record, isRecording: isRecording(record))
-                        case nil:
-                            Text("項目を選択してください")
-                                .foregroundStyle(.tertiary)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    HStack(spacing: 0) {
+                        List(items, selection: $selection) { item in
+                            switch item {
+                            case .dictation(let record): HistoryRow(record: record)
+                            case .meeting(let record):
+                                MeetingRow(record: record, isRecording: isRecording(record))
+                                    .contextMenu { MeetingActions(env: env, record: record) }
+                            }
                         }
+                        .scrollContentBackground(.hidden)
+                        .frame(width: 280)
+                        Theme.separator.frame(width: 1)
+                        Group {
+                            switch items.first(where: { $0.id == selection }) {
+                            case .dictation(let record): HistoryDetail(env: env, record: record).id(record.id)
+                            case .meeting(let record):
+                                MeetingDetail(env: env, record: record, isRecording: isRecording(record))
+                            case nil:
+                                Text("項目を選択してください")
+                                    .foregroundStyle(.tertiary)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .glassPanel(cornerRadius: 14)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 20)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .glassPanel(cornerRadius: 14)
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 20)
             }
         }
         // The folder changes outside the app too (and while a meeting records), so look again
@@ -93,9 +106,14 @@ struct HistoryView: View {
 /// Shown in the page header next to the title.
 struct HistoryHeaderActions: View {
     let history: HistoryStore
+    @Bindable var settings: SettingsStore
     @State private var confirming = false
 
     var body: some View {
+        Toggle("履歴を保存", isOn: $settings.historyEnabled)
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .help("オフにすると、新しい入力を履歴に残しません。これまでの履歴は消えません。")
         Button("すべて削除", role: .destructive) { confirming = true }
             .disabled(history.records.isEmpty)
             .confirmationDialog("履歴をすべて削除しますか？", isPresented: $confirming) {

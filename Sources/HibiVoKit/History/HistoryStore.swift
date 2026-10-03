@@ -35,7 +35,7 @@ public struct HistoryRecord: Codable, Identifiable, Hashable, Sendable {
 @MainActor
 @Observable
 public final class HistoryStore {
-    public static let limit = 200
+    nonisolated public static let limit = 200
 
     public private(set) var records: [HistoryRecord]
     @ObservationIgnored private let file: JSONFileStore<[HistoryRecord]>

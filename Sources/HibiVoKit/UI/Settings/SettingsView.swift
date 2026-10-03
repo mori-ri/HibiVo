@@ -33,32 +33,12 @@ struct GeneralSettingsView: View {
                 ToggleRow("録音中はスピーカーの音量を下げる", isOn: $settings.duckOutputWhileRecording)
                 ToggleRow("話している内容をリアルタイムで表示", isOn: $settings.showLiveTranscript)
             }
-            SettingsSection(
-                title: "履歴",
-                footer: "文字起こしと整形結果のテキストを、この Mac の中に最大 \(HistoryStore.limit) 件保存します。音声は保存しません。"
-            ) {
-                ToggleRow("履歴を保存する", isOn: $settings.historyEnabled)
-            }
             SettingsSection(title: "権限") {
                 PermissionRow(title: "アクセシビリティ（ホットキー・貼り付け）", granted: env.state.hasAccessibilityPermission) {
                     Permissions.openAccessibilitySettings()
                 }
                 PermissionRow(title: "マイク", granted: env.state.hasMicrophonePermission) {
                     Permissions.openMicrophoneSettings()
-                }
-            }
-            SettingsSection(
-                title: "フィードバック",
-                footer: "使いにくいところ、欲しい機能、質問など、小さなことでも気軽に送ってください。ブラウザで GitHub Discussions が開きます。"
-            ) {
-                LabeledRow("感想・要望を送る") {
-                    Button("開く…") { ProjectLinks.open(ProjectLinks.newFeedback) }
-                }
-                LabeledRow("みんなの投稿を見る") {
-                    Button("開く…") { ProjectLinks.open(ProjectLinks.discussions) }
-                }
-                LabeledRow("GitHub リポジトリ") {
-                    Button("開く…") { ProjectLinks.open(ProjectLinks.repository) }
                 }
             }
         }
@@ -143,21 +123,19 @@ struct CleanupSettingsView: View {
     var body: some View {
         @Bindable var settings = env.settings
         SettingsPage {
-            SettingsSection(footer: "整形に失敗したときは、文字起こし結果をそのまま入力します。") {
+            SettingsSection(
+                footer:
+                    "整形に失敗したときは、文字起こし結果をそのまま入力します。Custom モードでは、基本的な整形に加えて指示に従います。アプリ別モードで Custom を選んだアプリにも使われます。"
+            ) {
                 ToggleRow("AI で文章を整える", isOn: $settings.cleanupEnabled)
                 PickerRow("既定のモード", selection: $settings.defaultCleanupMode) {
                     ForEach(CleanupMode.allCases) { Text($0.displayName).tag($0) }
                 }
-            }
-            SettingsSection(
-                title: "カスタム指示",
-                footer: "Custom モードで使う指示です。フィラーの除去などの基本的な整形に加えて、ここに書いた指示に従います。アプリごとの整形モードで Custom を選んだアプリにも使われます。"
-            ) {
-                TextEditorRow(
-                    text: Binding(
-                        get: { settings.customCleanupInstructions },
-                        set: { settings.setCustomCleanupInstructions($0) }),
-                    limit: CleanupMode.customInstructionsLimit)
+                PromptEditorRow(
+                    title: "Custom モードの指示", text: settings.customCleanupInstructions,
+                    limit: CleanupMode.customInstructionsLimit,
+                    explanation: "フィラーの除去などの基本的な整形に加えて、ここに書いた指示に従います。",
+                    onSave: settings.setCustomCleanupInstructions)
             }
             SettingsSection(title: "LLM") {
                 PickerRow("Provider", selection: $settings.cleanupProviderID) {
@@ -346,23 +324,18 @@ private struct BedrockSettingsFields: View {
     }
 }
 
-/// Editor for the editable part of the minutes prompt. Edits a local draft so clearing the text to write
-/// new instructions doesn't snap back to the default while typing.
+/// Editor for the editable part of the minutes prompt.
 private struct MinutesInstructionsRows: View {
     let settings: SettingsStore
-    @State private var draft = ""
 
     var body: some View {
-        LabeledRow("議事録のプロンプト") {
-            Button("デフォルトに戻す") { draft = MeetingMinutesPrompt.defaultInstructions }
-                .disabled(
-                    settings.meetingMinutesInstructions == nil && draft == MeetingMinutesPrompt.defaultInstructions)
-        }
-        TextEditorRow(text: $draft, limit: MeetingMinutesPrompt.instructionsLimit, minHeight: 220)
-            .onAppear { draft = settings.meetingMinutesInstructions ?? MeetingMinutesPrompt.defaultInstructions }
-            .onChange(of: draft) { settings.setMeetingMinutesInstructions(draft) }
-        NoteRow(
-            "議事録に書く内容と書き方を指定します。1 行目のタイトル(ファイル名に使います)、辞書の扱い、出力の形式についての指示は自動で加わります。空欄のときはデフォルトのプロンプトを使います。"
-        )
+        PromptEditorRow(
+            title: "議事録のプロンプト",
+            text: settings.meetingMinutesInstructions ?? MeetingMinutesPrompt.defaultInstructions,
+            limit: MeetingMinutesPrompt.instructionsLimit,
+            defaultText: MeetingMinutesPrompt.defaultInstructions,
+            explanation:
+                "議事録に書く内容と書き方を指定します。1 行目のタイトル(ファイル名に使います)、辞書の扱い、出力の形式についての指示は自動で加わります。空欄のときはデフォルトのプロンプトを使います。",
+            onSave: settings.setMeetingMinutesInstructions)
     }
 }
