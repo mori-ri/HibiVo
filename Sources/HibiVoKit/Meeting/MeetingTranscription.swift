@@ -37,11 +37,15 @@ public protocol MeetingTranscriptionSession: TranscriptionSession {
 public protocol MeetingTranscriptionProvider: TranscriptionProvider {
     /// Whether tokens carry speaker labels.
     var identifiesSpeakers: Bool { get }
+    /// Whether a meeting in `language` can start now. False while an on-device model is still being
+    /// downloaded: a meeting can't be retried like a dictation, so it isn't started without one.
+    func isReady(language: String) -> Bool
     func makeMeetingSession(_ config: TranscriptionConfig) -> any MeetingTranscriptionSession
 }
 
 extension MeetingTranscriptionProvider {
     public var identifiesSpeakers: Bool { true }
+    public func isReady(language: String) -> Bool { true }
 }
 
 /// The STT a meeting runs on, picked from the settings when it starts.

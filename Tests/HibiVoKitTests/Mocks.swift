@@ -117,7 +117,10 @@ final class MockMeetingProvider: MeetingTranscriptionProvider, @unchecked Sendab
     let defaultModel = "m1"
     var requiresAPIKey = true
     var identifiesSpeakers = true
+    var ready = true
     private(set) var sessions: [MockMeetingSession] = []
+
+    func isReady(language: String) -> Bool { ready }
     private(set) var configs: [TranscriptionConfig] = []
 
     func makeSession(_ config: TranscriptionConfig) -> any TranscriptionSession {

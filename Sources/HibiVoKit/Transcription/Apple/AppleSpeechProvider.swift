@@ -2,6 +2,7 @@
 import Foundation
 import OSLog
 import Speech
+import os
 
 /// macOS's own on-device recognition (`SpeechAnalyzer` + `SpeechTranscriber`, macOS 26 and later).
 /// Free and needs no API key; the audio never leaves the Mac. It can't tell speakers apart, so a
@@ -27,19 +28,22 @@ public struct AppleSpeechProvider: MeetingTranscriptionProvider {
     }
 
     public func makeSession(_ config: TranscriptionConfig) -> any TranscriptionSession {
-        session(config, waitsForModel: false)
+        makeMeetingSession(config)
     }
 
     public func makeMeetingSession(_ config: TranscriptionConfig) -> any MeetingTranscriptionSession {
-        // A meeting can't be retried like a dictation, so it keeps its audio until the model is ready.
-        session(config, waitsForModel: true)
-    }
-
-    private func session(_ config: TranscriptionConfig, waitsForModel: Bool) -> any MeetingTranscriptionSession {
         if #available(macOS 26, *) {
-            return AppleSpeechSession(config: config, sampleRate: sampleRate, waitsForModel: waitsForModel)
+            return AppleSpeechSession(config: config, sampleRate: sampleRate)
         }
         return UnsupportedSession()
+    }
+
+    /// True once `prepareModel` has found the model installed. Otherwise starts preparing it, so the
+    /// user can try again shortly.
+    public func isReady(language: String) -> Bool {
+        if Self.readyLanguages.withLock({ $0.contains(language) }) { return true }
+        Task { await Self.prepareModel(language: language) }
+        return false
     }
 
     // MARK: - Model
@@ -56,8 +60,13 @@ public struct AppleSpeechProvider: MeetingTranscriptionProvider {
     @discardableResult
     public static func prepareModel(language: String) async -> ModelStatus {
         guard #available(macOS 26, *), isSupported else { return .unavailable }
-        return await AppleSpeechModels.shared.prepare(language: language)
+        let status = await AppleSpeechModels.shared.prepare(language: language)
+        if status == .ready { _ = readyLanguages.withLock { $0.insert(language) } }
+        return status
     }
+
+    /// Languages whose model is known to be installed, so a meeting can check without waiting.
+    private static let readyLanguages = OSAllocatedUnfairLock<Set<String>>(initialState: [])
 }
 
 /// Recognised text as macOS returns it, tidied for pasting.
@@ -155,7 +164,6 @@ actor AppleSpeechSession: MeetingTranscriptionSession {
     private let eventsContinuation: AsyncStream<MeetingSessionEvent>.Continuation
     private let config: TranscriptionConfig
     private let sampleRate: Double
-    private let waitsForModel: Bool
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "apple-speech")
 
     private var setup: Task<Void, Never>?
@@ -174,10 +182,9 @@ actor AppleSpeechSession: MeetingTranscriptionSession {
     private var waiter: CheckedContinuation<Void, Never>?
     private var timedOut = false
 
-    init(config: TranscriptionConfig, sampleRate: Double, waitsForModel: Bool) {
+    init(config: TranscriptionConfig, sampleRate: Double) {
         self.config = config
         self.sampleRate = sampleRate
-        self.waitsForModel = waitsForModel
         (partials, partialsContinuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         (events, eventsContinuation) = AsyncStream.makeStream()
         if !config.speakerDiarization { eventsContinuation.finish() }
@@ -240,17 +247,10 @@ actor AppleSpeechSession: MeetingTranscriptionSession {
             locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults],
             attributeOptions: [.audioTimeRange])
         if !(await models.isInstalled(transcriber)) {
-            if waitsForModel {
-                guard await models.install(locale) else {
-                    fail(.modelUnavailable)
-                    return
-                }
-            } else {
-                // Downloading can take minutes; fetch it in the background and let the user retry.
-                Task { await models.install(locale) }
-                fail(.modelUnavailable)
-                return
-            }
+            // Downloading can take minutes; fetch it in the background and let the user retry.
+            Task { await models.install(locale) }
+            fail(.modelUnavailable)
+            return
         }
         guard !isClosed else { return }
 

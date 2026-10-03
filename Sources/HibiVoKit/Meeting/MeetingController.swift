@@ -192,6 +192,10 @@ public final class MeetingController {
             }
             apiKey = key
         }
+        guard provider.isReady(language: settings.language) else {
+            show(.speechModelNotReady)
+            return
+        }
         let entries = vocabulary()
         let config = TranscriptionConfig(
             apiKey: apiKey,

@@ -263,6 +263,15 @@ import Testing
         #expect(text.contains("話者は区別していません"))
     }
 
+    @Test func doesNotStartUntilTheModelIsReady() {
+        provider.ready = false
+        let sut = makeController()
+        sut.start()
+        #expect(state.phase == .error(UserFacingError.speechModelNotReady.message))
+        #expect(audio.startCount == 0)
+        #expect(!sut.isActive)
+    }
+
     @Test func nothingSaidLeavesNoFile() async {
         let sut = makeController()
         sut.start()
