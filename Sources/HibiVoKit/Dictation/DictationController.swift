@@ -142,6 +142,7 @@ public final class DictationController {
 
         let session = context.transcriptionProvider.makeSession(context.transcriptionConfig)
         Task { await session.start() }
+        if context.cleanup.mode != .raw { context.cleanup.provider?.prewarm() }
         if duckingEnabled() { ducker?.duck() }
 
         state.phase = .recording

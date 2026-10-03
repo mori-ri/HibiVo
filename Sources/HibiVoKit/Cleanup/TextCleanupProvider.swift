@@ -20,6 +20,13 @@ public protocol TextCleanupProvider: Sendable {
     var defaultModel: String { get }
 
     func complete(system: String, user: String, model: String) async throws -> CleanupCompletion
+
+    /// Called when a recording that will be cleaned up starts, so a local model can load while the user speaks.
+    func prewarm()
+}
+
+extension TextCleanupProvider {
+    public func prewarm() {}
 }
 
 /// Billable tokens reported by the provider for one request.
@@ -52,6 +59,7 @@ public struct CleanupCompletion: Equatable, Sendable {
 
 /// The cleanup providers users can pick in Settings.
 public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
+    case apple
     case anthropic
     case openAICompatible = "openai-compatible"
     case bedrock
@@ -61,6 +69,7 @@ public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
 
     public var displayName: String {
         switch self {
+        case .apple: "macOS 標準"
         case .anthropic: "Anthropic (Claude)"
         case .openAICompatible: "OpenAI 互換"
         case .bedrock: "Amazon Bedrock"
@@ -70,6 +79,8 @@ public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
 
     public var defaultModel: String {
         switch self {
+        // There is only the system's model; recorded in usage and history.
+        case .apple: "apple-foundation-model"
         case .anthropic: "claude-haiku-4-5"
         case .openAICompatible: ""
         case .bedrock: "global.anthropic.claude-haiku-4-5-20251001-v1:0"

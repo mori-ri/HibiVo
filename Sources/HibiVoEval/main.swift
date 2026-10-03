@@ -158,6 +158,11 @@ func makeProvider(_ options: Options) -> any TextCleanupProvider {
         return BedrockCleanupProvider(
             region: region,
             authentication: .iam(AWSCredentials(accessKeyID: id, secretAccessKey: key, sessionToken: token)))
+    case "apple":
+        guard AppleIntelligenceCleanupProvider.isAvailable else {
+            fail(AppleIntelligenceCleanupProvider.unavailableReason ?? "Apple Intelligence is unavailable")
+        }
+        return AppleIntelligenceCleanupProvider()
     case "claude-code":
         return ClaudeCodeProvider(cli: ClaudeCodeCLI.locate())
     case "echo":
