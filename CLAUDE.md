@@ -72,9 +72,9 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - プロンプトは純粋関数的な `CleanupPromptBuilder` が生成する。文字起こしは `<transcript>` で囲まれ、モデルが内容に回答せず書き直すようにしている。
 - Custom モードは、設定の「カスタム指示」(`SettingsStore.customCleanupInstructions`、`CleanupMode.customInstructionsLimit` 文字まで)を `<instructions>` として基本の整形ルールに加える。指示は録音開始時に `DictationContext.Cleanup` に固定する。
 - プロバイダ:
-  - Anthropic Messages(`output_config.effort: low`、Opus 5 / Fable 5 向けにサーバー側 `fallbacks`)。
+  - Anthropic Messages(`output_config.effort: low`、Opus 5 以降・Fable 5 系・Sonnet 5.5 向けにサーバー側 `fallbacks`)。
   - OpenAI 互換の chat completions。
-  - Gemini Interactions API(`thinking_level: low`、`store: false`)。既定は `gemini-3.8-flash`。
+  - Gemini Interactions API(`thinking_level: low`、`store: false`)。既定は `gemini-3.5-flash-lite`。
   - `BedrockCleanupProvider`: `anthropic.` を含むモデル ID は Anthropic のリクエストボディで InvokeModel を使う。それ以外のモデル(GLM、MiniMax、GPT など)は Converse API を使う。認証は Bedrock API キー(Bearer)か、自前の `AWSSigV4`(CryptoKit 実装、AWS テストスイートのベクタで検証済み)で署名する IAM キー。
 - プロバイダ種別、デフォルトモデル、Keychain のアカウント名は `CleanupProviderKind` / `SecretAccount`(`TextCleanupProvider.swift`)に集約されている。
 

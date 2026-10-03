@@ -4,7 +4,7 @@ import Foundation
 public struct AnthropicCleanupProvider: TextCleanupProvider {
     public let id = "anthropic"
     public let displayName = "Anthropic (Claude)"
-    public let defaultModel = "claude-opus-5-5"
+    public let defaultModel = CleanupProviderKind.anthropic.defaultModel
 
     private let apiKey: String
     private let urlSession: URLSession
