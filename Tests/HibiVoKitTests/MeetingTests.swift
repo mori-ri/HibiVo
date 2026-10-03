@@ -335,6 +335,88 @@ import Testing
         #expect(!text.contains("無音でした"))
     }
 
+    @Test func microphoneFailureStopsAndSavesWithANotice() async throws {
+        settings.meetingCapturesSystemAudio = true
+        let sut = makeController()
+        sut.start()
+        let session = provider.sessions[0]
+        audio.speak(bytes: 320)
+        systemAudio.speak(bytes: 320)
+        await session.emit(.tokens([MeetingToken(text: "保存する内容", isFinal: true, speaker: "1", startMs: 0, endMs: 500)]))
+        await settle { state.partialTranscript == "保存する内容" }
+        // An exhausted engine recovery ends the stream without a controller stop request.
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        #expect(!sut.isActive)
+        #expect(state.phase == .error(UserFacingError.meetingMicrophoneLost.message))
+        #expect(await session.didFinish)
+        #expect(await session.receivedBytes == 320)
+        let text = try String(contentsOf: try #require(savedFiles().first), encoding: .utf8)
+        #expect(text.contains("保存する内容"))
+        #expect(text.contains("マイクの切り替え後に録音を再開できなかった"))
+        #expect(text.contains("- 終了:"))
+        #expect(!text.contains("- 記録中"))
+    }
+
+    @Test func microphoneFailureBeforeSpeechStillSavesANotice() async throws {
+        let sut = makeController()
+        sut.start()
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        #expect(state.phase == .error(UserFacingError.meetingMicrophoneLost.message))
+        let text = try String(contentsOf: try #require(savedFiles().first), encoding: .utf8)
+        #expect(text.contains("マイクの切り替え後に録音を再開できなかった"))
+    }
+
+    @Test func afterMeetingMicrophoneFailureWithNoAudioSavesANotice() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([.success([])])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        #expect(await transcriber.calls.isEmpty)
+        #expect(state.phase == .error(UserFacingError.meetingMicrophoneLost.message))
+        let text = try String(contentsOf: try #require(savedFiles().first), encoding: .utf8)
+        #expect(text.contains("マイクの切り替え後に録音を再開できなかった"))
+    }
+
+    @Test func afterMeetingMicrophoneFailureNoticeSurvivesTranscriptionFailure() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([.failure(.unauthorized)])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.speak(bytes: 320)
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        let text = try String(contentsOf: try #require(savedFiles().first), encoding: .utf8)
+        #expect(text.contains("マイクの切り替え後に録音を再開できなかった"))
+    }
+
+    @Test func afterMeetingMicrophoneFailureStillTranscribesCapturedAudio() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([
+            .success([
+                MeetingToken(text: "保存する内容", isFinal: true, speaker: "1", startMs: 0, endMs: 500)
+            ])
+        ])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.speak(bytes: 320)
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        #expect(state.phase == .error(UserFacingError.meetingMicrophoneLost.message))
+        #expect(await transcriber.calls.first?.bytes == 320)
+        let text = try String(contentsOf: try #require(savedFiles().first), encoding: .utf8)
+        #expect(text.contains("保存する内容"))
+        #expect(text.contains("マイクの切り替え後に録音を再開できなかった"))
+    }
+
     @Test func systemAudioFailureFallsBackToMicrophone() async throws {
         settings.meetingCapturesSystemAudio = true
         systemAudio.failStart = true
@@ -518,6 +600,38 @@ import Testing
         #expect(shown.count == 1)
         #expect(state.phase == .idle)
     }
+
+    @Test func microphoneNoticeAloneIsNotTurnedIntoMinutes() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.success("unused"))
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, onSaved: { shown.append($0) })
+        sut.start()
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        #expect(await writer.calls.isEmpty)
+        #expect(shown.count == 1)
+        #expect(savedFiles().count == 1)
+    }
+
+    @Test func afterMeetingMicrophoneNoticeAloneIsNotTurnedIntoMinutes() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let writer = MockMinutesWriter(.success("unused"))
+        var shown: [URL] = []
+        let sut = makeController(
+            fileTranscriber: MockFileTranscriber([.success([])]), minutesWriter: writer,
+            onSaved: { shown.append($0) })
+        sut.start()
+        audio.speak(bytes: 320)
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        #expect(await writer.calls.isEmpty)
+        #expect(shown.count == 1)
+        #expect(savedFiles().count == 1)
+    }
 }
 
 @Suite struct PCMMixerTests {
@@ -544,6 +658,18 @@ import Testing
         var mixer = PCMMixer(maximumLag: 2)
         #expect(samples(mixer.push(pcm([1, 2, 3, 4, 5]), from: .microphone)) == [1, 2, 3])
         #expect(samples(mixer.push(pcm([6]), from: .microphone)) == [4])
+    }
+
+    @Test func resumedMicrophoneDoesNotAccumulateTheOutageAsLag() {
+        var mixer = PCMMixer(maximumLag: 2)
+        _ = mixer.push(pcm([100, 100]), from: .microphone)
+        #expect(samples(mixer.push(pcm([1, 2]), from: .system)) == [101, 102])
+        // During a long microphone restart only the last maximumLag samples remain queued.
+        #expect(samples(mixer.push(pcm([3, 4, 5, 6, 7, 8]), from: .system)) == [3, 4, 5, 6])
+        #expect(samples(mixer.push(pcm([100, 200]), from: .microphone)) == [107, 208])
+        #expect(mixer.flush() == nil)
+        _ = mixer.push(pcm([300, 400]), from: .microphone)
+        #expect(samples(mixer.push(pcm([9, 10]), from: .system)) == [309, 410])
     }
 
     @Test func sumsAreClamped() {
