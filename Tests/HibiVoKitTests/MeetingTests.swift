@@ -600,6 +600,38 @@ import Testing
         #expect(shown.count == 1)
         #expect(state.phase == .idle)
     }
+
+    @Test func microphoneNoticeAloneIsNotTurnedIntoMinutes() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.success("unused"))
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, onSaved: { shown.append($0) })
+        sut.start()
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        #expect(await writer.calls.isEmpty)
+        #expect(shown.count == 1)
+        #expect(savedFiles().count == 1)
+    }
+
+    @Test func afterMeetingMicrophoneNoticeAloneIsNotTurnedIntoMinutes() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let writer = MockMinutesWriter(.success("unused"))
+        var shown: [URL] = []
+        let sut = makeController(
+            fileTranscriber: MockFileTranscriber([.success([])]), minutesWriter: writer,
+            onSaved: { shown.append($0) })
+        sut.start()
+        audio.speak(bytes: 320)
+        audio.stop()
+        await settle { state.phase != .meeting }
+        await sut.waitUntilIdle()
+        #expect(await writer.calls.isEmpty)
+        #expect(shown.count == 1)
+        #expect(savedFiles().count == 1)
+    }
 }
 
 @Suite struct PCMMixerTests {

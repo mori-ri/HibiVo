@@ -169,6 +169,7 @@ protocol MicrophoneEngine: AnyObject {
 
 @MainActor
 private final class AVMicrophoneEngine: MicrophoneEngine {
+    private static let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "audio")
     private let engine = AVAudioEngine()
     private var hasTap = false
     var notificationObject: AnyObject { engine }
@@ -176,7 +177,11 @@ private final class AVMicrophoneEngine: MicrophoneEngine {
     func start(sampleRate: Double, deviceUID: String?, continuation: AsyncStream<AudioChunk>.Continuation) throws {
         let input = engine.inputNode
         if let deviceUID, let deviceID = AudioDeviceCatalog.deviceID(forUID: deviceUID) {
-            try Self.setInputDevice(deviceID, on: input)
+            // A device that is listed but can't be selected (held exclusively, disconnecting) falls back
+            // to the system default input rather than failing the recording.
+            if let status = Self.setInputDevice(deviceID, on: input) {
+                Self.log.error("Couldn't select the input device (\(status)); using the default input")
+            }
         }
         let hardwareFormat = input.outputFormat(forBus: 0)
         guard hardwareFormat.sampleRate > 0, hardwareFormat.channelCount > 0,
@@ -215,16 +220,13 @@ private final class AVMicrophoneEngine: MicrophoneEngine {
         }
     }
 
-    private static func setInputDevice(_ deviceID: AudioDeviceID, on input: AVAudioInputNode) throws {
-        guard let unit = input.audioUnit else {
-            throw AudioCaptureError.engineFailed("入力デバイスを設定できません")
-        }
+    /// Returns the failing status, or nil when the device was selected.
+    private static func setInputDevice(_ deviceID: AudioDeviceID, on input: AVAudioInputNode) -> OSStatus? {
+        guard let unit = input.audioUnit else { return kAudioUnitErr_Uninitialized }
         var id = deviceID
         let status = AudioUnitSetProperty(
             unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
             &id, UInt32(MemoryLayout<AudioDeviceID>.size))
-        guard status == noErr else {
-            throw AudioCaptureError.engineFailed("入力デバイスを設定できません (\(status))")
-        }
+        return status == noErr ? nil : status
     }
 }

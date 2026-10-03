@@ -420,7 +420,14 @@ public final class MeetingController {
             state.phase = .idle
         }
         // After leaving .processing, so a problem with the minutes can still be shown.
-        if saved { didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary) }
+        // A document that only holds the microphone notice has nothing to write minutes from.
+        if saved {
+            if meeting.transcript.isEmpty {
+                onSaved(meeting.fileURL)
+            } else {
+                didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary)
+            }
+        }
     }
 
     /// Ends the recording part of an after-meeting meeting and transcribes it in the background.
@@ -498,7 +505,11 @@ public final class MeetingController {
         let document = markdown(meeting, ended: true)
         if await writer.write(document, to: meeting.fileURL) {
             log.info("Meeting transcribed (\(meeting.transcript.segments.count) segments)")
-            didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary)
+            if meeting.transcript.isEmpty {
+                onSaved(meeting.fileURL)
+            } else {
+                didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary)
+            }
         } else {
             showUnlessBusy(.meetingSaveFailed)
         }
