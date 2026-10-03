@@ -65,7 +65,7 @@ public struct VocabularyEntry: Codable, Identifiable, Hashable, Sendable {
         replaceableForms.map(KanaFolding.katakana)
     }
 
-    var promptTerm: CleanupPromptBuilder.Term {
+    public var promptTerm: CleanupPromptBuilder.Term {
         CleanupPromptBuilder.Term(
             preferred: preferred, spokenForms: replaceableForms, contextualForms: contextualForms)
     }

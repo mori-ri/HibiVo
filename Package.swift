@@ -17,6 +17,11 @@ let package = Package(
         .target(
             name: "HibiVoKit"
         ),
+        // Cleanup quality eval (scripts/eval.sh). Calls real providers, so it is never run by tests.
+        .executableTarget(
+            name: "HibiVoEval",
+            dependencies: ["HibiVoKit"]
+        ),
         .testTarget(
             name: "HibiVoKitTests",
             dependencies: ["HibiVoKit"]

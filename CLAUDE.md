@@ -14,6 +14,7 @@ scripts/test.sh --filter HotkeyInterpreterTests        # 1 スイートのみ
 scripts/test.sh --filter "DictationControllerTests/shortTapIsCancelled"   # 1 テストのみ
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter SonioxIntegration           # 実際の Soniox エンドポイントに接続 (オプトイン)
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter GeminiIntegration           # 実際の Gemini エンドポイントに接続 (オプトイン、GEMINI_API_KEY)
+scripts/eval.sh --variant baseline --provider bedrock --model <id>    # 整形の品質評価 (実際の API と Claude の判定、有料)。結果は .claude/hillclimb/cleanup/
 
 scripts/run.sh                          # debug ビルド → build/HibiVo.app → 起動 (起動中のアプリは終了させる)
 CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署名

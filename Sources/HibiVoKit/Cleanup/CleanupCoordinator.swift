@@ -59,6 +59,22 @@ public struct CleanupCoordinator: Sendable {
         }
     }
 
+    /// What dictation does with a finished transcript: apply the dictionary, then clean up.
+    /// Shared with the eval runner so it measures exactly this path.
+    /// - Returns: The transcript after dictionary replacement, and the cleanup outcome.
+    public func run(
+        transcript: String, vocabulary: [VocabularyEntry], mode: CleanupMode, appName: String?,
+        customInstructions: String, provider: (any TextCleanupProvider)?, model: String
+    ) async -> (raw: String, outcome: CleanupOutcome) {
+        let raw = VocabularyReplacer.apply(vocabulary, to: transcript)
+        let outcome = await run(
+            Request(
+                raw: raw, mode: mode, vocabulary: vocabulary.map(\.promptTerm), appName: appName,
+                customInstructions: customInstructions),
+            provider: provider, model: model)
+        return (raw, outcome)
+    }
+
     private func fallback(_ raw: String, _ error: CleanupError, usage: TokenUsage? = nil) -> CleanupOutcome {
         log.notice("Cleanup fell back to raw transcript: \(String(describing: error), privacy: .public)")
         return CleanupOutcome(text: raw, didCleanup: false, failure: error, usage: usage)
