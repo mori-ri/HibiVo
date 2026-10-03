@@ -95,13 +95,18 @@ public enum MeetingDocument {
         case systemAudioSilent
     }
 
+    /// Heading of the user's notes in the transcript. The minutes prompt refers to it by this name.
+    static let notesHeading = "## メモ"
+
     /// - Parameters:
     ///   - includesSystemAudio: Whether the Mac's audio output was mixed in with the microphone.
     ///   - identifiesSpeakers: Whether the STT labelled speakers; macOS's recognizer doesn't.
+    ///   - notes: What the user wrote during the meeting, placed before the transcript so the minutes
+    ///     are written with it.
     public static func markdown(
         _ transcript: MeetingTranscript, startedAt: Date, endedAt: Date?, includesSystemAudio: Bool = false,
-        identifiesSpeakers: Bool = true, notices: [Notice] = [], vocabulary: [VocabularyEntry] = [],
-        timeZone: TimeZone = .current
+        identifiesSpeakers: Bool = true, notices: [Notice] = [], notes: String = "",
+        vocabulary: [VocabularyEntry] = [], timeZone: TimeZone = .current
     ) -> String {
         var lines = ["# ミーティング \(format(startedAt, "yyyy-MM-dd HH:mm", timeZone))", ""]
         lines.append("- 開始: \(format(startedAt, "yyyy-MM-dd HH:mm:ss", timeZone))")
@@ -128,6 +133,7 @@ public enum MeetingDocument {
                 )
             }
         }
+        if let section = notesSection(notes) { lines += ["", section] }
         lines += ["", "---", ""]
 
         let labels = speakerLabels(transcript)
@@ -149,6 +155,19 @@ public enum MeetingDocument {
             lines.append("")
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// The notes under their heading; nil when nothing was written.
+    static func notesSection(_ notes: String) -> String? {
+        let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : "\(notesHeading)\n\n\(trimmed)"
+    }
+
+    /// The minutes file: Claude's title and minutes, and where they came from. The user's notes are
+    /// not copied here; Claude takes what matters from them in the transcript.
+    static func minutes(title: String?, body: String, transcriptFileName: String) -> String {
+        ["# \(title ?? "議事録")", body, "---", "*Claude が文字起こし「\(transcriptFileName)」から作成しました。*\n"]
+            .joined(separator: "\n\n")
     }
 
     struct SpeakerKey: Hashable {

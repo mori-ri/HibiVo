@@ -1,15 +1,92 @@
 import SwiftUI
 
+/// What the HUD's buttons do. Only the meeting HUD has buttons; elsewhere the whole HUD is one target.
+struct HUDActions {
+    var stopMeeting: @MainActor () -> Void = {}
+    var toggleMeetingNotes: @MainActor () -> Void = {}
+}
+
+/// State of the HUD itself. Stopping a meeting from the HUD takes two clicks, because a stray click
+/// would end a recording that can't be redone: the first arms the button, the second stops.
+@MainActor
+@Observable
+final class HUDModel {
+    static let confirmationWindow: Duration = .seconds(3)
+
+    private(set) var stopArmed = false
+    @ObservationIgnored private var disarm: Task<Void, Never>?
+
+    /// A click on the stop button. True when it confirms an armed stop.
+    func confirmStop() -> Bool {
+        if stopArmed {
+            reset()
+            return true
+        }
+        stopArmed = true
+        disarm?.cancel()
+        disarm = Task { [weak self] in
+            try? await Task.sleep(for: Self.confirmationWindow)
+            guard !Task.isCancelled else { return }
+            self?.stopArmed = false
+        }
+        return false
+    }
+
+    func reset() {
+        disarm?.cancel()
+        stopArmed = false
+    }
+}
+
 struct HUDView: View {
     let state: AppState
     let settings: SettingsStore
+    var model = HUDModel()
+    var actions = HUDActions()
 
     var body: some View {
         if state.phase == .idle, !state.learnedVocabulary.isEmpty {
             LearnedNotice(corrections: state.learnedVocabulary.map(\.correction))
+        } else if state.phase == .meeting {
+            meetingCapsule
         } else {
             capsule
         }
+    }
+
+    /// Laid out so the buttons stay put: the transcript has a fixed width, and stop sits at the far end,
+    /// apart from the notes button, with the level meter between them.
+    private var meetingCapsule: some View {
+        HStack(spacing: 8) {
+            MeetingBadge(startedAt: state.meetingStartedAt ?? Date())
+            HUDPillButton(symbol: "note.text", title: "メモ", help: "メモを表示・非表示", action: actions.toggleMeetingNotes)
+            if settings.showLiveTranscript || state.meetingReconnecting {
+                Text(meetingLabel ?? "聞き取り中…")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(meetingLabel == nil ? 0.45 : 1))
+                    .lineLimit(1)
+                    .truncationMode(.head)
+                    .frame(width: 260, alignment: .leading)
+            }
+            // White: nothing is cleaned up or pasted in a meeting.
+            LevelBars(level: state.audioLevel, colorful: false)
+            Rectangle()
+                .fill(.white.opacity(0.2))
+                .frame(width: 1, height: 14)
+                .padding(.horizontal, 4)
+            StopMeetingButton(armed: model.stopArmed, action: actions.stopMeeting)
+        }
+        .foregroundStyle(.white)
+        .padding(.leading, 12)
+        .padding(.trailing, 7)
+        .padding(.vertical, 6.4)
+        .background(Capsule().fill(.black.opacity(0.78)))
+        .fixedSize()
+    }
+
+    private var meetingLabel: String? {
+        if state.meetingReconnecting { return "再接続中…" }
+        return state.partialTranscript.isEmpty ? nil : state.partialTranscript
     }
 
     private var capsule: some View {
@@ -38,7 +115,7 @@ struct HUDView: View {
         case .processing:
             ProgressView().controlSize(.small).tint(.white)
         case .meeting:
-            MeetingBadge(startedAt: state.meetingStartedAt ?? Date())
+            EmptyView()
         case .error:
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
         case .idle:
@@ -51,14 +128,7 @@ struct HUDView: View {
         case .recording:
             settings.showLiveTranscript && !state.partialTranscript.isEmpty ? state.partialTranscript : nil
         case .processing: nil
-        case .meeting:
-            if state.meetingReconnecting {
-                "再接続中…"
-            } else if settings.showLiveTranscript, !state.partialTranscript.isEmpty {
-                state.partialTranscript
-            } else {
-                nil
-            }
+        case .meeting: nil
         case .error(let message): message
         case .idle: nil
         }
@@ -132,6 +202,54 @@ private struct LearnedNotice: View {
     }
 
     private var gradient: LinearGradient { Theme.brandGradient }
+}
+
+/// A labelled button on the dark capsule.
+private struct HUDPillButton: View {
+    let symbol: String
+    let title: String
+    let help: String
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+                .padding(.horizontal, 8)
+                .frame(height: 22)
+                .background(Capsule().fill(.white.opacity(0.12)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+}
+
+/// Square stop symbol, like a recorder. The first click turns it into a red "click again" pill.
+private struct StopMeetingButton: View {
+    let armed: Bool
+    let action: @MainActor () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: "stop.fill").font(.system(size: 9, weight: .bold))
+                if armed {
+                    Text("もう一度押して終了").font(.system(size: 11, weight: .semibold))
+                }
+            }
+            .foregroundStyle(.white.opacity(armed ? 1 : 0.85))
+            .padding(.horizontal, armed ? 9 : 0)
+            .frame(minWidth: 22, minHeight: 22)
+            .background(Capsule().fill(armed ? Color.red : .white.opacity(0.12)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(armed ? "もう一度押すとミーティングを終了します" : "ミーティングを終了(2 回押す)")
+        .accessibilityLabel(armed ? "もう一度押してミーティングを終了" : "ミーティングを終了")
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: armed)
+    }
 }
 
 /// Red dot and elapsed time, so a long meeting recording is always visibly on.

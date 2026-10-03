@@ -21,6 +21,7 @@ public struct MenuBarContent: View {
         }
 
         if env.state.phase == .meeting {
+            Button("ミーティングのメモを表示") { env.meetingNotes.show() }
             Button("ミーティングの文字起こしを終了") { env.meeting.stop() }
         }
         if env.state.meetingTranscriptionsInProgress > 0 {

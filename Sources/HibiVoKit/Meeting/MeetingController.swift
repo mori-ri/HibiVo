@@ -70,6 +70,12 @@ public final class MeetingController {
         var activity: NSObjectProtocol?
         /// When recording stopped; transcription may finish minutes later.
         var endedAt: Date?
+        /// The user's notes (`AppState.meetingNotes`) as of the last save, final once stopping.
+        var notes = ""
+
+        var hasNotes: Bool { MeetingDocument.notesSection(notes) != nil }
+        /// Kept even without speech: it records a capture failure or holds the user's notes.
+        var keepsDocument: Bool { microphoneUnavailable || hasNotes }
 
         init(
             provider: any MeetingTranscriptionProvider, fileTranscriber: (any MeetingFileTranscriber)?,
@@ -265,17 +271,14 @@ public final class MeetingController {
             meeting.pumps = [pump(microphone, as: .microphone, into: meeting)]
         }
 
-        // After-meeting mode has nothing to save until the end.
-        saver =
-            afterMeeting
-            ? nil
-            : Task { [weak self, saveInterval] in
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: saveInterval)
-                    guard !Task.isCancelled else { return }
-                    await self?.saveIfDirty()
-                }
+        // In after-meeting mode this only saves the notes; the transcript comes at the end.
+        saver = Task { [weak self, saveInterval] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: saveInterval)
+                guard !Task.isCancelled else { return }
+                await self?.saveIfDirty()
             }
+        }
         watchdog = Task { [weak self] in
             try? await Task.sleep(for: Self.maximumDuration)
             guard !Task.isCancelled else { return }
@@ -287,6 +290,7 @@ public final class MeetingController {
         state.meetingReconnecting = false
         state.audioLevel = 0
         state.partialTranscript = ""
+        state.meetingNotes = ""
         log.info("Meeting started (system audio: \(system != nil), after meeting: \(afterMeeting))")
     }
 
@@ -294,6 +298,9 @@ public final class MeetingController {
         guard let meeting, !meeting.isStopping else { return }
         meeting.isStopping = true
         meeting.endedAt = Date()
+        // The notes window closes with the meeting; what was typed so far is final.
+        meeting.notes = state.meetingNotes
+        state.meetingNotes = ""
         watchdog?.cancel()
         saver?.cancel()
         meeting.reconnect?.cancel()
@@ -404,6 +411,8 @@ public final class MeetingController {
         if let tail = meeting.mixer?.flush() { meeting.outgoingContinuation.yield(tail) }
         meeting.outgoingContinuation.finish()
         await meeting.sender?.value
+        // An autosave already under way must land before the final write, or it would overwrite it.
+        await saver?.value
         if meeting.recorded != nil {
             handOffForTranscription(meeting)
             return
@@ -411,14 +420,12 @@ public final class MeetingController {
         // Finalizes the tail of the audio; the resulting tokens arrive through `events` before it closes.
         _ = try? await meeting.session?.finish()
         await meeting.events?.value
-        // An autosave already under way must land before the final write, or it would overwrite it.
-        await saver?.value
         if let activity = meeting.activity { ProcessInfo.processInfo.endActivity(activity) }
         recordUsage(meeting)
 
         var saved = false
         let document = markdown(meeting, ended: true)
-        if meeting.transcript.isEmpty && !meeting.microphoneUnavailable {
+        if meeting.transcript.isEmpty && !meeting.keepsDocument {
             await writer.remove(meeting.fileURL)
         } else {
             saved = await writer.write(document, to: meeting.fileURL)
@@ -456,7 +463,7 @@ public final class MeetingController {
         state.partialTranscript = ""
         if let failure = meeting.failure { show(failure) } else { state.phase = .idle }
         guard meeting.bytes > 0, let fileTranscriber = meeting.fileTranscriber else {
-            if meeting.microphoneUnavailable {
+            if meeting.keepsDocument {
                 let document = markdown(meeting, ended: true)
                 transcriptions.append(
                     Task {
@@ -475,8 +482,9 @@ public final class MeetingController {
         log.info("Meeting stopped; transcribing \(self.milliseconds(meeting.bytes, in: meeting) / 1000) s of audio")
         transcriptions.append(
             Task {
-                // Preserve the capture failure even if the later API request cannot transcribe the audio.
-                if meeting.microphoneUnavailable {
+                // Preserve the capture failure and the notes even if the later API request cannot
+                // transcribe the audio.
+                if meeting.keepsDocument {
                     if !(await writer.write(markdown(meeting, ended: true), to: meeting.fileURL)) {
                         showUnlessBusy(.meetingSaveFailed)
                     }
@@ -516,7 +524,7 @@ public final class MeetingController {
                     provider: meeting.provider.id, model: transcriber.model,
                     seconds: Double(milliseconds(audio.count, in: meeting)) / 1000)))
         meeting.transcript.apply(tokens)
-        guard !meeting.transcript.isEmpty || meeting.microphoneUnavailable else {
+        guard !meeting.transcript.isEmpty || meeting.keepsDocument else {
             showUnlessBusy(.nothingRecognized)
             return
         }
@@ -536,6 +544,7 @@ public final class MeetingController {
     /// Hands a saved transcript to Claude Code for minutes, or shows it right away when minutes are off.
     /// With minutes, Finder shows the minutes once they exist (or the transcript if they fail), so the
     /// user isn't pulled to Finder twice.
+    /// The user's notes reach the minutes through the transcript document, where Claude reads them.
     private func didSave(_ document: String, to url: URL, vocabulary: [VocabularyEntry]) {
         guard settings.meetingMinutesEnabled else {
             onSaved(url)
@@ -578,9 +587,9 @@ public final class MeetingController {
         }
         let (title, body) = MeetingMinutesTitle.split(minutes)
         let url = Self.minutesURL(for: transcriptURL, title: title)
-        let heading = "# \(title ?? "議事録")\n\n"
-        let footer = "\n\n---\n\n*Claude が文字起こし「\(transcriptURL.lastPathComponent)」から作成しました。*\n"
-        if await writer.write(heading + body + footer, to: url) {
+        let text = MeetingDocument.minutes(
+            title: title, body: body, transcriptFileName: transcriptURL.lastPathComponent)
+        if await writer.write(text, to: url) {
             log.info("Minutes saved")
             onSaved(url)
         } else {
@@ -606,7 +615,12 @@ public final class MeetingController {
     }
 
     private func saveIfDirty() async {
-        guard let meeting, meeting.isDirty, !meeting.isStopping, !meeting.transcript.isEmpty else { return }
+        guard let meeting, !meeting.isStopping else { return }
+        if meeting.notes != state.meetingNotes {
+            meeting.notes = state.meetingNotes
+            meeting.isDirty = true
+        }
+        guard meeting.isDirty, !meeting.transcript.isEmpty || meeting.hasNotes else { return }
         meeting.isDirty = false
         if !(await writer.write(markdown(meeting, ended: false), to: meeting.fileURL)) {
             meeting.isDirty = true
@@ -625,7 +639,7 @@ public final class MeetingController {
         return MeetingDocument.markdown(
             meeting.transcript, startedAt: meeting.startedAt, endedAt: ended ? (meeting.endedAt ?? Date()) : nil,
             includesSystemAudio: meeting.mixer != nil, identifiesSpeakers: meeting.provider.identifiesSpeakers,
-            notices: notices, vocabulary: meeting.vocabulary)
+            notices: notices, notes: meeting.notes, vocabulary: meeting.vocabulary)
     }
 
     private func milliseconds(_ bytes: Int, in meeting: Meeting) -> Int {

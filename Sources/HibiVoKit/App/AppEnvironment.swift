@@ -25,6 +25,7 @@ public final class AppEnvironment {
     let dictation: DictationController
     public let meeting: MeetingController
     private let hud: HUDController
+    public let meetingNotes: MeetingNotesPanelController
     private var permissionPollTask: Task<Void, Never>?
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "app")
 
@@ -81,6 +82,8 @@ public final class AppEnvironment {
         let dictation = dictation
         let meeting = meeting
         let state = state
+        let meetingNotes = MeetingNotesPanelController(state: state)
+        self.meetingNotes = meetingNotes
         hud = HUDController(
             state: state, settings: settings,
             onClick: {
@@ -90,7 +93,9 @@ public final class AppEnvironment {
                     dictation.toggleCleanup()
                 }
             },
-            onHover: { learner.setHovering($0) })
+            onHover: { learner.setHovering($0) },
+            onStopMeeting: { meeting.stop() },
+            onToggleMeetingNotes: { meetingNotes.toggle() })
 
         hotkey.onAction = { action, occurredAt in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth

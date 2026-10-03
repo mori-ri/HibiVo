@@ -30,6 +30,9 @@ public final class AppState {
     public var meetingStartedAt: Date?
     /// The meeting's STT connection dropped and is being re-established.
     public var meetingReconnecting = false
+    /// What the user writes in the notes window during a meeting (Markdown). Saved with the
+    /// transcript and put at the top of the minutes.
+    public var meetingNotes = ""
     /// Finished meetings still being transcribed in the background (after-meeting mode).
     public var meetingTranscriptionsInProgress = 0
     /// Saved meetings whose minutes Claude Code is still writing.
