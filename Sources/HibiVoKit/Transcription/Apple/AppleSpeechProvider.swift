@@ -134,7 +134,8 @@ actor AppleSpeechModels {
         installs[key] = task
         let installed = await task.value
         // Let a later call try again after a failure (e.g. offline).
-        if !installed { installs[key] = nil }
+        // Only drop our own task: another caller may already have started a fresh attempt.
+        if !installed, installs[key] == task { installs[key] = nil }
         return installed
     }
 }
