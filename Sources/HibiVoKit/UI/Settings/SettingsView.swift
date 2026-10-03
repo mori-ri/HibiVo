@@ -95,8 +95,14 @@ struct TranscriptionSettingsView: View {
                     ForEach(env.transcriptionProviders, id: \.id) { Text($0.displayName).tag($0.id) }
                 }
                 // Model names differ per provider, so go back to the new provider's default.
-                .onChange(of: settings.transcriptionProviderID) { settings.transcriptionModel = "" }
-                if let provider {
+                .onChange(of: settings.transcriptionProviderID) {
+                    settings.transcriptionModel = ""
+                    env.prepareSpeechModel()
+                }
+                if let provider, !provider.requiresAPIKey {
+                    NoteRow("Mac の中で文字起こしするため、API Key は不要で料金もかかりません。音声は外部に送信されません。")
+                    SpeechModelStatusRow(language: settings.language)
+                } else if let provider {
                     APIKeyField(secrets: env.secrets, account: provider.id, label: "\(provider.displayName) API Key")
                     PickerRow("モデル", selection: $settings.transcriptionModel) {
                         Text("既定（\(provider.defaultModel)）").tag("")
@@ -111,6 +117,29 @@ struct TranscriptionSettingsView: View {
                     Text("English").tag("en")
                 }
             }
+        }
+    }
+}
+
+/// Shows whether macOS's speech model for the language is on this Mac, downloading it if not.
+private struct SpeechModelStatusRow: View {
+    let language: String
+    @State private var status: AppleSpeechProvider.ModelStatus = .downloading
+
+    var body: some View {
+        Group {
+            switch status {
+            case .ready:
+                NoteRow("音声認識モデル: 準備できています")
+            case .downloading:
+                NoteRow("音声認識モデルをダウンロードしています…")
+            case .unavailable:
+                NoteRow("この言語の音声認識モデルを用意できませんでした。ネットワークを確認するか、別の STT Provider を選んでください。", color: .red)
+            }
+        }
+        .task(id: language) {
+            status = .downloading
+            status = await AppleSpeechProvider.prepareModel(language: language)
         }
     }
 }
@@ -270,17 +299,40 @@ struct MeetingSettingsView: View {
 
     var body: some View {
         @Bindable var settings = env.settings
+        let transcriber =
+            env.meetingTranscribers.first { $0.provider.id == settings.meetingTranscriptionProviderID }
+            ?? env.meetingTranscribers[0]
+        let identifiesSpeakers = transcriber.provider.identifiesSpeakers
         SettingsPage {
             SettingsSection(
                 footer:
-                    "\(env.settings.hotkey.displayName) を押しながら M で開始し、もう一度 \(env.settings.hotkey.displayName) を押すと終了します。文字起こしは Soniox で行い、Markdown で保存します。"
+                    "\(env.settings.hotkey.displayName) を押しながら M で開始し、もう一度 \(env.settings.hotkey.displayName) を押すと終了します。Markdown で保存します。"
             ) {
-                PickerRow("文字起こしのタイミング", selection: $settings.meetingTranscriptionTiming) {
-                    ForEach(MeetingTranscriptionTiming.allCases) { Text($0.displayName).tag($0) }
+                PickerRow("文字起こし", selection: $settings.meetingTranscriptionProviderID) {
+                    ForEach(env.meetingTranscribers, id: \.provider.id) {
+                        Text($0.provider.displayName).tag($0.provider.id)
+                    }
                 }
-                switch env.settings.meetingTranscriptionTiming {
+                .onChange(of: settings.meetingTranscriptionProviderID) { env.prepareSpeechModel() }
+                if !transcriber.provider.requiresAPIKey {
+                    NoteRow("Mac の中で文字起こしするため、API Key は不要で料金もかかりません。話者は区別しません。話者を区別するには Soniox を選んでください。")
+                    SpeechModelStatusRow(language: settings.language)
+                } else {
+                    APIKeyField(
+                        secrets: env.secrets, account: transcriber.provider.id,
+                        label: "\(transcriber.provider.displayName) API Key")
+                }
+                if transcriber.fileTranscriber != nil {
+                    PickerRow("文字起こしのタイミング", selection: $settings.meetingTranscriptionTiming) {
+                        ForEach(MeetingTranscriptionTiming.allCases) { Text($0.displayName).tag($0) }
+                    }
+                }
+                switch transcriber.fileTranscriber == nil ? .realtime : env.settings.meetingTranscriptionTiming {
                 case .realtime:
-                    NoteRow("会議中に文字起こしし、数秒ごとにファイルへ書き足します。話者の区別はやや粗くなります。")
+                    NoteRow(
+                        identifiesSpeakers
+                            ? "会議中に文字起こしし、数秒ごとにファイルへ書き足します。話者の区別はやや粗くなります。"
+                            : "会議中に文字起こしし、数秒ごとにファイルへ書き足します。")
                 case .afterMeeting:
                     NoteRow(
                         "会議中は録音だけを行い、終了後に音声全体から文字起こしするため、話者を正確に区別できます。結果は 1 時間の会議で数分ほどで届きます。音声は終了までメモリに置くだけで保存しないため、途中でアプリが終了するとその会議は記録されません。"
@@ -296,7 +348,8 @@ struct MeetingSettingsView: View {
                     NoteRow("システム音声の記録には macOS 14.2 以降が必要です。", color: .red)
                 } else if env.settings.meetingCapturesSystemAudio {
                     NoteRow(
-                        "マイクの音と混ぜて 1 本にし、全員を話者 1・2… として識別します。初回はシステムオーディオ録音の許可を求められます。スピーカーで聞くと相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあるため、イヤホンの使用をおすすめします。"
+                        (identifiesSpeakers ? "マイクの音と混ぜて 1 本にし、全員を話者 1・2… として識別します。" : "マイクの音と混ぜて 1 本にして文字起こしします。")
+                            + "初回はシステムオーディオ録音の許可を求められます。スピーカーで聞くと相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあるため、イヤホンの使用をおすすめします。"
                     )
                     LabeledRow("システムオーディオ録音の権限") {
                         Button("設定を開く…") { Permissions.openSystemAudioSettings() }

@@ -41,6 +41,7 @@ final class MockTranscriptionProvider: TranscriptionProvider, @unchecked Sendabl
     let sampleRate: Double = 16_000
     let models = ["m1"]
     let defaultModel = "m1"
+    var requiresAPIKey = true
     let result: Result<String, TranscriptionError>
     private(set) var sessions: [MockTranscriptionSession] = []
     private(set) var lastConfig: TranscriptionConfig?
@@ -114,7 +115,12 @@ final class MockMeetingProvider: MeetingTranscriptionProvider, @unchecked Sendab
     let sampleRate: Double = 16_000
     let models = ["m1"]
     let defaultModel = "m1"
+    var requiresAPIKey = true
+    var identifiesSpeakers = true
+    var ready = true
     private(set) var sessions: [MockMeetingSession] = []
+
+    func isReady(language: String) -> Bool { ready }
     private(set) var configs: [TranscriptionConfig] = []
 
     func makeSession(_ config: TranscriptionConfig) -> any TranscriptionSession {

@@ -45,8 +45,12 @@ public struct DictationContextBuilder {
 
     public func make(target: TargetApplication?) throws(UserFacingError) -> DictationContext {
         guard let provider = transcriptionProvider else { throw .transcriptionFailed }
-        guard let apiKey = secrets.secret(for: provider.id), !apiKey.isEmpty else {
-            throw .missingAPIKey(provider: provider.displayName)
+        var apiKey = ""
+        if provider.requiresAPIKey {
+            guard let key = secrets.secret(for: provider.id), !key.isEmpty else {
+                throw .missingAPIKey(provider: provider.displayName)
+            }
+            apiKey = key
         }
         let entries = vocabulary()
         let config = TranscriptionConfig(

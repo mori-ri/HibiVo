@@ -169,7 +169,8 @@ import Testing
     ) -> MeetingController {
         MeetingController(
             state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: secrets,
-            provider: provider, fileTranscriber: fileTranscriber, minutesWriter: { minutesWriter },
+            transcriber: { [provider] in MeetingTranscriber(provider: provider, fileTranscriber: fileTranscriber) },
+            minutesWriter: { minutesWriter },
             vocabulary: { [VocabularyEntry(preferred: "AppSync", spoken: "あっぷしんく")] },
             directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved)
     }
@@ -235,6 +236,40 @@ import Testing
         sut.start()
         #expect(state.phase == .error(UserFacingError.meetingRequiresAPIKey(provider: "Mock").message))
         #expect(audio.startCount == 0)
+    }
+
+    /// macOS's recognizer: no key, no speaker numbers, and it always streams.
+    @Test func keylessProviderWithoutSpeakersStreamsAndSavesUnlabelledText() async throws {
+        provider.requiresAPIKey = false
+        provider.identifiesSpeakers = false
+        settings.meetingTranscriptionTiming = .afterMeeting
+        var saved: URL?
+        let sut = makeController(secrets: MockSecrets(values: [:]), onSaved: { saved = $0 })
+        sut.start()
+        #expect(state.phase == .meeting)
+        #expect(provider.configs.first?.apiKey == "")
+
+        // No file transcriber, so after-meeting mode falls back to streaming.
+        let session = try #require(provider.sessions.first)
+        audio.speak()
+        await session.emit(.tokens([MeetingToken(text: "始めます", isFinal: true, startMs: 0, endMs: 800)]))
+        await settle { state.partialTranscript == "始めます" }
+        sut.stop()
+        await sut.waitUntilIdle()
+
+        let text = try String(contentsOf: try #require(saved), encoding: .utf8)
+        #expect(text.contains("[00:00:00] 始めます"))
+        #expect(!text.contains("話者1"))
+        #expect(text.contains("話者は区別していません"))
+    }
+
+    @Test func doesNotStartUntilTheModelIsReady() {
+        provider.ready = false
+        let sut = makeController()
+        sut.start()
+        #expect(state.phase == .error(UserFacingError.speechModelNotReady.message))
+        #expect(audio.startCount == 0)
+        #expect(!sut.isActive)
     }
 
     @Test func nothingSaidLeavesNoFile() async {
@@ -548,7 +583,7 @@ import Testing
         var shown: [URL] = []
         let sut = MeetingController(
             state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: MockSecrets(),
-            provider: provider, minutesWriter: { writer },
+            transcriber: { [provider] in MeetingTranscriber(provider: provider) }, minutesWriter: { writer },
             vocabulary: { [VocabularyEntry(preferred: "AppSync", spoken: "アップシンク")] }, directory: directory,
             saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: { shown.append($0) })
         try await recordShortMeeting(sut)

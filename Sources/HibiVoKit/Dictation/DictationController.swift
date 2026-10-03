@@ -321,6 +321,7 @@ public final class DictationController {
         switch error as? TranscriptionError {
         case .unauthorized: .invalidAPIKey(provider: provider.displayName)
         case .timedOut: .transcriptionTimedOut
+        case .modelUnavailable: .speechModelNotReady
         case .network: .network
         default: .transcriptionFailed
         }

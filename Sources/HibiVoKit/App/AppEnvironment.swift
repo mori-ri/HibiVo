@@ -8,7 +8,13 @@ public final class AppEnvironment {
     public let settings: SettingsStore
     public let hotkey: HotkeyMonitor
     public let secrets: any SecretStore = KeychainService()
-    public let transcriptionProviders: [any TranscriptionProvider] = [SonioxProvider(), GeminiLiveProvider()]
+    public let transcriptionProviders: [any TranscriptionProvider] =
+        (AppleSpeechProvider.isSupported ? [AppleSpeechProvider()] : []) + [SonioxProvider(), GeminiLiveProvider()]
+    /// The providers that can transcribe a meeting, each with its after-meeting transcriber if it has one.
+    public let meetingTranscribers: [MeetingTranscriber] =
+        (AppleSpeechProvider.isSupported ? [MeetingTranscriber(provider: AppleSpeechProvider())] : []) + [
+            MeetingTranscriber(provider: SonioxProvider(), fileTranscriber: SonioxFileTranscriber())
+        ]
     public let vocabulary = VocabularyStore()
     public let history = HistoryStore()
     public let usage = UsageStore()
@@ -26,6 +32,9 @@ public final class AppEnvironment {
         settings = SettingsStore()
         hotkey = HotkeyMonitor(trigger: settings.hotkey)
         let settings = settings
+        let secrets = secrets
+        settings.keepSonioxForExistingUsers { secrets.secret(for: SonioxProvider().id)?.isEmpty == false }
+        let meetingTranscribers = meetingTranscribers
         let vocabulary = vocabulary
         let meetings = meetings
         let learner = CorrectionLearner(vocabulary: vocabulary, state: state)
@@ -54,8 +63,10 @@ public final class AppEnvironment {
             systemAudio: SystemAudioCaptureService.isSupported ? SystemAudioCaptureService() : nil,
             settings: settings,
             secrets: secrets,
-            provider: SonioxProvider(),
-            fileTranscriber: SonioxFileTranscriber(),
+            transcriber: {
+                meetingTranscribers.first { $0.provider.id == settings.meetingTranscriptionProviderID }
+                    ?? meetingTranscribers[0]
+            },
             minutesWriter: {
                 ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
                     ClaudeCodeMinutesWriter(executable: $0, instructions: settings.meetingMinutesInstructions ?? "")
@@ -113,6 +124,7 @@ public final class AppEnvironment {
     /// Called once the app has finished launching.
     public func start() {
         Task { await requestMicrophoneIfNeeded() }
+        prepareSpeechModel()
         state.hasAccessibilityPermission = Permissions.isAccessibilityTrusted
         if !state.hasAccessibilityPermission { Permissions.promptForAccessibility() }
         startHotkeyWhenTrusted()
@@ -197,6 +209,16 @@ public final class AppEnvironment {
         if updated.status == .pastedRaw { updated.status = .pasted }
         history.update(updated)
         return true
+    }
+
+    /// Fetches macOS's speech model ahead of time when it is in use, so the first dictation doesn't
+    /// wait for a download.
+    public func prepareSpeechModel() {
+        let apple = AppleSpeechProvider().id
+        guard settings.transcriptionProviderID == apple || settings.meetingTranscriptionProviderID == apple
+        else { return }
+        let language = settings.language
+        Task { await AppleSpeechProvider.prepareModel(language: language) }
     }
 
     private func requestMicrophoneIfNeeded() async {

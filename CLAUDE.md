@@ -52,7 +52,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - `AppEnvironment` は、ミーティング中は操作を `MeetingController` に回す。開始時は、トリガーの押下で始まった音声入力をキャンセルしてから開始する。
 - 音声は、マイクと、設定で有効なときはシステム音声(`SystemAudioCaptureService`)。システム音声は Core Audio の process tap(macOS 14.2 以降)を private なアグリゲートデバイスに入れて IO proc で読む。必要なのは「システムオーディオ録音」の権限だけで、拒否されていても例外は出ず、無音が届く。
 - 2 つの音源は `PCMMixer` で 1 本の PCM16 にミックスし、1 つの STT セッションに送る(料金は 1 本分)。片方が止まったときは、300 ms を超えた分を無音で埋めて送る。送信は 1 本のキューで順序を保つ。
-- STT は常に Soniox(`MeetingTranscriptionProvider`)で、話者識別(`enable_speaker_diarization`)を有効にする。辞書は音声入力と同じく、表記と読み(`readings`)をヒントとして渡す(非同期の場合も同じ)。`SonioxSession` は話者識別が有効なときだけ `events` にトークンを流し、文字列は溜めない。
+- STT は設定(`meetingTranscriptionProviderID`、音声入力とは別)で選ぶ `MeetingTranscriber`(プロバイダと、あれば終了後用の `MeetingFileTranscriber`)。開始時に固定する。macOS 標準は話者を区別せず、終了後モードもない(常にリアルタイム)。Soniox は話者識別(`enable_speaker_diarization`)を有効にする。辞書は音声入力と同じく、表記と読み(`readings`)をヒントとして渡す(非同期の場合も同じ)。`SonioxSession` は話者識別が有効なときだけ `events` にトークンを流し、文字列は溜めない。
 - `MeetingTranscript`(純粋関数的)が、話者の切り替わりと 4 秒以上の間で段落に分ける。`MeetingDocument` が Markdown に変換する。話者は登場順に「話者1」「話者2」… と番号を振る。再接続後のセッションの話者には新しい番号を振る。ファイルは `Application Support/HibiVo/Meetings/` に数秒ごとにアトミックに書き直す。
 - セッションが切れたら再接続する(不正なキーの場合を除く)。新しいセッションの時刻は、それまでに送った音声の長さだけずらす。話者番号はセッションごとに振り直される。
 - 「終了後にまとめて」モード(`MeetingTranscriptionTiming.afterMeeting`)では STT セッションを開かず、ミックスした PCM をメモリに溜める。終了後に `SonioxFileTranscriber`(非同期 API `stt-async-v5`: アップロード → 作成 → ポーリング → 取得 → ファイルと文字起こしの削除)で処理する。WAV はメモリ上で組み立てる。バックグラウンドで実行し、録音が終わった時点でホットキーは解放する。一時的な失敗は 3 回まで再試行する。
@@ -63,7 +63,8 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 **修正からの辞書学習**: 貼り付けに成功したら、`CorrectionWatcher` が対象アプリのフォーカス中の入力欄を AX で 0.5 秒ごとに読み、ユーザーが直した結果を追う(`AXManualAccessibility` で Electron にもツリーを作らせる)。`InsertedTextTracker` は、貼り付け直後のキャレット位置から挿入の前後のテキストを覚え、それが変わらない間はその間を挿入部分とみなす。フォーカスの移動、アプリの切り替え、欄が空になったとき、次の音声入力の開始、45 秒のいずれかで終わり、`CorrectionLearner` に渡す。`CorrectionExtractor`(純粋関数的)は文字単位の差分を取り、変更箇所を前後の英字・片仮名・漢字の連続まで広げて語にする(平仮名は助詞や送り仮名なので広げない)。書き直し、数字、句読点、送り仮名、名詞以外(動詞・形容詞の語幹。システムのトークナイザーが送り仮名ごと 1 語にするかで判定する)、表記だけの違い、短い仮名、音が似ていない組(システムの形態素解析のローマ字読みの子音で比べる。略語は除く)は捨てる。登録は `VocabularyStore.learn`(同じ表記があれば別名に追加、ほかの項目と取り合う形は登録しない)で、HUD に専用のカード(`LearnedNotice`)を 10 秒表示し、ポインタを重ねている間は消さない。クリックで取り消せる。AX で読めないアプリ向けに、履歴の「修正」でも同じ抽出を行い、候補をボタンで追加できる。入力欄のテキストは保存しない。
 
-**STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションはソケット接続前の `send` を受け付けてバッファする。実装は 2 つ。どちらもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
+**STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションは準備(ソケット接続など)が済む前の `send` を受け付けてバッファする。実装は 3 つ。いずれもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
+- macOS 標準(`AppleSpeechProvider`、`SpeechAnalyzer` + `SpeechTranscriber`、macOS 26 以降): 対応する Mac では音声入力・ミーティングとも既定。API キー不要(`requiresAPIKey == false`)、話者識別なし(`identifiesSpeakers == false`)。音声は端末内で処理する。辞書の表記は `AnalysisContext.contextualStrings` に渡す。モデルが未インストールのとき、音声入力は裏でダウンロードを始めて `modelUnavailable` で失敗する。ミーティングはやり直せないので、`isReady(language:)` が false(モデルの準備ができていない)なら開始しない。起動時と設定変更時に `AppEnvironment.prepareSpeechModel` で先にダウンロードしておく。既定が Soniox だった頃からの利用者で Soniox のキーがある人は、`SettingsStore.keepSonioxForExistingUsers` が一度だけ Soniox のままにする。
 - Soniox(`stt-rt-v5`): `finalize` → `<fin>` トークンを待つ。
 - Gemini(`gemini-3.5-transcribe-live`、Live API): 手動 VAD。`setupComplete` まで音声をバッファし、`activityStart` → 音声 → `activityEnd` を送る。確定した `inputTranscription` のセグメントを連結し、`turnComplete` と最後のセグメント(順序は保証されない)が揃うか、少し待って終了する。不正なキーはソケットの close 理由で届く。API キー(Keychain の `gemini`)は整形の Gemini と共通。
 

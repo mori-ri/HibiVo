@@ -33,6 +33,8 @@ public enum TranscriptionError: Error, Equatable, Sendable {
     case server(String)
     case timedOut
     case cancelled
+    /// The on-device speech model isn't installed yet (or can't be).
+    case modelUnavailable
 }
 
 /// A speech-to-text service. Stateless: each utterance gets its own `TranscriptionSession`,
@@ -44,8 +46,14 @@ public protocol TranscriptionProvider: Sendable {
     var sampleRate: Double { get }
     var models: [String] { get }
     var defaultModel: String { get }
+    /// False for on-device recognition, which needs no key.
+    var requiresAPIKey: Bool { get }
 
     func makeSession(_ config: TranscriptionConfig) -> any TranscriptionSession
+}
+
+extension TranscriptionProvider {
+    public var requiresAPIKey: Bool { true }
 }
 
 /// One utterance of streaming recognition.

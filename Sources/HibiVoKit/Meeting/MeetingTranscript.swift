@@ -95,10 +95,13 @@ public enum MeetingDocument {
         case systemAudioSilent
     }
 
-    /// - Parameter includesSystemAudio: Whether the Mac's audio output was mixed in with the microphone.
+    /// - Parameters:
+    ///   - includesSystemAudio: Whether the Mac's audio output was mixed in with the microphone.
+    ///   - identifiesSpeakers: Whether the STT labelled speakers; macOS's recognizer doesn't.
     public static func markdown(
         _ transcript: MeetingTranscript, startedAt: Date, endedAt: Date?, includesSystemAudio: Bool = false,
-        notices: [Notice] = [], vocabulary: [VocabularyEntry] = [], timeZone: TimeZone = .current
+        identifiesSpeakers: Bool = true, notices: [Notice] = [], vocabulary: [VocabularyEntry] = [],
+        timeZone: TimeZone = .current
     ) -> String {
         var lines = ["# ミーティング \(format(startedAt, "yyyy-MM-dd HH:mm", timeZone))", ""]
         lines.append("- 開始: \(format(startedAt, "yyyy-MM-dd HH:mm:ss", timeZone))")
@@ -109,7 +112,10 @@ public enum MeetingDocument {
             lines.append("- 記録中")
         }
         lines.append(includesSystemAudio ? "- 音声: マイクとシステム音声(相手の声)" : "- 音声: マイクのみ")
-        lines.append("- 話者は音声から自動で推定しています。番号は実際の人物と一致しないことがあります。")
+        lines.append(
+            identifiesSpeakers
+                ? "- 話者は音声から自動で推定しています。番号は実際の人物と一致しないことがあります。"
+                : "- macOS 標準の文字起こしで記録したため、話者は区別していません。")
         for notice in notices {
             switch notice {
             case .microphoneUnavailable:
@@ -129,7 +135,10 @@ public enum MeetingDocument {
             let time = "[\(timestamp(segment.startMs))]"
             switch segment.kind {
             case .reconnected:
-                lines.append("*\(time) 文字起こしが途切れたため再接続しました。以降は同じ人でも別の番号になることがあります。*")
+                lines.append(
+                    identifiesSpeakers
+                        ? "*\(time) 文字起こしが途切れたため再接続しました。以降は同じ人でも別の番号になることがあります。*"
+                        : "*\(time) 文字起こしが途切れたため再開しました。*")
             case .speech(let speaker):
                 let text = VocabularyReplacer.apply(vocabulary, to: segment.text)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
