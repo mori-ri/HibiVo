@@ -233,13 +233,19 @@ struct ClaudeCodeCLI: Sendable {
         _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         try process.run()
         let input = Data(user.utf8)
-        let data = await Task.detached {
-            try? stdin.fileHandleForWriting.write(contentsOf: input)
-            try? stdin.fileHandleForWriting.close()
-            let data = stdout.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            return data
-        }.value
+        // A detached task doesn't inherit cancellation, so kill the CLI when the case hits its ceiling;
+        // otherwise the task group in withCeiling waits on it and the ceiling never takes effect.
+        let data = await withTaskCancellationHandler {
+            await Task.detached {
+                try? stdin.fileHandleForWriting.write(contentsOf: input)
+                try? stdin.fileHandleForWriting.close()
+                let data = stdout.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                return data
+            }.value
+        } onCancel: {
+            process.terminate()
+        }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw CleanupError.invalidResponse
@@ -731,6 +737,8 @@ func harnessDigest(flow: URL) -> String {
 
 func main() async {
     var parsed = Options.parse(CommandLine.arguments)
+    // CleanupCoordinator falls back on an empty model, so the self-test providers need a placeholder.
+    if parsed.model.isEmpty, ["echo", "constant"].contains(parsed.provider) { parsed.model = "fixed" }
     let judge = makeJudge(&parsed)
     let options = parsed
     let flow = URL(fileURLWithPath: options.flowDir)
@@ -745,7 +753,7 @@ func main() async {
             "the eval harness changed since it was last approved. Review it, then rerun with --approve-harness", code: 2
         )
     }
-    guard !options.model.isEmpty || ["echo", "constant"].contains(options.provider) else { fail("--model is required") }
+    guard !options.model.isEmpty else { fail("--model is required") }
 
     var cases = loadCases(options.caseFiles)
     if !options.only.isEmpty { cases = cases.filter { options.only.contains($0.id) } }
