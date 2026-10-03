@@ -59,7 +59,8 @@ public struct CleanupCoordinator: Sendable {
         }
     }
 
-    /// What dictation does with a finished transcript: apply the dictionary, then clean up.
+    /// What dictation does with a finished transcript: apply the dictionary, clean up, then drop
+    /// the period after a lone word.
     /// Shared with the eval runner so it measures exactly this path.
     /// - Returns: The transcript after dictionary replacement, and the cleanup outcome.
     public func run(
@@ -67,11 +68,12 @@ public struct CleanupCoordinator: Sendable {
         customInstructions: String, provider: (any TextCleanupProvider)?, model: String
     ) async -> (raw: String, outcome: CleanupOutcome) {
         let raw = VocabularyReplacer.apply(vocabulary, to: transcript)
-        let outcome = await run(
+        var outcome = await run(
             Request(
                 raw: raw, mode: mode, vocabulary: vocabulary.map(\.promptTerm), appName: appName,
                 customInstructions: customInstructions),
             provider: provider, model: model)
+        outcome.text = TrailingPeriod.trimmed(outcome.text)
         return (raw, outcome)
     }
 

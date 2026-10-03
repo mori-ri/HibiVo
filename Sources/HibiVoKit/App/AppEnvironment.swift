@@ -190,7 +190,7 @@ public final class AppEnvironment {
         }
         guard outcome.didCleanup else { return false }
         var updated = record
-        updated.cleanedTranscript = outcome.text
+        updated.cleanedTranscript = TrailingPeriod.trimmed(outcome.text)
         updated.correctedText = nil
         updated.cleanupMode = mode
         updated.errorMessage = nil
