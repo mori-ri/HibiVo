@@ -49,7 +49,8 @@ public enum CleanupPromptBuilder {
     static func modeRules(_ mode: CleanupMode) -> String {
         switch mode {
         case .raw:
-            "# モード: Raw\n句読点と誤変換だけを直し、それ以外は変えない。"
+            // Never sent: CleanupCoordinator pastes the transcript as is without calling the model in Raw mode.
+            ""
         case .natural:
             """
             # モード: Natural
