@@ -45,17 +45,16 @@ struct HomeView: View {
     private var models: some View {
         let settings = env.settings
         return VStack(alignment: .leading, spacing: 8) {
-            HomeSectionHeader(title: "使用中のモデル") {
-                Button("設定を変更") { show(.transcription) }
-            }
+            HomeSectionHeader(title: "使用中のモデル") { EmptyView() }
             SettingsSection {
-                ModelRow("音声入力の文字起こし", model: dictationModel)
-                ModelRow("AI 整形", model: cleanupModel)
-                ModelRow("ミーティングの文字起こし", model: meetingModel)
+                ModelRow("音声入力の文字起こし", model: dictationModel) { show(.transcription) }
+                ModelRow("AI 整形", model: cleanupModel) { show(.cleanup) }
+                ModelRow("ミーティングの文字起こし", model: meetingModel) { show(.meeting) }
                 ModelRow(
                     "議事録",
                     model: settings.meetingMinutesEnabled
-                        ? ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized) : nil)
+                        ? ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized) : nil
+                ) { show(.meeting) }
             }
         }
     }
@@ -198,14 +197,17 @@ private struct HomeSectionHeader<Action: View>: View {
     }
 }
 
-/// The step on the left, the service and model it uses on the right; "オフ" when the step is off.
+/// The step on the left, the service and model it uses on the right ("オフ" when the step is off),
+/// and a button to the page where it is set.
 private struct ModelRow: View {
     let title: String
     let model: (provider: String, model: String)?
+    let change: () -> Void
 
-    init(_ title: String, model: (provider: String, model: String)?) {
+    init(_ title: String, model: (provider: String, model: String)?, change: @escaping () -> Void) {
         self.title = title
         self.model = model
+        self.change = change
     }
 
     var body: some View {
@@ -222,6 +224,7 @@ private struct ModelRow: View {
             } else {
                 Text("オフ").foregroundStyle(.secondary)
             }
+            Button("変更", action: change)
         }
     }
 }
