@@ -103,6 +103,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 ## 規約
 
+- 画面・HUD・アイコンの色、形、文字、動きは `DESIGN.md` に従う。ブランドの色は `Theme` のトークン(`brandGradient` など)を使い、値を直接書かない。
 - ユーザー向けテキストは日本語で、ステータスコードではなくユーザーに伝わる言い回しにする。エラーは `UserFacingError` を経由させる。コードコメントは英語。
 - テストは Swift Testing(`@Test`、`#expect`)を使う。モックは `Tests/HibiVoKitTests/Mocks.swift` にある。`#require` の中に `#require` をネストしない(マクロ再帰エラーになる)。
 - 自明でない設計判断はローカル専用の `notes/DECISIONS.md`(番号付きの表)に記録する。詳しい設計と macOS 関連のメモは `notes/ARCHITECTURE.md` にある。どちらもクローンには含まれない。
