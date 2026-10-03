@@ -55,7 +55,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 2. **アクセシビリティ** を許可します（システム設定 › プライバシーとセキュリティ › アクセシビリティ）。ホットキーと貼り付けに必要です。
 3. **マイク** を許可します。
 4. メニュー › 設定… › 文字起こし で STT Provider（Soniox / Google Gemini）を選び、API Key を保存します。Gemini の API Key は AI 整形の Google Gemini と共通です。
-5. AI 整形 タブで LLM の Provider と認証情報を設定します（既定は Anthropic `claude-opus-5`）。
+5. AI 整形 タブで LLM の Provider と認証情報を設定します（既定は Anthropic `claude-opus-5-5`）。
    Amazon Bedrock の場合はリージョン・モデル ID（または推論プロファイル ID）と、Bedrock API キーか IAM アクセスキー（`bedrock:InvokeModel` 権限）を設定します。
    Claude のほか `zai.glm-4.7-flash`、`zai.glm-4.7`、`minimax.minimax-m2.5`、`global.openai.gpt-6-luna` なども指定できます（設定画面の「候補」から選択可）。
 6. 右 Option を押して話し、終わったらもう一度押します(押したまま話して離しても入力できます)。

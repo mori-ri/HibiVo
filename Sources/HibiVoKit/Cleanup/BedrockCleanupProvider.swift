@@ -38,7 +38,7 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
 
     /// Model IDs offered as suggestions in Settings. Any other ID can be typed in.
     public static let suggestedModels = [
-        "anthropic.claude-opus-5",
+        "anthropic.claude-opus-5-5",
         "global.anthropic.claude-haiku-4-5-20251001-v1:0",
         "zai.glm-4.7-flash",
         "zai.glm-4.7",
