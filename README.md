@@ -110,6 +110,11 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 - **辞書**: `~/Library/Application Support/HibiVo/vocabulary.json` に保存します。
 - **ミーティング**: 文字起こしと議事録を `~/Library/Application Support/HibiVo/Meetings/` に Markdown で平文保存します。音声は保存しません。議事録を作る場合、文字起こしは Claude Code 経由で Anthropic に送信されます。
 - **API Key / AWS 認証情報**: macOS の Keychain に保存します。設定ファイルには書き込みません。
+  - Soniox・Gemini・Anthropic・OpenAI 互換・Bedrock の API キーは、HibiVo 用の 1 つの項目にまとめて保存します。この項目へのアクセス許可は、保存した API キー全体に適用されます。
+  - 取得した API キーはアプリ内のメモリに保持し、通常の利用でキーごとの再取得・再承認を行いません。キーチェーンアクセスなどで外部からキーを変更した場合は、HibiVo を再起動してください。
+  - AWS IAM のアクセスキー ID・シークレットアクセスキー・セッショントークンは、権限範囲をアプリから判断できないため個別保存を維持します。
+  - 既存の API キーは初回取得・保存時に移行します。移行時には旧項目ごとの承認が必要になる場合があります。全キーの読み取りと一括保存に成功するまで、旧項目は削除しません。旧項目の削除に失敗した場合は旧項目も残りますが、以後は一括保存した項目を参照します。
+  - 評価用 CLI (`HibiVoEval`) に一括項目へのアクセスを許可すると、保存した API キー全体を取得できるようになります。署名変更などに伴う再承認は、一括化後も発生する場合があります。
 - 解析・テレメトリの送信はありません。
 
 ## 現状と制約（v0.1）

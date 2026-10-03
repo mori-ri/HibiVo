@@ -5,7 +5,8 @@
 //   scripts/eval.sh --variant baseline --provider anthropic --model claude-haiku-4-5
 //
 // Keys come from the environment (ANTHROPIC_API_KEY, GEMINI_API_KEY, AWS_BEARER_TOKEN_BEDROCK) or,
-// failing that, from HibiVo's Keychain items (macOS asks once to allow access).
+// failing that, from HibiVo's shared API-key Keychain item. Access grants cover all stored API keys;
+// migration from legacy items may require individual approvals. IAM credentials remain separate.
 //
 // `--provider claude-code` and `--judge-provider claude-code` go through the Claude Code CLI instead,
 // so they count against the user's Claude subscription rather than API billing. The CLI's start-up
