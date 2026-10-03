@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Overview page: the last week's usage, how to use the hotkey, the words the dictionary learned
+/// Overview page: the last week's usage, how to use the hotkey, the models in use, the words the dictionary learned
 /// lately, and feedback links.
 struct HomeView: View {
     let env: AppEnvironment
@@ -12,6 +12,7 @@ struct HomeView: View {
                 howTo.frame(maxWidth: .infinity)
                 learnedWords.frame(maxWidth: .infinity)
             }
+            models
             feedback
         }
     }
@@ -26,7 +27,8 @@ struct HomeView: View {
             HomeSectionHeader(title: "直近 7 日の利用状況") {
                 Button("詳しく見る") { show(.usage) }
             }
-            StatTiles(days: days, estimate: UsagePricing.estimate(days), yenPerUSD: rate)
+            StatTiles(
+                days: days, estimate: UsagePricing.estimate(days), yenPerUSD: rate, showsCharacters: false)
             SettingsSection {
                 SettingsRow {
                     DailyChart(series: series, metric: .dictations, period: .week, yenPerUSD: rate)
@@ -35,6 +37,64 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Models
+
+    /// What each step currently uses, resolved the same way a dictation or meeting would at start.
+    private var models: some View {
+        let settings = env.settings
+        return VStack(alignment: .leading, spacing: 8) {
+            HomeSectionHeader(title: "使用中のモデル") {
+                Button("設定を変更") { show(.transcription) }
+            }
+            SettingsSection {
+                ModelRow("音声入力の文字起こし", model: dictationModel)
+                ModelRow("AI 整形", model: cleanupModel)
+                ModelRow("ミーティングの文字起こし", model: meetingModel)
+                ModelRow(
+                    "議事録",
+                    model: settings.meetingMinutesEnabled
+                        ? ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized) : nil)
+            }
+        }
+    }
+
+    private var dictationModel: (provider: String, model: String)? {
+        let providers = env.transcriptionProviders
+        guard
+            let provider = providers.first(where: { $0.id == env.settings.transcriptionProviderID })
+                ?? providers.first
+        else { return nil }
+        return (provider.displayName, Self.model(env.settings.transcriptionModel, of: provider))
+    }
+
+    private var cleanupModel: (provider: String, model: String)? {
+        let settings = env.settings
+        guard settings.cleanupEnabled else { return nil }
+        let kind = CleanupProviderKind(rawValue: settings.cleanupProviderID) ?? .anthropic
+        let model = settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel
+        return (kind.displayName, model.isEmpty ? "モデル未設定" : model)
+    }
+
+    private var meetingModel: (provider: String, model: String)? {
+        let settings = env.settings
+        let transcribers = env.meetingTranscribers
+        guard
+            let stt = transcribers.first(where: { $0.provider.id == settings.meetingTranscriptionProviderID })
+                ?? transcribers.first
+        else { return nil }
+        if settings.meetingTranscriptionTiming == .afterMeeting, let file = stt.fileTranscriber {
+            return (stt.provider.displayName, file.model)
+        }
+        return (stt.provider.displayName, Self.model(settings.transcriptionModel, of: stt.provider))
+    }
+
+    /// A model saved for another provider falls back to this one's default, as `DictationContextBuilder` does.
+    /// macOS's recognizer has no model name worth showing, so it says where the audio is processed instead.
+    private static func model(_ saved: String, of provider: any TranscriptionProvider) -> String {
+        if provider is AppleSpeechProvider { return "端末内" }
+        return provider.models.contains(saved) ? saved : provider.defaultModel
     }
 
     // MARK: - How to
@@ -125,6 +185,34 @@ private struct HomeSectionHeader<Action: View>: View {
                 .font(.system(size: 12))
         }
         .padding(.horizontal, 4)
+    }
+}
+
+/// The step on the left, the service and model it uses on the right; "オフ" when the step is off.
+private struct ModelRow: View {
+    let title: String
+    let model: (provider: String, model: String)?
+
+    init(_ title: String, model: (provider: String, model: String)?) {
+        self.title = title
+        self.model = model
+    }
+
+    var body: some View {
+        LabeledRow(title) {
+            if let model {
+                HStack(spacing: 6) {
+                    Text(model.provider).foregroundStyle(.secondary)
+                    Text(model.model)
+                        .font(.system(size: 12, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+                .lineLimit(1)
+                .truncationMode(.middle)
+            } else {
+                Text("オフ").foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

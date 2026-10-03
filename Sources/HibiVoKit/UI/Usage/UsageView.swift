@@ -139,6 +139,7 @@ struct StatTiles: View {
     let days: [DailyUsage]
     let estimate: UsagePricing.Estimate
     let yenPerUSD: Double
+    var showsCharacters = true
 
     var body: some View {
         let dictations = days.reduce(0) { $0 + $1.dictations }
@@ -152,9 +153,11 @@ struct StatTiles: View {
             StatTile(
                 title: "話した時間", value: UsageFormat.duration(seconds: seconds),
                 caption: dictations > 0 ? "1 回あたり \(UsageFormat.duration(seconds: seconds / Double(dictations)))" : nil)
-            StatTile(
-                title: "文字数", value: "\(characters.formatted()) 文字",
-                caption: seconds >= 1 ? "\(Int(Double(characters) / (seconds / 60)).formatted()) 文字/分" : nil)
+            if showsCharacters {
+                StatTile(
+                    title: "文字数", value: "\(characters.formatted()) 文字",
+                    caption: seconds >= 1 ? "\(Int(Double(characters) / (seconds / 60)).formatted()) 文字/分" : nil)
+            }
             StatTile(
                 title: "API 料金（概算）", value: UsageFormat.yen(usd: estimate.totalUSD, rate: yenPerUSD),
                 caption: estimate.unpricedModels.isEmpty ? "公開価格から計算" : "一部のモデルは含まず")
