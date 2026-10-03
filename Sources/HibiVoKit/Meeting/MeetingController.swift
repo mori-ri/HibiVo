@@ -474,6 +474,8 @@ public final class MeetingController {
                         }
                     })
             } else {
+                // An autosave may have written notes that the user deleted before stopping.
+                transcriptions.append(Task { await writer.remove(meeting.fileURL) })
                 show(.nothingRecognized)
             }
             return
@@ -488,6 +490,10 @@ public final class MeetingController {
                     if !(await writer.write(markdown(meeting, ended: true), to: meeting.fileURL)) {
                         showUnlessBusy(.meetingSaveFailed)
                     }
+                } else {
+                    // An autosave may have written notes that the user deleted before stopping; the
+                    // transcript, if any, is written afresh below.
+                    await writer.remove(meeting.fileURL)
                 }
                 await transcribe(meeting, with: fileTranscriber)
             })

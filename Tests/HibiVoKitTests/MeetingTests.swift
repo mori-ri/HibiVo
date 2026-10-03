@@ -694,6 +694,26 @@ import Testing
         await sut.waitUntilIdle()
     }
 
+    @Test func afterMeetingDeletedNotesLeaveNoFile() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let sut = MeetingController(
+            state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: MockSecrets(),
+            transcriber: { [provider] in
+                MeetingTranscriber(provider: provider, fileTranscriber: MockFileTranscriber([.success([])]))
+            }, directory: directory, saveInterval: .milliseconds(10), reconnectDelays: [.zero])
+        sut.start()
+        state.meetingNotes = "消すメモ"
+        for _ in 0..<200 where savedFiles().isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!savedFiles().isEmpty)
+        state.meetingNotes = ""
+        audio.speak()
+        sut.stop()
+        await sut.waitUntilIdle()
+        #expect(savedFiles().isEmpty)
+    }
+
     @Test func failedMinutesStillShowTheTranscript() async throws {
         settings.meetingMinutesEnabled = true
         let writer = MockMinutesWriter(.failure(.failed("usage limit")))

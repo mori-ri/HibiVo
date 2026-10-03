@@ -169,9 +169,14 @@ struct MarkdownTextEditor: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.text = $text
-        guard let textView = scrollView.documentView as? NSTextView, textView.string != text,
-            !textView.hasMarkedText()
-        else { return }
+        guard let textView = scrollView.documentView as? NSTextView, textView.string != text else { return }
+        if textView.hasMarkedText() {
+            // Leave a composition alone, except when the meeting ends and the notes are cleared:
+            // otherwise the old text would stay in the view and be carried into the next meeting.
+            guard text.isEmpty else { return }
+            textView.inputContext?.discardMarkedText()
+            textView.unmarkText()
+        }
         textView.string = text
     }
 
