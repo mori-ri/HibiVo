@@ -78,7 +78,8 @@ public final class AppEnvironment {
                 } else {
                     dictation.toggleCleanup()
                 }
-            })
+            },
+            onHover: { learner.setHovering($0) })
 
         hotkey.onAction = { action, occurredAt in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth

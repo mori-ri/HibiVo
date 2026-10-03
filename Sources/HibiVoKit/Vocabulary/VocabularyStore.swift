@@ -16,9 +16,9 @@ public final class VocabularyStore {
         entries = file.load() ?? []
     }
 
-    /// Entries that actually have a preferred spelling.
+    /// Enabled entries that actually have a preferred spelling.
     public var activeEntries: [VocabularyEntry] {
-        entries.filter { !$0.preferred.trimmingCharacters(in: .whitespaces).isEmpty }
+        entries.filter { $0.isEnabled && !$0.preferred.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
     public func add(_ entry: VocabularyEntry) {
@@ -41,16 +41,23 @@ public final class VocabularyStore {
 
     /// Adds a corrected word: as a spoken form of the entry already spelled `corrected`, or as a new
     /// entry. Returns nil, changing nothing, when `canLearn` is false.
+    ///
+    /// A misrecognition written in kanji ("構成" for "校正") goes to the aliases: the spoken field is
+    /// shown as the word's reading, and kanji there reads as a wrong reading.
     @discardableResult
     public func learn(_ correction: VocabularyCorrection) -> VocabularyLearning? {
         guard canLearn(correction) else { return nil }
+        let isReading = !correction.original.contains { Script($0) == .kanji }
         guard var entry = entries.first(where: { $0.preferred == correction.corrected }) else {
-            let entry = VocabularyEntry(preferred: correction.corrected, spoken: correction.original)
+            let entry =
+                isReading
+                ? VocabularyEntry(preferred: correction.corrected, spoken: correction.original, origin: .learned)
+                : VocabularyEntry(preferred: correction.corrected, aliases: [correction.original], origin: .learned)
             add(entry)
             return VocabularyLearning(correction: correction, change: .added(entry.id))
         }
         let previous = entry
-        if entry.spoken.trimmingCharacters(in: .whitespaces).isEmpty {
+        if isReading, entry.spoken.trimmingCharacters(in: .whitespaces).isEmpty {
             entry.spoken = correction.original
         } else {
             entry.aliases.append(correction.original)

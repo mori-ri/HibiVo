@@ -154,6 +154,27 @@ import Testing
         #expect(store.entries.count == 1)
     }
 
+    @Test func disabledEntriesAreKeptButNotUsed() async throws {
+        let file = tempFile([VocabularyEntry].self)
+        let store = VocabularyStore(file: file)
+        var entry = VocabularyEntry(preferred: "AppSync", spoken: "アップシンク")
+        store.add(entry)
+        entry.isEnabled = false
+        store.update(entry)
+        #expect(store.activeEntries.isEmpty)
+        // Still owns its spoken form, so learning doesn't bring the word back.
+        #expect(!store.canLearn(VocabularyCorrection(original: "アップシンク", corrected: "AppSync2")))
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(VocabularyStore(file: file).entries.first?.isEnabled == false)
+    }
+
+    @Test func entriesSavedBeforeOriginAndEnabledDecodeAsManualAndEnabled() throws {
+        let json = #"[{"id":"7E1B5C2A-0000-4000-8000-000000000001","preferred":"AppSync","spoken":"","aliases":[]}]"#
+        let entries = try JSONDecoder().decode([VocabularyEntry].self, from: Data(json.utf8))
+        #expect(entries.first?.isEnabled == true)
+        #expect(entries.first?.origin == .manual)
+    }
+
     @Test func historyRecordsFailuresAndCleanup() async {
         let defaults = UserDefaults(suiteName: "StoreTests-\(UUID())")!
         let settings = SettingsStore(defaults: defaults)

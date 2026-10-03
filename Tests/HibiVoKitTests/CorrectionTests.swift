@@ -54,6 +54,16 @@ import Testing
         #expect(extract("資料を明日送ります", "資料を送ります").isEmpty)
     }
 
+    @Test func onlyNounsAreLearned() {
+        // Verb and adjective stems: the kanji alone isn't a dictionary word.
+        #expect(extract("資料を早く送ります", "資料を速く送ります").isEmpty)
+        #expect(extract("会場を移した", "会場を写した").isEmpty)
+        #expect(extract("温かい料理", "暖かい料理").isEmpty)
+        // Nouns, including one used with する.
+        #expect(extract("文章を構成して送ります", "文章を校正して送ります") == [pair("構成", "校正")])
+        #expect(extract("早朝に感数を直す", "早朝に関数を直す") == [pair("感数", "関数")])
+    }
+
     @Test func scriptOnlyChangesAreIgnored() {
         #expect(extract("すごいですね", "スゴイですね").isEmpty)
     }
@@ -96,6 +106,7 @@ import Testing
         let learning = try #require(store.learn(VocabularyCorrection(original: "アップシンク", corrected: "AppSync")))
         #expect(store.entries.map(\.preferred) == ["AppSync"])
         #expect(store.entries.first?.spoken == "アップシンク")
+        #expect(store.entries.first?.origin == .learned)
         store.undo(learning)
         #expect(store.entries.isEmpty)
     }
@@ -105,8 +116,20 @@ import Testing
         let learning = try #require(store.learn(VocabularyCorrection(original: "アプシンク", corrected: "AppSync")))
         #expect(store.entries.count == 1)
         #expect(store.entries.first?.aliases == ["アプシンク"])
+        #expect(store.entries.first?.origin == .manual)
         store.undo(learning)
         #expect(store.entries.first?.aliases == [])
+    }
+
+    @Test func kanjiMisrecognitionBecomesAnAliasNotAReading() throws {
+        try #require(store.learn(VocabularyCorrection(original: "構成", corrected: "校正")))
+        #expect(store.entries.first?.spoken == "")
+        #expect(store.entries.first?.aliases == ["構成"])
+
+        store.add(VocabularyEntry(preferred: "関数"))
+        try #require(store.learn(VocabularyCorrection(original: "感数", corrected: "関数")))
+        #expect(store.entries.last?.spoken == "")
+        #expect(store.entries.last?.aliases == ["感数"])
     }
 
     @Test func coveredFormsAreNotLearnedAgain() {

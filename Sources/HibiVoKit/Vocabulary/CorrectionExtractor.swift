@@ -22,7 +22,8 @@ public struct VocabularyCorrection: Hashable, Sendable {
 /// most of the text changed in several places), punctuation, numbers, okurigana, script-only
 /// changes and short kana (`VocabularyEntry.needsContext`) are dropped, and so is a pair that
 /// doesn't sound alike, since STT errors sound like the right word while content edits
-/// ("明日" → "今日") don't.
+/// ("明日" → "今日") don't. Only nouns are kept: a verb or adjective ("早く" → "速く") is
+/// dropped, because its kanji alone is not a word the dictionary can replace.
 public enum CorrectionExtractor {
     static let maxSpans = 3
     static let maxTermLength = 20
@@ -46,7 +47,10 @@ public enum CorrectionExtractor {
         return spans.compactMap { span in
             let correction = VocabularyCorrection(
                 original: trim(String(a[span.a])), corrected: trim(String(b[span.b])))
-            guard isVocabulary(correction), seen.insert(correction).inserted else { return nil }
+            let leading = b[span.b].prefix { $0.unicodeScalars.allSatisfy(trimmed.contains) }.count
+            let end = span.b.lowerBound + leading + correction.corrected.count
+            guard isVocabulary(correction), !isInflected(b, wordEnd: end), seen.insert(correction).inserted
+            else { return nil }
             return correction
         }
     }
@@ -162,6 +166,21 @@ public enum CorrectionExtractor {
             !VocabularyEntry.needsContext(original)
         else { return false }
         return isAcronym(corrected) || similarity(original, corrected) >= minimumSimilarity
+    }
+
+    /// Whether the word ending at `wordEnd` is the stem of a verb or adjective. Okurigana stays
+    /// out of the spans, so "速く" yields "速"; the system tokenizer keeps an inflected word in one
+    /// token ("速く", "書い", "美しい") but splits a noun from what follows ("校正 | する", "会議 | に").
+    static func isInflected(_ characters: [Character], wordEnd: Int) -> Bool {
+        guard wordEnd > 0, wordEnd < characters.count else { return false }
+        let text = String(characters) as NSString
+        let end = String(characters[..<wordEnd]).utf16.count
+        let tokenizer = CFStringTokenizerCreate(
+            nil, text, CFRange(location: 0, length: text.length), kCFStringTokenizerUnitWord,
+            Locale(identifier: "ja") as CFLocale)
+        guard !CFStringTokenizerGoToTokenAtIndex(tokenizer, end - 1).isEmpty else { return false }
+        let range = CFStringTokenizerGetCurrentTokenRange(tokenizer)
+        return range.location + range.length > end
     }
 
     /// "AWS" read out as "エーダブリューエス" sounds nothing like its letters' romaji.
