@@ -145,6 +145,15 @@ struct KeychainServiceTests {
         #expect(KeychainService(storage: storage).secret(for: "soniox") == "new")
     }
 
+    @Test func readOnlyServiceReadsOnlyTheRequestedLegacyItemAndNeverWrites() {
+        let storage = MemoryKeychainStorage(["soniox": "speech", SecretAccount.anthropic: "cleanup"])
+        let before = storage.snapshot()
+        let store = KeychainService(storage: storage, migratesLegacyItems: false)
+        #expect(store.secret(for: SecretAccount.anthropic) == "cleanup")
+        #expect(storage.snapshot() == before)
+        #expect(!storage.readAccounts().contains("soniox"))
+    }
+
     @Test func concurrentUpdatesThroughCopiesDoNotLoseKeys() async {
         let storage = MemoryKeychainStorage()
         let store = KeychainService(storage: storage)

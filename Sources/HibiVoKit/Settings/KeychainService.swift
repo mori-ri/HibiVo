@@ -19,12 +19,14 @@ public struct KeychainService: SecretStore {
 
     private let state: State
 
-    public init(service: String = "io.github.mori-ri.hibivo.api-keys") {
-        state = State(storage: SystemKeychainStorage(service: service))
+    /// `migratesLegacyItems: false` never writes: legacy items are read only for the requested account. Tools like
+    /// HibiVoEval use it so they don't prompt for unrelated keys or create the shared item under their own ACL.
+    public init(service: String = "io.github.mori-ri.hibivo.api-keys", migratesLegacyItems: Bool = true) {
+        state = State(storage: SystemKeychainStorage(service: service), migratesLegacyItems: migratesLegacyItems)
     }
 
-    init(storage: any KeychainItemStorage) {
-        state = State(storage: storage)
+    init(storage: any KeychainItemStorage, migratesLegacyItems: Bool = true) {
+        state = State(storage: storage, migratesLegacyItems: migratesLegacyItems)
     }
 
     public func secret(for account: String) -> String? {
@@ -32,7 +34,8 @@ public struct KeychainService: SecretStore {
         defer { state.lock.unlock() }
         do {
             if Self.bundledAccounts.contains(account) {
-                return try state.loadBundle()[account]
+                if let value = try state.loadBundle()[account] { return value }
+                guard !state.migratesLegacyItems else { return nil }
             }
             return try state.storage.read(account).flatMap { String(data: $0, encoding: .utf8) }
         } catch {
@@ -60,9 +63,13 @@ public struct KeychainService: SecretStore {
     private final class State: @unchecked Sendable {
         let lock = NSLock()
         let storage: any KeychainItemStorage
+        let migratesLegacyItems: Bool
         var cachedBundle: [String: String]?
 
-        init(storage: any KeychainItemStorage) { self.storage = storage }
+        init(storage: any KeychainItemStorage, migratesLegacyItems: Bool) {
+            self.storage = storage
+            self.migratesLegacyItems = migratesLegacyItems
+        }
 
         /// `replacingCorrupt` lets an explicit save start over when the bundle can't be decoded; its contents
         /// are lost either way, and refusing would leave no way to store keys again.
@@ -82,7 +89,7 @@ public struct KeychainService: SecretStore {
             // Migrate legacy items not yet in the bundle. An unreadable one (e.g. access denied) is skipped and
             // left in place for a later launch, so it never blocks the other keys.
             var migrated: [String] = []
-            for account in KeychainService.bundledAccounts where keys[account] == nil {
+            for account in KeychainService.bundledAccounts where migratesLegacyItems && keys[account] == nil {
                 guard let data = try? storage.read(account), let value = String(data: data, encoding: .utf8) else {
                     continue
                 }
