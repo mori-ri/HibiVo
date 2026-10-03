@@ -118,13 +118,14 @@ public enum CorrectionExtractor {
 
     /// Where the word starting at `start` ends. Text the user typed right after the inserted text
     /// joins the last span; this keeps only the fix itself, up to a space, punctuation or the
-    /// hiragana that follows a Latin or katakana word ("AppSync を使う", "AppSyncを使う" → "AppSync").
+    /// hiragana that follows a word ("AppSync を使う", "AppSyncを使う" → "AppSync", "校正をお願い" → "校正").
+    /// Okurigana cut off here is caught by `isInflected`.
     static func wordEnd(_ characters: [Character], from start: Int) -> Int {
         var previous: Script?
         for index in start..<characters.count {
             let script = Script(characters[index])
             if characters[index].isWhitespace || script == .other && previous != nil { return index }
-            if script == .hiragana, previous == .latin || previous == .katakana { return index }
+            if script == .hiragana, previous?.isWord == true { return index }
             previous = script
         }
         return characters.count

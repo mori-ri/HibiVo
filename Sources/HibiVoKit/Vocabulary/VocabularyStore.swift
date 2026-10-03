@@ -68,11 +68,15 @@ public final class VocabularyStore {
 
     /// False when the dictionary already turns `original` into `corrected`, or when `original` is a
     /// registered spelling or another entry's spoken form, which would make two entries fight over
-    /// the same text.
+    /// the same text. Also false when `corrected` is a disabled entry: the user turned it off, so
+    /// learning must not quietly add to it.
     public func canLearn(_ correction: VocabularyCorrection) -> Bool {
         let key = KanaFolding.matchKeys(correction.original)
         let covers = { (form: String) in KanaFolding.matchKeys(form) == key }
-        return !entries.contains { covers($0.preferred) || $0.spokenForms.contains(where: covers) }
+        return !entries.contains {
+            covers($0.preferred) || $0.spokenForms.contains(where: covers)
+                || !$0.isEnabled && $0.preferred == correction.corrected
+        }
     }
 
     /// Reverts a `learn`. Edits the user made to the entry since are lost with it.

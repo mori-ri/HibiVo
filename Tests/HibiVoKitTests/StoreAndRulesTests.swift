@@ -164,6 +164,9 @@ import Testing
         #expect(store.activeEntries.isEmpty)
         // Still owns its spoken form, so learning doesn't bring the word back.
         #expect(!store.canLearn(VocabularyCorrection(original: "アップシンク", corrected: "AppSync2")))
+        // Nor does a new misrecognition of the disabled spelling extend it.
+        #expect(store.learn(VocabularyCorrection(original: "アプシンク", corrected: "AppSync")) == nil)
+        #expect(store.entries.first?.aliases == [])
         try await Task.sleep(for: .milliseconds(200))
         #expect(VocabularyStore(file: file).entries.first?.isEnabled == false)
     }

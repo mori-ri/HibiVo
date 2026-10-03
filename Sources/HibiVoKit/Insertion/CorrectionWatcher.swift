@@ -95,7 +95,10 @@ public final class CorrectionWatcher: CorrectionWatching {
         guard let value = attribute(kAXFocusedUIElementAttribute, of: app),
             CFGetTypeID(value) == AXUIElementGetTypeID()
         else { return nil }
-        return unsafeDowncast(value, to: AXUIElement.self)
+        let element = unsafeDowncast(value, to: AXUIElement.self)
+        // The timeout set on the app element doesn't carry over to the elements it returns.
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        return element
     }
 
     private static func isSecure(_ element: AXUIElement) -> Bool {

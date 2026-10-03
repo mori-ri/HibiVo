@@ -84,6 +84,7 @@ import Testing
     @Test func textTypedAfterTheFixIsLeftOut() {
         #expect(extract("アップシンク", "AppSyncを使う") == [pair("アップシンク", "AppSync")])
         #expect(extract("設定はアップシンク", "設定はAppSync、以上") == [pair("アップシンク", "AppSync")])
+        #expect(extract("この構成", "この校正をお願い") == [pair("構成", "校正")])
     }
 
     @Test func unchangedTextHasNoCorrections() {

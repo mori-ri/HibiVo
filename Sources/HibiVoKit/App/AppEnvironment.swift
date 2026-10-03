@@ -166,9 +166,10 @@ public final class AppEnvironment {
     /// dictionary could learn.
     public func saveCorrection(_ text: String, for record: HistoryRecord) -> [VocabularyCorrection] {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text != record.finalText else { return [] }
+        let unchanged = { (other: String) in text == other.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard !text.isEmpty, !unchanged(record.finalText) else { return [] }
         var updated = record
-        updated.correctedText = text == record.insertedText ? nil : text
+        updated.correctedText = unchanged(record.insertedText) ? nil : text
         history.update(updated)
         return CorrectionExtractor.corrections(from: record.finalText, to: text).filter(vocabulary.canLearn)
     }
