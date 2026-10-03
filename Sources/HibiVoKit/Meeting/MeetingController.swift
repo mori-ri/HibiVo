@@ -10,6 +10,9 @@ import OSLog
 /// is rewritten every few seconds so a crash loses at most the last moments, and a dropped STT
 /// connection is re-opened without stopping the recording.
 ///
+/// macOS's own recognizer can't tell speakers apart, so its meetings have no speaker numbers, and it
+/// has no after-meeting mode: it always transcribes as the meeting runs.
+///
 /// In after-meeting mode (`MeetingTranscriptionTiming.afterMeeting`) there is no STT session while
 /// recording: the mixed audio is kept in memory and sent to the file transcriber once the meeting
 /// ends, which separates speakers far better. That runs in the background, so dictation and the next
@@ -26,6 +29,9 @@ public final class MeetingController {
 
     @MainActor
     private final class Meeting {
+        let provider: any MeetingTranscriptionProvider
+        /// Set in after-meeting mode only.
+        let fileTranscriber: (any MeetingFileTranscriber)?
         let config: TranscriptionConfig
         let startedAt: Date
         let fileURL: URL
@@ -66,9 +72,12 @@ public final class MeetingController {
         var endedAt: Date?
 
         init(
+            provider: any MeetingTranscriptionProvider, fileTranscriber: (any MeetingFileTranscriber)?,
             config: TranscriptionConfig, startedAt: Date, fileURL: URL, vocabulary: [VocabularyEntry],
             session: (any MeetingTranscriptionSession)?
         ) {
+            self.provider = provider
+            self.fileTranscriber = fileTranscriber
             self.config = config
             self.startedAt = startedAt
             self.fileURL = fileURL
@@ -83,8 +92,8 @@ public final class MeetingController {
     private let systemAudio: (any AudioCapturing)?
     private let settings: SettingsStore
     private let secrets: any SecretStore
-    private let provider: any MeetingTranscriptionProvider
-    private let fileTranscriber: (any MeetingFileTranscriber)?
+    /// Read when a meeting starts, so a changed setting applies from the next meeting.
+    private let transcriber: @MainActor () -> MeetingTranscriber
     /// Built when a meeting is saved, so a changed Claude Code path or setting takes effect; nil when
     /// minutes are off or Claude Code can't be found.
     private let minutesWriter: @MainActor () -> (any MeetingMinutesWriting)?
@@ -113,8 +122,7 @@ public final class MeetingController {
         systemAudio: (any AudioCapturing)? = nil,
         settings: SettingsStore,
         secrets: any SecretStore,
-        provider: any MeetingTranscriptionProvider,
-        fileTranscriber: (any MeetingFileTranscriber)? = nil,
+        transcriber: @escaping @MainActor () -> MeetingTranscriber,
         minutesWriter: @escaping @MainActor () -> (any MeetingMinutesWriting)? = { nil },
         vocabulary: @escaping @MainActor () -> [VocabularyEntry] = { [] },
         usage: UsageStore? = nil,
@@ -128,8 +136,7 @@ public final class MeetingController {
         self.systemAudio = systemAudio
         self.settings = settings
         self.secrets = secrets
-        self.provider = provider
-        self.fileTranscriber = fileTranscriber
+        self.transcriber = transcriber
         self.minutesWriter = minutesWriter
         self.vocabulary = vocabulary
         self.usage = usage
@@ -175,9 +182,15 @@ public final class MeetingController {
         guard meeting == nil, !state.phase.isActive else { return }
         errorDismiss?.cancel()
 
-        guard let apiKey = secrets.secret(for: provider.id), !apiKey.isEmpty else {
-            show(.meetingRequiresAPIKey(provider: provider.displayName))
-            return
+        let stt = transcriber()
+        let provider = stt.provider
+        var apiKey = ""
+        if provider.requiresAPIKey {
+            guard let key = secrets.secret(for: provider.id), !key.isEmpty else {
+                show(.meetingRequiresAPIKey(provider: provider.displayName))
+                return
+            }
+            apiKey = key
         }
         let entries = vocabulary()
         let config = TranscriptionConfig(
@@ -211,10 +224,11 @@ public final class MeetingController {
             }
         }
 
-        let afterMeeting = settings.meetingTranscriptionTiming == .afterMeeting && fileTranscriber != nil
+        let fileTranscriber = settings.meetingTranscriptionTiming == .afterMeeting ? stt.fileTranscriber : nil
+        let afterMeeting = fileTranscriber != nil
         let startedAt = Date()
         let meeting = Meeting(
-            config: config, startedAt: startedAt,
+            provider: provider, fileTranscriber: fileTranscriber, config: config, startedAt: startedAt,
             fileURL: directory.appending(path: MeetingDocument.fileName(startedAt: startedAt)),
             vocabulary: entries, session: afterMeeting ? nil : provider.makeMeetingSession(config))
         meeting.systemAudioUnavailable = systemAudioUnavailable
@@ -344,7 +358,7 @@ public final class MeetingController {
             guard !meeting.isStopping else { return }
             if error == .unauthorized {
                 log.error("Meeting STT rejected the API key")
-                meeting.failure = .invalidAPIKey(provider: provider.displayName)
+                meeting.failure = .invalidAPIKey(provider: meeting.provider.displayName)
                 stop()
                 return
             }
@@ -364,7 +378,7 @@ public final class MeetingController {
             guard !Task.isCancelled, let self, !meeting.isStopping else { return }
             let old = meeting.session
             Task { await old?.cancel() }
-            let now = self.milliseconds(meeting.bytes)
+            let now = self.milliseconds(meeting.bytes, in: meeting)
             // Note the relabelled speakers once per outage, not once per failed attempt.
             if meeting.sessionHadSpeech {
                 meeting.transcript.markReconnect(atMs: now)
@@ -373,7 +387,7 @@ public final class MeetingController {
                 meeting.transcript.offsetMs = now
             }
             meeting.sessionHadSpeech = false
-            let session = provider.makeMeetingSession(meeting.config)
+            let session = meeting.provider.makeMeetingSession(meeting.config)
             meeting.session = session
             open(session, in: meeting)
         }
@@ -437,7 +451,7 @@ public final class MeetingController {
         state.meetingStartedAt = nil
         state.partialTranscript = ""
         if let failure = meeting.failure { show(failure) } else { state.phase = .idle }
-        guard meeting.bytes > 0, let fileTranscriber else {
+        guard meeting.bytes > 0, let fileTranscriber = meeting.fileTranscriber else {
             if meeting.microphoneUnavailable {
                 let document = markdown(meeting, ended: true)
                 transcriptions.append(
@@ -454,7 +468,7 @@ public final class MeetingController {
             return
         }
         state.meetingTranscriptionsInProgress += 1
-        log.info("Meeting stopped; transcribing \(self.milliseconds(meeting.bytes) / 1000) s of audio")
+        log.info("Meeting stopped; transcribing \(self.milliseconds(meeting.bytes, in: meeting) / 1000) s of audio")
         transcriptions.append(
             Task {
                 // Preserve the capture failure even if the later API request cannot transcribe the audio.
@@ -476,10 +490,10 @@ public final class MeetingController {
         for attempt in 0..<3 {
             do {
                 tokens = try await transcriber.transcribe(
-                    pcm16: audio, sampleRate: Int(provider.sampleRate), config: meeting.config)
+                    pcm16: audio, sampleRate: Int(meeting.provider.sampleRate), config: meeting.config)
                 break
             } catch TranscriptionError.unauthorized {
-                failure = .invalidAPIKey(provider: provider.displayName)
+                failure = .invalidAPIKey(provider: meeting.provider.displayName)
                 break
             } catch {
                 log.error("Meeting transcription failed (\(String(describing: error), privacy: .public))")
@@ -495,8 +509,8 @@ public final class MeetingController {
         usage?.record(
             UsageEvent(
                 transcription: TranscriptionUsage(
-                    provider: provider.id, model: transcriber.model,
-                    seconds: Double(milliseconds(audio.count)) / 1000)))
+                    provider: meeting.provider.id, model: transcriber.model,
+                    seconds: Double(milliseconds(audio.count, in: meeting)) / 1000)))
         meeting.transcript.apply(tokens)
         guard !meeting.transcript.isEmpty || meeting.microphoneUnavailable else {
             showUnlessBusy(.nothingRecognized)
@@ -606,12 +620,13 @@ public final class MeetingController {
         }
         return MeetingDocument.markdown(
             meeting.transcript, startedAt: meeting.startedAt, endedAt: ended ? (meeting.endedAt ?? Date()) : nil,
-            includesSystemAudio: meeting.mixer != nil, notices: notices, vocabulary: meeting.vocabulary)
+            includesSystemAudio: meeting.mixer != nil, identifiesSpeakers: meeting.provider.identifiesSpeakers,
+            notices: notices, vocabulary: meeting.vocabulary)
     }
 
-    private func milliseconds(_ bytes: Int) -> Int {
+    private func milliseconds(_ bytes: Int, in meeting: Meeting) -> Int {
         // Mono PCM16: two bytes per sample.
-        Int(Double(bytes) / (provider.sampleRate * 2) * 1000)
+        Int(Double(bytes) / (meeting.provider.sampleRate * 2) * 1000)
     }
 
     private func recordUsage(_ meeting: Meeting) {
@@ -619,8 +634,8 @@ public final class MeetingController {
         usage.record(
             UsageEvent(
                 transcription: TranscriptionUsage(
-                    provider: provider.id, model: meeting.config.model,
-                    seconds: Double(milliseconds(meeting.bytes)) / 1000)))
+                    provider: meeting.provider.id, model: meeting.config.model,
+                    seconds: Double(milliseconds(meeting.bytes, in: meeting)) / 1000)))
     }
 
     private func show(_ error: UserFacingError) {

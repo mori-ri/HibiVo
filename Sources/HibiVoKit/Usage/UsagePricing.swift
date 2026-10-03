@@ -102,6 +102,8 @@ public enum UsagePricing {
         case "soniox":
             usage.seconds / 3600 * (usage.model.contains("async") ? sonioxAsyncPerHour : sonioxRealtimePerHour)
         case "gemini": usage.seconds / 60 * geminiLiveTranscribePerMinute
+        // Runs on the Mac.
+        case "apple": 0
         default: nil
         }
     }

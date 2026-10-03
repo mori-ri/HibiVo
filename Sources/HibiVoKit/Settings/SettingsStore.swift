@@ -13,6 +13,10 @@ public final class SettingsStore {
     public var transcriptionProviderID: String {
         didSet { defaults.set(transcriptionProviderID, forKey: "transcriptionProviderID") }
     }
+    /// The STT meetings use. Separate from dictation's: only some providers can transcribe a meeting.
+    public var meetingTranscriptionProviderID: String {
+        didSet { defaults.set(meetingTranscriptionProviderID, forKey: "meetingTranscriptionProviderID") }
+    }
     /// Empty means the provider's default model.
     public var transcriptionModel: String { didSet { defaults.set(transcriptionModel, forKey: "transcriptionModel") } }
     public var language: String { didSet { defaults.set(language, forKey: "language") } }
@@ -68,7 +72,10 @@ public final class SettingsStore {
         self.defaults = defaults
         hotkey = Self.load("hotkey", from: defaults) ?? .default
         microphoneUID = defaults.string(forKey: "microphoneUID")
-        transcriptionProviderID = defaults.string(forKey: "transcriptionProviderID") ?? "soniox"
+        transcriptionProviderID =
+            defaults.string(forKey: "transcriptionProviderID") ?? Self.defaultTranscriptionProviderID
+        meetingTranscriptionProviderID =
+            defaults.string(forKey: "meetingTranscriptionProviderID") ?? Self.defaultTranscriptionProviderID
         transcriptionModel = defaults.string(forKey: "transcriptionModel") ?? ""
         language = defaults.string(forKey: "language") ?? "ja"
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
@@ -97,6 +104,25 @@ public final class SettingsStore {
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
         usdJPYRate = defaults.object(forKey: "usdJPYRate") as? Double ?? UsagePricing.defaultUSDJPYRate
         seedAppModeOverrides()
+    }
+
+    /// macOS's own recognizer where the system has it: free, private and needs no setup.
+    nonisolated static var defaultTranscriptionProviderID: String {
+        AppleSpeechProvider.isSupported ? AppleSpeechProvider().id : SonioxProvider().id
+    }
+
+    /// Soniox was the default before macOS's recognizer. Someone who already set up a Soniox key keeps
+    /// using it rather than being switched silently. Runs once; choices the user made are left alone.
+    public func keepSonioxForExistingUsers(hasSonioxKey: () -> Bool) {
+        guard !defaults.bool(forKey: "transcriptionDefaultsMigrated") else { return }
+        defaults.set(true, forKey: "transcriptionDefaultsMigrated")
+        let unset = ["transcriptionProviderID", "meetingTranscriptionProviderID"].filter {
+            defaults.string(forKey: $0) == nil
+        }
+        guard !unset.isEmpty, hasSonioxKey() else { return }
+        let soniox = SonioxProvider().id
+        if unset.contains("transcriptionProviderID") { transcriptionProviderID = soniox }
+        if unset.contains("meetingTranscriptionProviderID") { meetingTranscriptionProviderID = soniox }
     }
 
     /// Cleanup mode for the app that will receive the text.

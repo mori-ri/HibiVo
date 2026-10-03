@@ -6,6 +6,7 @@ public enum UserFacingError: Error, Equatable, Sendable {
     case invalidAPIKey(provider: String)
     case transcriptionFailed
     case transcriptionTimedOut
+    case speechModelNotReady
     case network
     case nothingRecognized
     case accessibilityMissing
@@ -25,6 +26,7 @@ public enum UserFacingError: Error, Equatable, Sendable {
         case .invalidAPIKey(let provider): "\(provider) の API Key が正しくありません"
         case .transcriptionFailed: "文字起こしに失敗しました"
         case .transcriptionTimedOut: "文字起こしがタイムアウトしました"
+        case .speechModelNotReady: "macOS の音声認識モデルを準備しています。少し待ってからもう一度お試しください"
         case .network: "ネットワークに接続できません"
         case .nothingRecognized: "音声を認識できませんでした"
         case .accessibilityMissing: "アクセシビリティ権限が必要です"

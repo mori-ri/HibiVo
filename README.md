@@ -3,18 +3,18 @@
 押す → 話す → もう一度押す(または押している間だけ話す)→ 文章が入る。macOS 向けの日本語音声入力アプリです。
 
 - Push-to-Talk（既定は右 Option。Fn / 右 Command / ⌃Space も選べます）
-- 話している間にストリーミングで文字起こし（Soniox または Google Gemini）するので、録音を終えたらすぐ入力されます
+- 話している間にストリーミングで文字起こしするので、録音を終えたらすぐ入力されます。既定は macOS 標準の文字起こし（macOS 26 以降。Mac の中で処理し、API Key 不要・無料）で、Soniox または Google Gemini も選べます
 - LLM で整形（Raw / Natural / Business / Prompt / Custom）。アプリごとにモードを自動で切り替えます
 - 元のアプリのカーソル位置へ貼り付け、クリップボードは元に戻します
 - ユーザー辞書（表記と聞き取り例を登録。聞き取り例は平仮名・片仮名、全角・半角を区別せずに置き換え、STT のヒントにも使います）、履歴（コピー / もう一度入力 / 整形やり直し）
-- ミーティングモード: ホットキー + M で録音を続け、マイクとシステム音声（オンライン参加者の声）を話者識別付きで文字起こしして Markdown に保存（Soniox）
+- ミーティングモード: ホットキー + M で録音を続け、マイクとシステム音声（オンライン参加者の声）を文字起こしして Markdown に保存（既定は macOS 標準。Soniox なら話者識別付き）
 - 音声は保存しません。API Key は Keychain に保存します
 
 ## 必要なもの
 
 - macOS 14 以降、Apple Silicon
 - Command Line Tools（`xcode-select --install`）または Xcode
-- 文字起こし用の API Key: [Soniox](https://soniox.com) または [Google AI Studio](https://aistudio.google.com)（Gemini 3.5 Transcribe）
+- 文字起こし: macOS 26 以降なら macOS 標準の文字起こしで API Key なしで使えます。それ以外の場合や、話者識別・クラウドの認識を使いたい場合は [Soniox](https://soniox.com) または [Google AI Studio](https://aistudio.google.com)（Gemini 3.5 Transcribe）の API Key
 - AI 整形用の LLM（なくても Raw で使えます）: Anthropic API、Amazon Bedrock、Google Gemini API、または OpenAI 互換 API
 
 ## インストール（ソースからビルド）
@@ -54,7 +54,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 1. 起動するとメニューバーに HibiVo のアイコンが出ます。
 2. **アクセシビリティ** を許可します（システム設定 › プライバシーとセキュリティ › アクセシビリティ）。ホットキーと貼り付けに必要です。
 3. **マイク** を許可します。
-4. メニュー › 設定… › 文字起こし で STT Provider（Soniox / Google Gemini）を選び、API Key を保存します。Gemini の API Key は AI 整形の Google Gemini と共通です。
+4. メニュー › 設定… › 文字起こし で STT Provider を選びます。既定の「macOS 標準」は設定不要です（初回は音声認識モデルを自動でダウンロードします）。Soniox / Google Gemini を使う場合は API Key を保存します。Gemini の API Key は AI 整形の Google Gemini と共通です。
 5. AI 整形 タブで LLM の Provider と認証情報を設定します（既定は Anthropic `claude-haiku-4-5`。短い文の整形は応答速度を優先し、各プロバイダの既定も軽量モデル）。
    Amazon Bedrock の場合はリージョン・モデル ID（または推論プロファイル ID）と、Bedrock API キーか IAM アクセスキー（`bedrock:InvokeModel` 権限）を設定します。
    Claude のほか `zai.glm-4.7-flash`、`zai.glm-4.7`、`minimax.minimax-m2.5`、`global.openai.gpt-6-luna` なども指定できます（設定画面の「候補」から選択可）。
@@ -86,17 +86,20 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 | ホットキーをもう一度押して離す | 終了して保存し、Finder でファイルを表示 |
 | 設定 › ミーティング › 保存先「開く…」 | 保存先フォルダを開く |
 
-- 話者識別付きで文字起こしし、`~/Library/Application Support/HibiVo/Meetings/<開始日時>.md` に保存します。
-- 文字起こしのタイミングは 設定 › ミーティング で選べます。
+- 文字起こしして `~/Library/Application Support/HibiVo/Meetings/<開始日時>.md` に保存します。
+- 文字起こしは 設定 › ミーティング で選べます（音声入力の STT とは別の設定です）。
+  - **macOS 標準**（macOS 26 以降の既定）: Mac の中で文字起こしします。API Key は不要で料金もかかりません。話者は区別しません。常にリアルタイムで文字起こしします。
+  - **Soniox**: 話者を識別し、`**話者1**`・`**話者2**`… と書き分けます。Soniox の API Key が必要です。
+- Soniox の場合は、文字起こしのタイミングを選べます。
   - **リアルタイム**（既定）: 会議中に文字起こしし、数秒ごとにファイルへ書き足します。途中でアプリが落ちても、それまでの内容は残ります。話者の区別はやや粗く、別の人が同じ話者にまとめられることがあります。
   - **終了後にまとめて**: 会議中は録音だけを行い、終了後に音声全体から文字起こしするため、話者を正確に区別できます。料金もリアルタイムより少し安くなります。結果は 1 時間の会議で数分ほどで届き、届いたファイルを Finder で表示します。文字起こしの間も音声入力や次のミーティングは使えます。音声は終了までメモリに置くだけでディスクには書かないため、途中でアプリが終了するとその会議は記録されません。
-- オンライン会議やハイブリッド会議にも対応しています。マイクとシステム音声（Mac で再生中の音 = オンライン参加者の声）を混ぜて 1 本にし、会議室の人もオンラインの人も区別せず `**話者1**`・`**話者2**`… と識別します。
+- オンライン会議やハイブリッド会議にも対応しています。マイクとシステム音声（Mac で再生中の音 = オンライン参加者の声）を混ぜて 1 本にし、会議室の人もオンラインの人も区別せず、Soniox なら `**話者1**`・`**話者2**`… と識別します。
   - システム音声の記録には macOS 14.2 以降と、初回に表示される「システムオーディオ録音」の許可が必要です。画面収録の許可は不要です。設定 › ミーティング でオフにできます。
   - スピーカーで聞いていると、相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあります。イヤホンの使用をおすすめします。
 - 録音中にマイクが切り替わると、自動で録音を再開します。指定したマイクが外れた場合はシステム標準のマイクを使います（設定は変更しません）。切り替え中のマイク音声は記録できません。再開できない場合はミーティングを終了し、記録に注記を残してエラーを表示します。
 - 貼り付けや AI 整形は行いません。会議中は通常の音声入力は使えません。
 - 誤操作で記録を失わないよう、会議中の Esc や、ホットキーと他のキーの同時押し（Fn + ← など）では終了しません。
-- STT の設定にかかわらず Soniox を使います（Soniox の API Key が必要）。システム音声を記録しても送る音声は 1 本なので、料金は変わりません。接続が切れたら自動で再接続します。再接続後は話者番号が振り直されます。
+- Soniox の場合、システム音声を記録しても送る音声は 1 本なので、料金は変わりません。接続が切れたら自動で再接続します。再接続後は話者番号が振り直されます。
 - 4 時間で自動的に終了します。
 - **議事録**: [Claude Code](https://claude.com/claude-code) がインストールされ、claude.ai のアカウントでログインしていれば、終了後に Claude が文字起こしから議事録（概要・決定事項・ToDo・議論の内容・未解決の事項）を作り、`<開始日時>_<会議の内容を表すタイトル>.md`（例: `2026-09-27_14-00-05_新機能リリース計画.md`）として隣に保存します。タイトルは Claude が内容から付けます。ユーザー辞書も Claude に渡すので、登録した表記が議事録でも使われます。
   - Claude のサブスクリプションの利用枠で処理するので、API の料金はかかりません。
@@ -105,8 +108,8 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 
 ## プライバシー
 
-- **音声**: メモリ上で STT へ送るだけで、ディスクには保存しません。
-- **テキスト**: 文字起こしは STT Provider（Soniox / Google Gemini）へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
+- **音声**: メモリ上で STT へ送るだけで、ディスクには保存しません。macOS 標準の文字起こしでは、音声は Mac の外に出ません。
+- **テキスト**: Soniox / Google Gemini を選んだ場合、音声はその STT Provider へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
 - **履歴**: 文字起こし原文と整形結果を `~/Library/Application Support/HibiVo/history.json` に平文で最大 200 件保存します。履歴画面の右上の「履歴を保存」で無効にでき、同じ画面から全件削除できます。
 - **辞書**: `~/Library/Application Support/HibiVo/vocabulary.json` に保存します。
 - **ミーティング**: 文字起こしと議事録を `~/Library/Application Support/HibiVo/Meetings/` に Markdown で平文保存します。音声は保存しません。議事録を作る場合、文字起こしは Claude Code 経由で Anthropic に送信されます。
@@ -122,7 +125,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 
 開発者の環境で、Push-to-Talk → 文字起こし → 整形 → 貼り付けの一連の流れを確認済みです。
 
-- STT は Soniox と Google Gemini（`gemini-3.5-transcribe-live`、Live API でストリーミング）
+- STT は macOS 標準（`SpeechAnalyzer`、macOS 26 以降）、Soniox、Google Gemini（`gemini-3.5-transcribe-live`、Live API でストリーミング）
 - Amazon Bedrock は Claude（InvokeModel）と、GLM・MiniMax・GPT など Converse API 対応モデルに対応。AWS プロファイル / SSO の認証情報の自動読み込みは未対応
 - ホットキーはプリセット（右 Option / Fn / 右 Command / ⌃Space）から選択。任意のキーの登録は未対応
 - アプリごとの整形モードは bundle id で判定するため、ブラウザ内の Web アプリ（Gmail など）はブラウザの設定に従う

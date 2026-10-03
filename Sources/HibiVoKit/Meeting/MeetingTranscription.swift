@@ -33,9 +33,27 @@ public protocol MeetingTranscriptionSession: TranscriptionSession {
     var events: AsyncStream<MeetingSessionEvent> { get }
 }
 
-/// An STT service that can transcribe a meeting with speaker labels.
+/// An STT service that can transcribe a meeting, with speaker labels where it supports them.
 public protocol MeetingTranscriptionProvider: TranscriptionProvider {
+    /// Whether tokens carry speaker labels.
+    var identifiesSpeakers: Bool { get }
     func makeMeetingSession(_ config: TranscriptionConfig) -> any MeetingTranscriptionSession
+}
+
+extension MeetingTranscriptionProvider {
+    public var identifiesSpeakers: Bool { true }
+}
+
+/// The STT a meeting runs on, picked from the settings when it starts.
+public struct MeetingTranscriber: Sendable {
+    public var provider: any MeetingTranscriptionProvider
+    /// Transcribes the whole recording once the meeting ends; nil when the provider only streams.
+    public var fileTranscriber: (any MeetingFileTranscriber)?
+
+    public init(provider: any MeetingTranscriptionProvider, fileTranscriber: (any MeetingFileTranscriber)? = nil) {
+        self.provider = provider
+        self.fileTranscriber = fileTranscriber
+    }
 }
 
 /// When a meeting is transcribed.
