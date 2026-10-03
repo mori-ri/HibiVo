@@ -35,6 +35,7 @@ public final class DictationController {
     private let contextBuilder: DictationContextBuilder
     private let activeApp: any ActiveApplicationProviding
     private let inserter: any TextInserting
+    private let correctionWatcher: (any CorrectionWatching)?
     private let cleanup: CleanupCoordinator
     private let history: HistoryStore?
     private let historyEnabled: @MainActor () -> Bool
@@ -60,6 +61,7 @@ public final class DictationController {
         contextBuilder: DictationContextBuilder,
         activeApp: any ActiveApplicationProviding,
         inserter: any TextInserting,
+        correctionWatcher: (any CorrectionWatching)? = nil,
         cleanup: CleanupCoordinator = CleanupCoordinator(),
         history: HistoryStore? = nil,
         historyEnabled: @escaping @MainActor () -> Bool = { true },
@@ -75,6 +77,7 @@ public final class DictationController {
         self.contextBuilder = contextBuilder
         self.activeApp = activeApp
         self.inserter = inserter
+        self.correctionWatcher = correctionWatcher
         self.cleanup = cleanup
         self.history = history
         self.historyEnabled = historyEnabled
@@ -117,6 +120,8 @@ public final class DictationController {
         // A press while processing is ignored so pastes never interleave.
         guard !state.phase.isActive else { return }
         errorDismiss?.cancel()
+        // Starting again means the user is done fixing the last text.
+        correctionWatcher?.stop()
 
         let context: DictationContext
         do {
@@ -273,6 +278,7 @@ public final class DictationController {
         case .pasted where cleaned.failure != nil: show(.cleanupFellBack)
         case .pasted: state.phase = .idle
         }
+        if outcome == .pasted { correctionWatcher?.watch(inserted: cleaned.text, target: context.target) }
     }
 
     private func record(

@@ -7,12 +7,38 @@ public struct VocabularyEntry: Codable, Identifiable, Hashable, Sendable {
     /// How the term tends to come out of STT when misrecognised. Optional.
     public var spoken: String
     public var aliases: [String]
+    /// Disabled entries stay in the list, and still keep `learn` from re-adding their forms, but are
+    /// not used for hints, replacement or cleanup.
+    public var isEnabled: Bool
+    public var origin: Origin
 
-    public init(id: UUID = UUID(), preferred: String, spoken: String = "", aliases: [String] = []) {
+    /// Who added the entry. An entry the user added stays `.manual` when learning adds an alias to it.
+    public enum Origin: String, Codable, Sendable {
+        case manual
+        case learned
+    }
+
+    public init(
+        id: UUID = UUID(), preferred: String, spoken: String = "", aliases: [String] = [], isEnabled: Bool = true,
+        origin: Origin = .manual
+    ) {
         self.id = id
         self.preferred = preferred
         self.spoken = spoken
         self.aliases = aliases
+        self.isEnabled = isEnabled
+        self.origin = origin
+    }
+
+    // Entries saved before `isEnabled` and `origin` existed were all added by hand.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        preferred = try container.decode(String.self, forKey: .preferred)
+        spoken = try container.decodeIfPresent(String.self, forKey: .spoken) ?? ""
+        aliases = try container.decodeIfPresent([String].self, forKey: .aliases) ?? []
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        origin = try container.decodeIfPresent(Origin.self, forKey: .origin) ?? .manual
     }
 
     /// Non-empty spoken form and aliases, i.e. everything that should become `preferred`.

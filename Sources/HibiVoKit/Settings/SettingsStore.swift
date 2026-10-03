@@ -31,6 +31,10 @@ public final class SettingsStore {
     }
     /// Whether dictation results are kept in the local history.
     public var historyEnabled: Bool { didSet { defaults.set(historyEnabled, forKey: "historyEnabled") } }
+    /// Whether words the user fixes after a paste are added to the dictionary.
+    public var learnsFromCorrections: Bool {
+        didSet { defaults.set(learnsFromCorrections, forKey: "learnsFromCorrections") }
+    }
     /// Whether speaker volume is lowered while recording.
     public var duckOutputWhileRecording: Bool {
         didSet { defaults.set(duckOutputWhileRecording, forKey: "duckOutputWhileRecording") }
@@ -77,6 +81,7 @@ public final class SettingsStore {
         customCleanupInstructions = String(
             (defaults.string(forKey: "customCleanupInstructions") ?? "").prefix(CleanupMode.customInstructionsLimit))
         historyEnabled = defaults.object(forKey: "historyEnabled") as? Bool ?? true
+        learnsFromCorrections = defaults.object(forKey: "learnsFromCorrections") as? Bool ?? true
         duckOutputWhileRecording = defaults.object(forKey: "duckOutputWhileRecording") as? Bool ?? true
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
         meetingCapturesSystemAudio = defaults.object(forKey: "meetingCapturesSystemAudio") as? Bool ?? true

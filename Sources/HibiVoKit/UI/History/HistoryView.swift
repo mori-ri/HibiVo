@@ -143,11 +143,24 @@ private struct HistoryDetail: View {
     let record: HistoryRecord
     @State private var isRetrying = false
     @State private var retryFailed = false
+    /// The text being corrected; nil when not editing.
+    @State private var draft: String?
+    /// Words the last correction fixed, offered for the dictionary.
+    @State private var suggestions: [VocabularyCorrection] = []
+    @State private var learned: Set<VocabularyCorrection> = []
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                section("入力されたテキスト", text: record.finalText)
+                if let draft {
+                    editor(draft)
+                } else {
+                    section(record.correctedText == nil ? "入力されたテキスト" : "修正後のテキスト", text: record.finalText)
+                }
+                if !suggestions.isEmpty { suggestionList }
+                if record.correctedText != nil {
+                    section("入力されたテキスト", text: record.insertedText)
+                }
                 if record.cleanedTranscript != nil {
                     section("文字起こし（原文）", text: record.rawTranscript)
                 }
@@ -162,6 +175,8 @@ private struct HistoryDetail: View {
                     Button("もう一度入力") { env.pasteAgain(record.finalText) }
                     Button(isRetrying ? "整形中…" : "整形をやり直す") { retry() }
                         .disabled(isRetrying || record.rawTranscript.isEmpty)
+                    Button("修正") { draft = record.finalText }
+                        .disabled(draft != nil || record.finalText.isEmpty)
                 }
                 .disabled(record.finalText.isEmpty && record.rawTranscript.isEmpty)
                 if retryFailed { Text("整形できませんでした。AI 整形の設定を確認してください。").font(.caption).foregroundStyle(.red) }
@@ -193,6 +208,52 @@ private struct HistoryDetail: View {
             Text(label)
             Text(value)
         }
+    }
+
+    private func editor(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("テキストを修正").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+            TextEditor(text: Binding(get: { draft ?? text }, set: { draft = $0 }))
+                .font(.system(size: 14))
+                .frame(minHeight: 80)
+                .scrollContentBackground(.hidden)
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(.background.opacity(0.6)))
+            HStack {
+                Button("保存") { saveCorrection() }
+                    .keyboardShortcut(.defaultAction)
+                Button("キャンセル") { draft = nil }
+                    .keyboardShortcut(.cancelAction)
+            }
+            Text("誤認識された言葉を直すと、辞書への追加を提案します。").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private var suggestionList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("辞書に追加").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+            ForEach(suggestions, id: \.self) { correction in
+                HStack(spacing: 8) {
+                    Text("\(correction.original) → \(correction.corrected)")
+                    if learned.contains(correction) {
+                        Label("追加しました", systemImage: "checkmark").foregroundStyle(.secondary)
+                    } else {
+                        Button("追加") {
+                            if env.vocabulary.learn(correction) != nil { learned.insert(correction) }
+                        }
+                        .disabled(!env.vocabulary.canLearn(correction))
+                    }
+                }
+                .font(.system(size: 13))
+            }
+        }
+    }
+
+    private func saveCorrection() {
+        guard let text = draft else { return }
+        suggestions = env.saveCorrection(text, for: record)
+        learned = []
+        draft = nil
     }
 
     private func retry() {

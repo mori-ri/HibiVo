@@ -14,6 +14,7 @@ public final class AppEnvironment {
     public let usage = UsageStore()
     public let meetings = MeetingArchive()
     private let inserter = TextInsertionService()
+    private let learner: CorrectionLearner
     private let contextBuilder: DictationContextBuilder
     let dictation: DictationController
     public let meeting: MeetingController
@@ -27,6 +28,8 @@ public final class AppEnvironment {
         let settings = settings
         let vocabulary = vocabulary
         let meetings = meetings
+        let learner = CorrectionLearner(vocabulary: vocabulary, state: state)
+        self.learner = learner
         contextBuilder = DictationContextBuilder(
             settings: settings, secrets: secrets, transcriptionProviders: transcriptionProviders,
             vocabulary: { vocabulary.activeEntries })
@@ -36,6 +39,9 @@ public final class AppEnvironment {
             contextBuilder: contextBuilder,
             activeApp: ActiveApplicationService(),
             inserter: inserter,
+            correctionWatcher: CorrectionWatcher(
+                isEnabled: { settings.learnsFromCorrections },
+                onFinish: { learner.learn(inserted: $0, edited: $1) }),
             history: history,
             historyEnabled: { settings.historyEnabled },
             usage: usage,
@@ -63,7 +69,17 @@ public final class AppEnvironment {
             })
         let dictation = dictation
         let meeting = meeting
-        hud = HUDController(state: state, settings: settings, onClick: { dictation.toggleCleanup() })
+        let state = state
+        hud = HUDController(
+            state: state, settings: settings,
+            onClick: {
+                if state.phase == .idle, !state.learnedVocabulary.isEmpty {
+                    learner.undoShown()
+                } else {
+                    dictation.toggleCleanup()
+                }
+            },
+            onHover: { learner.setHovering($0) })
 
         hotkey.onAction = { action, occurredAt in
             // Handle outside the tap callback: starting the audio engine can take a while (Bluetooth
@@ -146,6 +162,18 @@ public final class AppEnvironment {
         NSPasteboard.general.setString(text, forType: .string)
     }
 
+    /// Stores the user's fix of a record's text and returns the words it corrected that the
+    /// dictionary could learn.
+    public func saveCorrection(_ text: String, for record: HistoryRecord) -> [VocabularyCorrection] {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unchanged = { (other: String) in text == other.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard !text.isEmpty, !unchanged(record.finalText) else { return [] }
+        var updated = record
+        updated.correctedText = unchanged(record.insertedText) ? nil : text
+        history.update(updated)
+        return CorrectionExtractor.corrections(from: record.finalText, to: text).filter(vocabulary.canLearn)
+    }
+
     /// Re-runs cleanup on a record's raw transcript with the current settings and updates it in place.
     public func retryCleanup(_ record: HistoryRecord) async -> Bool {
         guard !record.rawTranscript.isEmpty else { return false }
@@ -163,6 +191,7 @@ public final class AppEnvironment {
         guard outcome.didCleanup else { return false }
         var updated = record
         updated.cleanedTranscript = outcome.text
+        updated.correctedText = nil
         updated.cleanupMode = mode
         updated.errorMessage = nil
         if updated.status == .pastedRaw { updated.status = .pasted }

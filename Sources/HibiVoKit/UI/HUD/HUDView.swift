@@ -5,6 +5,14 @@ struct HUDView: View {
     let settings: SettingsStore
 
     var body: some View {
+        if state.phase == .idle, !state.learnedVocabulary.isEmpty {
+            LearnedNotice(corrections: state.learnedVocabulary.map(\.correction))
+        } else {
+            capsule
+        }
+    }
+
+    private var capsule: some View {
         HStack(spacing: 8) {
             indicator
             if let label {
@@ -55,6 +63,75 @@ struct HUDView: View {
         case .idle: nil
         }
     }
+}
+
+/// The words just added to the dictionary. A card of its own with a hint of the brand gradient and a
+/// short slide-in, because it appears while the user is busy typing and is easy to miss.
+/// The whole card is the undo target (`HUDHostingView` takes the click).
+private struct LearnedNotice: View {
+    let corrections: [VocabularyCorrection]
+    @State private var appeared = false
+    private static let maxShown = 3
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(gradient))
+            VStack(alignment: .leading, spacing: 3) {
+                Text("辞書に追加しました")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.6))
+                ForEach(corrections.prefix(Self.maxShown), id: \.self) { correction in
+                    HStack(spacing: 6) {
+                        Text(correction.original).foregroundStyle(.white.opacity(0.6))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.45))
+                        Text(correction.corrected).fontWeight(.semibold)
+                    }
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                }
+                if corrections.count > Self.maxShown {
+                    Text("ほか \(corrections.count - Self.maxShown) 件")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .frame(maxWidth: 300, alignment: .leading)
+            Label("取り消す", systemImage: "arrow.uturn.backward")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(.white.opacity(0.1)))
+        }
+        .foregroundStyle(.white)
+        .padding(.leading, 10)
+        .padding(.trailing, 12)
+        .padding(.vertical, 8)
+        .background {
+            RoundedRectangle(cornerRadius: 14).fill(.black.opacity(0.8))
+            RoundedRectangle(cornerRadius: 14).strokeBorder(gradient.opacity(0.5), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
+        .scaleEffect(appeared ? 1 : 0.95)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 6)
+        // Room for the shadow, which the panel would otherwise clip.
+        .padding(10)
+        .fixedSize()
+        .onAppear {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { appeared = true }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("クリックすると辞書への追加を取り消します")
+    }
+
+    private var gradient: LinearGradient { Theme.brandGradient }
 }
 
 /// Red dot and elapsed time, so a long meeting recording is always visibly on.
