@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-HibiVo は日本語優先の macOS メニューバー常駐型音声入力アプリ。ホットキーを押して話し、もう一度押すと、(必要に応じて LLM で整形した)テキストが直前にフォーカスしていたアプリのカーソル位置に貼り付けられる。Swift 6 / SwiftUI 製で、ビルドは SwiftPM のみ。Xcode プロジェクトは存在しない。
+HibiVo は日本語優先の macOS メニューバー常駐型音声入力アプリ。ホットキーを押して話し、もう一度押すと、(必要に応じて LLM で整形した)テキストが録音を止めた時点でフォーカスしているアプリのカーソル位置に貼り付けられる。Swift 6 / SwiftUI 製で、ビルドは SwiftPM のみ。Xcode プロジェクトは存在しない。
 
 ## コマンド
 
@@ -46,7 +46,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 1. `HotkeyMonitor` がメインランループ上でアクティブな CGEventTap を動かす。判定ロジックは純粋関数的な `HotkeyInterpreter`。修飾キーのトリガーはデバイス依存のフラグビットを使い、左右のキーを区別する。押し始めに他キーと同時押しした場合や Esc でキャンセル。押すと録音開始、録音中に押すと終了。`holdThreshold`(0.4 秒)以上押し続けて離した場合は離した時点で終了し(プッシュトゥトーク)、それより短ければ次に押すまで録音を続ける。
 2. 録音開始時、`DictationContextBuilder.make(target:)` がこの発話に必要なものをすべて `DictationContext` に固定する: 対象アプリ、STT 設定とキー、そのアプリの整形モード、認証情報付きの整形プロバイダ、語彙。発話中に設定が変わっても混ざらない。
 3. `AudioCaptureService`(録音ごとに新しい AVAudioEngine)が PCM16 モノラルのチャンクを `AsyncStream<AudioChunk>` として流す。ポンプタスクが発話中にそれを STT セッションへ転送する。
-4. 録音終了時: 250 ms 未満で止めた場合(誤ったダブルタップ)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
+4. 録音終了時: 250 ms 未満で止めた場合(誤ったダブルタップ)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。最前面のアプリが開始時と違えば、貼り付け先をそのアプリに変え、整形モードも開始時に固定した `AppModeTable` から引き直す(読みながら話し始め、返信欄に移ってから止める使い方のため)。HibiVo 自身が最前面なら開始時のアプリのまま。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
 
 **ミーティングモード**(`Meeting/MeetingController.swift`): トリガー + M(`HotkeyAction.meeting`)で開始し、次のトリガーの `.released` で終了する。`.pressed`・`.interrupted`・Esc は無視する(Fn + ← などで誤って終了しないため)。
 - `AppEnvironment` は、ミーティング中は操作を `MeetingController` に回す。開始時は、トリガーの押下で始まった音声入力をキャンセルしてから開始する。

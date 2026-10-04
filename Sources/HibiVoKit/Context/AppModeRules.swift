@@ -14,6 +14,22 @@ public struct AppModeOverride: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+/// The app-mode settings frozen for one dictation, so the mode can be looked up again for the
+/// app that has focus when recording stops without picking up settings changed meanwhile.
+public struct AppModeTable: Sendable {
+    public var overrides: [AppModeOverride]
+    public var fallback: CleanupMode
+
+    public init(overrides: [AppModeOverride], fallback: CleanupMode) {
+        self.overrides = overrides
+        self.fallback = fallback
+    }
+
+    public func mode(for bundleID: String?) -> CleanupMode {
+        AppModeRules.mode(for: bundleID, overrides: overrides, default: fallback)
+    }
+}
+
 /// Picks the cleanup mode for the app receiving the text: user setting → global default.
 public enum AppModeRules {
     /// Seeded into the user's settings on first launch, then editable and removable like any other entry.

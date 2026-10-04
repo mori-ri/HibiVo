@@ -67,6 +67,27 @@ import Testing
         #expect(try builder.make(target: terminal).cleanup.mode == .raw)
     }
 
+    @MainActor @Test func retargetPicksTheModeFromTheTableFrozenAtKeyDown() throws {
+        let defaults = UserDefaults(suiteName: "AppModeRulesTests-\(UUID())")!
+        let settings = SettingsStore(defaults: defaults)
+        settings.transcriptionProviderID = "mock"
+        let builder = DictationContextBuilder(
+            settings: settings, secrets: MockSecrets(), transcriptionProviders: [MockTranscriptionProvider()])
+        let terminal = TargetApplication(processID: 1, bundleID: "com.apple.Terminal", name: "Terminal")
+        let mail = TargetApplication(processID: 2, bundleID: "com.apple.mail", name: "Mail")
+
+        var context = try builder.make(target: terminal)
+        settings.appModeOverrides = []  // Edited mid-utterance; not applied to this one.
+        context.retarget(to: mail)
+        #expect(context.target == mail)
+        #expect(context.cleanup.mode == .business)
+
+        settings.cleanupEnabled = false
+        var raw = try builder.make(target: mail)
+        raw.retarget(to: terminal)
+        #expect(raw.cleanup.mode == .raw)
+    }
+
     @MainActor @Test func customInstructionsAreCappedPersistedAndFrozenInTheContext() throws {
         let defaults = UserDefaults(suiteName: "AppModeRulesTests-\(UUID())")!
         let settings = SettingsStore(defaults: defaults)

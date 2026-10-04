@@ -22,6 +22,7 @@ import Testing
     private func makeController(
         provider: MockTranscriptionProvider = MockTranscriptionProvider(),
         secrets: MockSecrets = MockSecrets(),
+        activeApp: MockActiveApp = MockActiveApp(),
         minimumDuration: Duration = .zero,
         holdThreshold: Duration = .zero
     ) -> DictationController {
@@ -29,7 +30,7 @@ import Testing
             state: state, audio: audio,
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: secrets, transcriptionProviders: [provider]),
-            activeApp: MockActiveApp(), inserter: inserter, correctionWatcher: watcher, ducker: ducker,
+            activeApp: activeApp, inserter: inserter, correctionWatcher: watcher, ducker: ducker,
             duckingEnabled: { settings.duckOutputWhileRecording }, minimumDuration: minimumDuration,
             holdThreshold: holdThreshold)
     }
@@ -80,6 +81,31 @@ import Testing
         #expect(provider.lastConfig?.language == "ja")
         #expect(provider.lastConfig?.apiKey == "test-key")
         #expect(inserter.inserted.map(\.text) == ["今日の15時からAWSのAppSyncについて打ち合わせをします"])
+        #expect(inserter.inserted.first?.target?.name == "Slack")
+    }
+
+    @Test func textGoesToTheAppInFrontWhenRecordingStops() async {
+        let activeApp = MockActiveApp()
+        let sut = makeController(activeApp: activeApp)
+        sut.handle(.pressed)  // Reading something in Slack…
+        audio.speak()
+        let mail = TargetApplication(processID: 7, bundleID: "com.apple.mail", name: "Mail")
+        activeApp.app = mail  // …then moving to the reply before stopping.
+        sut.handle(.released)
+        await sut.waitUntilIdle()
+        #expect(inserter.inserted.first?.target == mail)
+        #expect(watcher.watched.first?.target == mail)
+    }
+
+    @Test func ownWindowInFrontAtStopKeepsTheStartingApp() async {
+        let activeApp = MockActiveApp()
+        let sut = makeController(activeApp: activeApp)
+        sut.handle(.pressed)
+        audio.speak()
+        activeApp.app = TargetApplication(
+            processID: ProcessInfo.processInfo.processIdentifier, bundleID: "io.github.mori-ri.hibivo", name: "HibiVo")
+        sut.handle(.released)
+        await sut.waitUntilIdle()
         #expect(inserter.inserted.first?.target?.name == "Slack")
     }
 
