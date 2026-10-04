@@ -22,6 +22,8 @@ public final class SettingsStore {
     public var language: String { didSet { defaults.set(language, forKey: "language") } }
 
     public var cleanupEnabled: Bool { didSet { defaults.set(cleanupEnabled, forKey: "cleanupEnabled") } }
+    /// Opt-in: read the text around the paste target and send it with the transcript to cleanup.
+    public var usesScreenContext: Bool { didSet { defaults.set(usesScreenContext, forKey: "usesScreenContext") } }
     public var cleanupProviderID: String { didSet { defaults.set(cleanupProviderID, forKey: "cleanupProviderID") } }
     /// Empty means the provider's default model.
     public var cleanupModel: String { didSet { defaults.set(cleanupModel, forKey: "cleanupModel") } }
@@ -79,6 +81,7 @@ public final class SettingsStore {
         transcriptionModel = defaults.string(forKey: "transcriptionModel") ?? ""
         language = defaults.string(forKey: "language") ?? "ja"
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
+        usesScreenContext = defaults.bool(forKey: "usesScreenContext")
         cleanupProviderID = defaults.string(forKey: "cleanupProviderID") ?? "anthropic"
         cleanupModel = defaults.string(forKey: "cleanupModel") ?? ""
         bedrockRegion = defaults.string(forKey: "bedrockRegion") ?? BedrockCleanupProvider.defaultRegion

@@ -23,6 +23,7 @@ import Testing
         provider: MockTranscriptionProvider = MockTranscriptionProvider(),
         secrets: MockSecrets = MockSecrets(),
         activeApp: MockActiveApp = MockActiveApp(),
+        screenReader: MockScreenReader? = nil,
         minimumDuration: Duration = .zero,
         holdThreshold: Duration = .zero
     ) -> DictationController {
@@ -30,7 +31,8 @@ import Testing
             state: state, audio: audio,
             contextBuilder: DictationContextBuilder(
                 settings: settings, secrets: secrets, transcriptionProviders: [provider]),
-            activeApp: activeApp, inserter: inserter, correctionWatcher: watcher, ducker: ducker,
+            activeApp: activeApp, inserter: inserter, correctionWatcher: watcher, screenReader: screenReader,
+            ducker: ducker,
             duckingEnabled: { settings.duckOutputWhileRecording }, minimumDuration: minimumDuration,
             holdThreshold: holdThreshold)
     }
@@ -107,6 +109,22 @@ import Testing
         sut.handle(.released)
         await sut.waitUntilIdle()
         #expect(inserter.inserted.first?.target?.name == "Slack")
+    }
+
+    @Test func screenIsReadOnlyWhenTheUserOptedInAndCleanupRuns() async {
+        #expect(settings.usesScreenContext == false)  // Off until the user turns it on.
+        let reader = MockScreenReader(context: ScreenContext(body: "返信先のメール"))
+        let sut = makeController(screenReader: reader)
+        for (cleanup, opted) in [(false, true), (true, false), (true, true)] {
+            // MockSecrets has no cleanup key, so even the last pass has no provider to send it to.
+            settings.cleanupEnabled = cleanup
+            settings.usesScreenContext = opted
+            sut.handle(.pressed)
+            audio.speak()
+            sut.handle(.released)
+            await sut.waitUntilIdle()
+        }
+        #expect(reader.reads.isEmpty)
     }
 
     @Test func pastedTextIsWatchedForCorrectionsUntilTheNextDictation() async {
