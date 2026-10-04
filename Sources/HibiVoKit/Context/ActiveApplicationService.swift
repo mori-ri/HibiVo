@@ -1,6 +1,7 @@
 import AppKit
 
-/// The app that had focus when recording started; the transcript is pasted back into it.
+/// The app the transcript is pasted into: the one in front when recording stops, or the one from
+/// key-down when HibiVo's own window is in front then.
 public struct TargetApplication: Equatable, Sendable {
     public var processID: pid_t
     public var bundleID: String?

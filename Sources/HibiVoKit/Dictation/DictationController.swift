@@ -94,7 +94,7 @@ public final class DictationController {
     public func handle(_ action: HotkeyAction, at time: ContinuousClock.Instant? = nil) {
         let time = time ?? clock.now
         switch action {
-        case .pressed where state.phase == .recording: end(at: time)
+        case .pressed where state.phase == .recording: end(at: time, byUser: true)
         case .pressed: begin(pressedAt: time)
         case .released: releaseKey(at: time)
         case .interrupted, .escape, .meeting: cancel()
@@ -168,7 +168,8 @@ public final class DictationController {
             try? await Task.sleep(for: Self.maximumRecording)
             guard !Task.isCancelled else { return }
             guard let self else { return }
-            self.end(at: self.clock.now)
+            // Not the user's stop: whatever is in front ten minutes on isn't where they meant to write.
+            self.end(at: self.clock.now, byUser: false)
         }
         recording = Recording(
             context: context, session: session, startedAt: pressedAt, pump: pump, partials: partials,
@@ -179,18 +180,19 @@ public final class DictationController {
     private func releaseKey(at time: ContinuousClock.Instant) {
         guard state.phase == .recording, let recording, recording.isHeld else { return }
         if time - recording.startedAt >= holdThreshold {
-            end(at: time)
+            end(at: time, byUser: true)
         } else {
             self.recording?.isHeld = false
         }
     }
 
-    private func end(at time: ContinuousClock.Instant) {
-        guard state.phase == .recording, let recording else { return }
+    private func end(at time: ContinuousClock.Instant, byUser: Bool) {
+        guard state.phase == .recording, var recording else { return }
         if time - recording.startedAt < minimumDuration {
             cancel()
             return
         }
+        if byUser { retargetToFrontmost(&recording.context) }
         self.recording = nil
         recording.watchdog.cancel()
         audio.stop()  // Finishes the audio stream, which lets `pump` drain and return.
@@ -198,6 +200,18 @@ public final class DictationController {
         state.phase = .processing
         let stoppedAt = clock.now
         processing = Task { await process(recording, stoppedAt: stoppedAt) }
+    }
+
+    /// The text goes where the caret is when recording stops: people often start talking while
+    /// reading something and only then move to the field they are writing in. HibiVo's own
+    /// windows don't count, so the app from key-down is kept when one of them is in front.
+    private func retargetToFrontmost(_ context: inout DictationContext) {
+        guard let app = activeApp.frontmostApplication(),
+            app.processID != ProcessInfo.processInfo.processIdentifier,
+            app.processID != context.target?.processID
+        else { return }
+        log.info("Paste target moved to \(app.bundleID ?? app.name, privacy: .public) while recording")
+        context.retarget(to: app)
     }
 
     private func cancel() {

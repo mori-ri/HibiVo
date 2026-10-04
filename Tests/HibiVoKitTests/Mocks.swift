@@ -80,7 +80,7 @@ actor MockTranscriptionSession: TranscriptionSession {
 }
 
 @MainActor
-struct MockActiveApp: ActiveApplicationProviding {
+final class MockActiveApp: ActiveApplicationProviding {
     var app: TargetApplication? = TargetApplication(processID: 42, bundleID: "com.tinyspeck.slackmacgap", name: "Slack")
     func frontmostApplication() -> TargetApplication? { app }
 }

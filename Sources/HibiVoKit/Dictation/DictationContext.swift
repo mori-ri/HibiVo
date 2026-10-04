@@ -10,6 +10,9 @@ public struct DictationContext: Sendable {
         public var model: String
         /// Instructions for `.custom`, frozen with the rest so an edit mid-utterance doesn't apply halfway.
         public var customInstructions: String = ""
+        /// Where `mode` came from, kept to pick the mode again if the target changes at stop.
+        /// nil when cleanup is off; the mode then stays `.raw`.
+        public var appModes: AppModeTable?
     }
 
     public var target: TargetApplication?
@@ -17,6 +20,12 @@ public struct DictationContext: Sendable {
     public var transcriptionConfig: TranscriptionConfig
     public var cleanup: Cleanup
     public var vocabulary: [VocabularyEntry]
+
+    /// Sends the text to `app` instead, with that app's cleanup mode from the table frozen at key-down.
+    public mutating func retarget(to app: TargetApplication) {
+        target = app
+        if let appModes = cleanup.appModes { cleanup.mode = appModes.mode(for: app.bundleID) }
+    }
 }
 
 /// Builds a `DictationContext` from the current settings, secrets and dictionary.
@@ -69,11 +78,14 @@ public struct DictationContextBuilder {
 
     public func cleanup(for target: TargetApplication?) -> DictationContext.Cleanup {
         let kind = CleanupProviderKind(rawValue: settings.cleanupProviderID) ?? .anthropic
+        let appModes =
+            settings.cleanupEnabled
+            ? AppModeTable(overrides: settings.appModeOverrides, fallback: settings.defaultCleanupMode) : nil
         return DictationContext.Cleanup(
-            mode: settings.cleanupEnabled ? settings.cleanupMode(for: target?.bundleID) : .raw,
+            mode: appModes?.mode(for: target?.bundleID) ?? .raw,
             provider: settings.cleanupEnabled ? makeCleanupProvider(kind) : nil,
             model: settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel,
-            customInstructions: settings.customCleanupInstructions)
+            customInstructions: settings.customCleanupInstructions, appModes: appModes)
     }
 
     private func makeCleanupProvider(_ kind: CleanupProviderKind) -> (any TextCleanupProvider)? {
