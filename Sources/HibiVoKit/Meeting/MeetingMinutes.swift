@@ -67,7 +67,9 @@ enum MeetingMinutesPrompt {
         let body = trimmed.isEmpty ? defaultInstructions : String(trimmed.prefix(instructionsLimit))
         return """
             あなたは会議の議事録を作成するアシスタントです。<transcript> タグ内は、音声認識で自動作成した会議の文字起こしです。\
-            これを読み、日本語の議事録を Markdown で作成してください。
+            これを読み、日本語の議事録を Markdown で作成してください。\
+            文字起こしに「\(MeetingDocument.notesHeading)」があれば、それは参加者が会議中に書いたメモです。\
+            発言と合わせて議事録の材料にし、決定事項や ToDo の手がかりとして重視してください。
 
             # タイトル
             1 行目は「# 」に続けて、会議の内容を一言で表すタイトルを書いてください(例:「# 新機能のリリース日程」)。\

@@ -73,6 +73,22 @@ import Testing
         #expect(md.contains("[01:02:05] **話者2** 了解"))
     }
 
+    @Test func notesComeBeforeTheTranscript() throws {
+        var t = MeetingTranscript()
+        t.apply([token("始めます", "1", 0, 800)])
+        let md = MeetingDocument.markdown(t, startedAt: Date(), endedAt: nil, notes: "\n- 予算は来週\n\n")
+        let notes = try #require(md.range(of: "## メモ\n\n- 予算は来週\n\n---\n"))
+        let speech = try #require(md.range(of: "**話者1** 始めます"))
+        #expect(notes.upperBound <= speech.lowerBound)
+        #expect(!MeetingDocument.markdown(t, startedAt: Date(), endedAt: nil, notes: " \n").contains("## メモ"))
+    }
+
+    @Test func minutesHaveTheTitleBodyAndSource() {
+        let md = MeetingDocument.minutes(title: "予算", body: "## 概要\n予算の件。", transcriptFileName: "a.md")
+        #expect(md == "# 予算\n\n## 概要\n予算の件。\n\n---\n\n*Claude が文字起こし「a.md」から作成しました。*\n")
+        #expect(MeetingDocument.minutes(title: nil, body: "本文", transcriptFileName: "a.md").hasPrefix("# 議事録\n\n本文"))
+    }
+
     @Test func markdownWhileRecordingSaysSo() {
         let md = MeetingDocument.markdown(MeetingTranscript(), startedAt: Date(), endedAt: nil)
         #expect(md.contains("- 記録中"))
@@ -603,6 +619,101 @@ import Testing
         #expect(state.phase == .idle)
     }
 
+    @Test func notesReachTheMinutesThroughTheTranscriptOnly() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.success("# リリース日程の確認\n\n## 概要\nリリース日を決めた。"))
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, onSaved: { shown.append($0) })
+        sut.start()
+        state.meetingNotes = "### 宿題\n- [ ] 日程を連絡"
+        let session = try #require(provider.sessions.first)
+        await session.emit(
+            .tokens([MeetingToken(text: "来週リリースします", isFinal: true, speaker: "1", startMs: 0, endMs: 900)]))
+        await settle { state.partialTranscript == "来週リリースします" }
+        sut.stop()
+        // The window closes with the meeting; the next one starts with empty notes.
+        #expect(state.meetingNotes.isEmpty)
+        await sut.waitUntilIdle()
+
+        let call = try #require(await writer.calls.first)
+        #expect(call.transcript.contains("## メモ\n\n### 宿題\n- [ ] 日程を連絡\n"))
+        let transcript = try #require(savedFiles().first { $0.lastPathComponent != shown.first?.lastPathComponent })
+        #expect(try String(contentsOf: transcript, encoding: .utf8).contains("- [ ] 日程を連絡"))
+        let minutes = try String(contentsOf: try #require(shown.first), encoding: .utf8)
+        // Claude decides what of the notes belongs in the minutes; they aren't pasted in as written.
+        #expect(minutes.hasPrefix("# リリース日程の確認\n\n## 概要\n"))
+        #expect(!minutes.contains("日程を連絡"))
+    }
+
+    @Test func notesAreKeptWhenNothingWasSaid() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.success("unused"))
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, onSaved: { shown.append($0) })
+        sut.start()
+        state.meetingNotes = "あとで確認"
+        sut.stop()
+        await sut.waitUntilIdle()
+        #expect(await writer.calls.isEmpty)
+        let url = try #require(shown.first)
+        #expect(try String(contentsOf: url, encoding: .utf8).contains("## メモ\n\nあとで確認"))
+        #expect(state.phase == .error(UserFacingError.nothingRecognized.message))
+    }
+
+    @Test func afterMeetingNotesSurviveATranscriptionFailure() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([.failure(.unauthorized)])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        state.meetingNotes = "決定: A 案"
+        audio.speak()
+        sut.stop()
+        await sut.waitUntilIdle()
+        #expect(state.phase == .error(UserFacingError.invalidAPIKey(provider: "Mock").message))
+        let url = try #require(savedFiles().first)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        #expect(text.contains("決定: A 案"))
+        #expect(text.contains("- 終了: "))
+    }
+
+    @Test func notesAreAutosavedDuringTheMeeting() async throws {
+        let sut = MeetingController(
+            state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: MockSecrets(),
+            transcriber: { [provider] in MeetingTranscriber(provider: provider) }, directory: directory,
+            saveInterval: .milliseconds(10), reconnectDelays: [.zero])
+        sut.start()
+        state.meetingNotes = "途中のメモ"
+        for _ in 0..<200 where savedFiles().isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let url = try #require(savedFiles().first)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        #expect(text.contains("途中のメモ"))
+        #expect(text.contains("- 記録中"))
+        sut.stop()
+        await sut.waitUntilIdle()
+    }
+
+    @Test func afterMeetingDeletedNotesLeaveNoFile() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let sut = MeetingController(
+            state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: MockSecrets(),
+            transcriber: { [provider] in
+                MeetingTranscriber(provider: provider, fileTranscriber: MockFileTranscriber([.success([])]))
+            }, directory: directory, saveInterval: .milliseconds(10), reconnectDelays: [.zero])
+        sut.start()
+        state.meetingNotes = "消すメモ"
+        for _ in 0..<200 where savedFiles().isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!savedFiles().isEmpty)
+        state.meetingNotes = ""
+        audio.speak()
+        sut.stop()
+        await sut.waitUntilIdle()
+        #expect(savedFiles().isEmpty)
+    }
+
     @Test func failedMinutesStillShowTheTranscript() async throws {
         settings.meetingMinutesEnabled = true
         let writer = MockMinutesWriter(.failure(.failed("usage limit")))
@@ -666,6 +777,23 @@ import Testing
         #expect(await writer.calls.isEmpty)
         #expect(shown.count == 1)
         #expect(savedFiles().count == 1)
+    }
+}
+
+@MainActor @Suite struct HUDModelTests {
+    @Test func stoppingFromTheHUDTakesTwoClicks() {
+        let model = HUDModel()
+        #expect(!model.confirmStop())
+        #expect(model.stopArmed)
+        #expect(model.confirmStop())
+        #expect(!model.stopArmed)
+    }
+
+    @Test func resetDisarms() {
+        let model = HUDModel()
+        _ = model.confirmStop()
+        model.reset()
+        #expect(!model.confirmStop())
     }
 }
 
@@ -822,6 +950,8 @@ import Testing
         )
         #expect(MeetingMinutesPrompt.system.contains("<vocabulary>"))
         #expect(MeetingMinutesPrompt.system.contains("## ToDo"))
+        // The notes reach Claude inside the transcript, so it is told what they are.
+        #expect(MeetingMinutesPrompt.system.contains("「## メモ」があれば、それは参加者が会議中に書いたメモです"))
     }
 
     @Test func editedInstructionsReplaceOnlyTheEditablePart() {
