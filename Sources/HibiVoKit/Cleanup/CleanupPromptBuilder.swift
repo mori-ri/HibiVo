@@ -43,10 +43,18 @@ public enum CleanupPromptBuilder {
 
     static func contextBlock(_ context: ScreenContext) -> String {
         var parts: [String] = []
-        if !context.title.isEmpty { parts.append("タイトル: \(context.title)") }
-        if !context.body.isEmpty { parts.append("周りの文章:\n\(context.body)") }
-        if !context.draft.isEmpty { parts.append("入力欄に書いてある文章(この続きに入力されます):\n\(context.draft)") }
+        if !context.title.isEmpty { parts.append("タイトル: \(defanged(context.title))") }
+        if !context.body.isEmpty { parts.append("周りの文章:\n\(defanged(context.body))") }
+        if !context.draft.isEmpty {
+            parts.append("入力欄に書いてある文章(この続きに入力されます):\n\(defanged(context.draft))")
+        }
         return "<context>\n\(parts.joined(separator: "\n\n"))\n</context>"
+    }
+
+    /// Other people's text must not close `<context>` or open a fake `<transcript>`.
+    static func defanged(_ text: String) -> String {
+        text.replacingOccurrences(
+            of: #"<(/?)(context|transcript)>"#, with: "＜$1$2＞", options: [.regularExpression, .caseInsensitive])
     }
 
     static let screenContextRules = """
