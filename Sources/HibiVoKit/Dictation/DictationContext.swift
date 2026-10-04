@@ -13,8 +13,6 @@ public struct DictationContext: Sendable {
         /// Where `mode` came from, kept to pick the mode again if the target changes at stop.
         /// nil when cleanup is off; the mode then stays `.raw`.
         public var appModes: AppModeTable?
-        /// Whether to read the text around the paste target for cleanup (opt-in).
-        public var readsScreen = false
     }
 
     public var target: TargetApplication?
@@ -87,8 +85,7 @@ public struct DictationContextBuilder {
             mode: appModes?.mode(for: target?.bundleID) ?? .raw,
             provider: settings.cleanupEnabled ? makeCleanupProvider(kind) : nil,
             model: settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel,
-            customInstructions: settings.customCleanupInstructions, appModes: appModes,
-            readsScreen: settings.cleanupEnabled && settings.usesScreenContext)
+            customInstructions: settings.customCleanupInstructions, appModes: appModes)
     }
 
     private func makeCleanupProvider(_ kind: CleanupProviderKind) -> (any TextCleanupProvider)? {

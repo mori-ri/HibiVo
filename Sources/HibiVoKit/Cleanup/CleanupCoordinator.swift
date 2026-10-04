@@ -22,8 +22,6 @@ public struct CleanupCoordinator: Sendable {
         public var appName: String?
         /// Used only by `.custom`.
         public var customInstructions: String = ""
-        /// Text around the paste target, when the user turned that on.
-        public var screenContext: ScreenContext?
     }
 
     public var timeout: Duration
@@ -42,17 +40,14 @@ public struct CleanupCoordinator: Sendable {
 
         let system = CleanupPromptBuilder.systemPrompt(
             mode: request.mode, customInstructions: request.customInstructions, vocabulary: request.vocabulary,
-            appName: request.appName, hasScreenContext: request.screenContext.map { !$0.isEmpty } ?? false)
-        let user = CleanupPromptBuilder.userMessage(transcript: raw, screenContext: request.screenContext)
+            appName: request.appName)
+        let user = CleanupPromptBuilder.userMessage(transcript: raw)
 
         do {
             let output = try await withTimeout(timeout) {
                 try await provider.complete(system: system, user: user, model: model)
             }
-            guard
-                let text = CleanupOutputGuard.validate(
-                    output.text, raw: raw, mode: request.mode, screenContext: request.screenContext)
-            else {
+            guard let text = CleanupOutputGuard.validate(output.text, raw: raw, mode: request.mode) else {
                 return fallback(raw, .rejectedByGuard, usage: output.usage)
             }
             return CleanupOutcome(text: text, didCleanup: true, failure: nil, usage: output.usage)
@@ -70,14 +65,13 @@ public struct CleanupCoordinator: Sendable {
     /// - Returns: The transcript after dictionary replacement, and the cleanup outcome.
     public func run(
         transcript: String, vocabulary: [VocabularyEntry], mode: CleanupMode, appName: String?,
-        customInstructions: String, screenContext: ScreenContext? = nil, provider: (any TextCleanupProvider)?,
-        model: String
+        customInstructions: String, provider: (any TextCleanupProvider)?, model: String
     ) async -> (raw: String, outcome: CleanupOutcome) {
         let raw = VocabularyReplacer.apply(vocabulary, to: transcript)
         var outcome = await run(
             Request(
                 raw: raw, mode: mode, vocabulary: vocabulary.map(\.promptTerm), appName: appName,
-                customInstructions: customInstructions, screenContext: screenContext),
+                customInstructions: customInstructions),
             provider: provider, model: model)
         outcome.text = TrailingPeriod.trimmed(outcome.text)
         return (raw, outcome)

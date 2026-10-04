@@ -155,13 +155,6 @@ struct CleanupSettingsView: View {
             SettingsSection(footer: "整形に失敗したときは、文字起こし結果をそのまま入力します。") {
                 ToggleRow("AI で文章を整える", isOn: $settings.cleanupEnabled)
             }
-            SettingsSection(
-                footer:
-                    "オンにすると、録音を止めたときに貼り付け先の入力欄とその周りの文章（返信先のメールなど）を読み取り、文字起こしと一緒に LLM に送ります。宛名や固有名詞、敬語の判断に使います。読み取った文章は保存しません。パスワードの入力中は読み取りません。"
-            ) {
-                ToggleRow("貼り付け先の周りの文章を参考にする", isOn: $settings.usesScreenContext)
-                    .disabled(!settings.cleanupEnabled)
-            }
             CleanupModeSection(
                 mode: $settings.defaultCleanupMode, customInstructions: settings.customCleanupInstructions,
                 onSaveCustomInstructions: settings.setCustomCleanupInstructions)
