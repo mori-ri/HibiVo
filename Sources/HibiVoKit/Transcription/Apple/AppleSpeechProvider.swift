@@ -116,8 +116,13 @@ actor AppleSpeechModels {
     /// already has the model and recognition works, so the installed locales are checked too.
     func isInstalled(_ transcriber: SpeechTranscriber, locale: Locale) async -> Bool {
         if await AssetInventory.status(forModules: [transcriber]) == .installed { return true }
+        return Self.contains(await SpeechTranscriber.installedLocales, locale)
+    }
+
+    /// Matches by BCP 47 tag: the system's locale lists don't always compare equal to the supported locale.
+    private static func contains(_ locales: some Sequence<Locale>, _ locale: Locale) -> Bool {
         let id = locale.identifier(.bcp47)
-        return await SpeechTranscriber.installedLocales.contains { $0.identifier(.bcp47) == id }
+        return locales.contains { $0.identifier(.bcp47) == id }
     }
 
     func prepare(language: String) async -> AppleSpeechProvider.ModelStatus {
@@ -133,8 +138,13 @@ actor AppleSpeechModels {
             let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
             do {
                 // Keeps the model from being removed while the app uses it; harmless if already reserved.
-                if !(await AssetInventory.reservedLocales).contains(locale) {
-                    _ = try? await AssetInventory.reserve(locale: locale)
+                if !Self.contains(await AssetInventory.reservedLocales, locale) {
+                    do {
+                        _ = try await AssetInventory.reserve(locale: locale)
+                    } catch {
+                        // Not fatal: the model may already be on the Mac, but the system could remove it later.
+                        log.error("Speech model reservation failed: \(String(describing: error), privacy: .public)")
+                    }
                 }
                 // Already on the Mac: an installation request would still take half a minute to finish.
                 if await self.isInstalled(transcriber, locale: locale) { return true }
