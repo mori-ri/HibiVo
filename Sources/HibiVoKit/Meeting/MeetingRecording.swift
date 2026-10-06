@@ -96,21 +96,24 @@ actor MeetingRecordingStore {
     /// Every saved recording, oldest first.
     func pending() -> [Pending] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
         return names.filter { $0.hasSuffix(".json") }.compactMap { name in
-            let id = String(name.dropLast(5))
-            guard let data = try? Data(contentsOf: infoURL(id)),
-                let info = try? decoder.decode(MeetingRecordingInfo.self, from: data)
-            else {
-                // Unreadable info can never be transcribed.
-                remove(id: id)
-                return nil
-            }
-            let written = try? FileManager.default.attributesOfItem(atPath: audioURL(id).path)[.modificationDate]
-            return Pending(id: id, info: info, lastWrittenAt: written as? Date)
+            pending(id: String(name.dropLast(5)))
         }
         .sorted { $0.info.startedAt < $1.info.startedAt }
+    }
+
+    /// The saved recording as it is on disk now; nil once it has been removed.
+    func pending(id: String) -> Pending? {
+        guard let data = try? Data(contentsOf: infoURL(id)) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let info = try? decoder.decode(MeetingRecordingInfo.self, from: data) else {
+            // Unreadable info can never be transcribed.
+            remove(id: id)
+            return nil
+        }
+        let written = try? FileManager.default.attributesOfItem(atPath: audioURL(id).path)[.modificationDate]
+        return Pending(id: id, info: info, lastWrittenAt: written as? Date)
     }
 
     // MARK: - Files

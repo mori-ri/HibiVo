@@ -694,10 +694,17 @@ public final class MeetingController {
     }
 
     private func resumeSaved() async {
-        for pending in await recordings.pending() {
-            let id = pending.id
-            let info = pending.info
+        for listed in await recordings.pending() {
+            let id = listed.id
             guard !transcribing.contains(id), meeting?.id != id else { continue }
+            transcribing.insert(id)
+            // The listing may be stale: another resume may have finished this recording or updated its
+            // job while this loop was waiting, so read it again now that it is claimed.
+            guard let pending = await recordings.pending(id: id) else {
+                transcribing.remove(id)
+                continue
+            }
+            let info = pending.info
             let stt = transcribers().first { $0.provider.id == info.providerID }
             var apiKey = ""
             if stt?.provider.requiresAPIKey ?? true {
@@ -705,7 +712,6 @@ public final class MeetingController {
             }
             if Date().timeIntervalSince(info.startedAt) > MeetingRecordingStore.lifetime {
                 log.notice("Dropping a meeting recording that could not be transcribed in time")
-                transcribing.insert(id)
                 if let job = info.job, !apiKey.isEmpty { await stt?.fileTranscriber?.discard(job, apiKey: apiKey) }
                 await recordings.remove(id: id)
                 transcribing.remove(id)
@@ -713,9 +719,11 @@ public final class MeetingController {
             }
             // Left for later: the key may be added back, or the recording expires.
             guard let stt, let fileTranscriber = stt.fileTranscriber, !stt.provider.requiresAPIKey || !apiKey.isEmpty
-            else { continue }
+            else {
+                transcribing.remove(id)
+                continue
+            }
 
-            transcribing.insert(id)
             let meeting = Meeting(
                 provider: stt.provider, fileTranscriber: fileTranscriber,
                 config: TranscriptionConfig(
