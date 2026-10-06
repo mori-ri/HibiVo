@@ -3,18 +3,60 @@ import OSLog
 
 /// Transcribes a whole recording after the fact. Diarization is far more accurate this way than in
 /// real time, because the model hears the full meeting before it assigns speakers.
+///
+/// Split into steps so a job already on the provider's side survives a sleep, a shutdown or a lost
+/// connection: the caller keeps the `MeetingFileJob` and fetches its result later without uploading
+/// the audio again.
 public protocol MeetingFileTranscriber: Sendable {
     /// Recorded in usage, which prices async audio separately from real-time.
     var model: String { get }
+    /// Uploads the audio and starts transcribing it.
     /// - Parameter pcm16: Mono 16-bit little-endian PCM at `sampleRate`.
-    /// - Returns: Every token, final, with speaker labels and times from the start of the audio.
-    func transcribe(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> [MeetingToken]
+    func submit(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> MeetingFileJob
+    /// Waits for the job and returns every token, final, with speaker labels and times from the start
+    /// of the audio. Throws `MeetingFileJobError.gone` when the job no longer exists or failed, in which
+    /// case the audio has to be submitted again.
+    func result(of job: MeetingFileJob, apiKey: String) async throws -> [MeetingToken]
+    /// Deletes the job and its audio from the provider. Best effort.
+    func discard(_ job: MeetingFileJob, apiKey: String) async
+}
+
+extension MeetingFileTranscriber {
+    /// Submits, waits and cleans up in one go.
+    public func transcribe(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> [MeetingToken] {
+        let job = try await submit(pcm16: pcm16, sampleRate: sampleRate, config: config)
+        do {
+            let tokens = try await result(of: job, apiKey: config.apiKey)
+            await discard(job, apiKey: config.apiKey)
+            return tokens
+        } catch {
+            await discard(job, apiKey: config.apiKey)
+            throw error
+        }
+    }
+}
+
+/// A transcription running on the provider's side.
+public struct MeetingFileJob: Codable, Equatable, Sendable {
+    public var fileID: String
+    public var transcriptionID: String
+
+    public init(fileID: String, transcriptionID: String) {
+        self.fileID = fileID
+        self.transcriptionID = transcriptionID
+    }
+}
+
+public enum MeetingFileJobError: Error, Equatable, Sendable {
+    /// The job was deleted, expired or failed on the provider's side.
+    case gone
 }
 
 /// Soniox async transcription: upload the audio, create a transcription, poll until it completes,
-/// fetch the tokens, then delete both so the audio doesn't stay on Soniox's side.
+/// fetch the tokens, then delete both so the audio doesn't stay on Soniox's side. Both stay until
+/// `discard`, so a job cut off by a sleep can still be fetched afterwards.
 ///
-/// The WAV is built in memory; like everywhere else, audio is never written to disk.
+/// The WAV is built in memory.
 public struct SonioxFileTranscriber: MeetingFileTranscriber {
     static let baseURL = URL(string: "https://api.soniox.com/v1")!
     public let model = "stt-async-v5"
@@ -33,45 +75,47 @@ public struct SonioxFileTranscriber: MeetingFileTranscriber {
         self.timeout = timeout
     }
 
-    public func transcribe(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> [MeetingToken] {
+    public func submit(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> MeetingFileJob {
         let key = config.apiKey
         let boundary = "HibiVo-\(UUID().uuidString)"
         let upload: FileResponse = try await send(
             Self.uploadRequest(apiKey: key, boundary: boundary),
             body: Self.multipartBody(wav: pcm16, sampleRate: sampleRate, boundary: boundary))
-        var transcriptionID: String?
-        defer {
+        do {
+            let created: TranscriptionResponse = try await send(
+                Self.createRequest(fileID: upload.id, model: model, config: config))
+            return MeetingFileJob(fileID: upload.id, transcriptionID: created.id)
+        } catch {
             // Best effort, detached so a cancelled caller still cleans up.
             let session = urlSession
-            let id = transcriptionID
-            Task.detached {
-                if let id { _ = try? await session.data(for: Self.deleteRequest("transcriptions/\(id)", apiKey: key)) }
-                _ = try? await session.data(for: Self.deleteRequest("files/\(upload.id)", apiKey: key))
-            }
+            Task.detached { _ = try? await session.data(for: Self.deleteRequest("files/\(upload.id)", apiKey: key)) }
+            throw error
         }
+    }
 
-        let created: TranscriptionResponse = try await send(
-            Self.createRequest(fileID: upload.id, model: model, config: config))
-        transcriptionID = created.id
-
+    public func result(of job: MeetingFileJob, apiKey key: String) async throws -> [MeetingToken] {
         let deadline = ContinuousClock.now + timeout
+        let url = Self.baseURL.appending(path: "transcriptions/\(job.transcriptionID)")
         while true {
-            let status: TranscriptionResponse = try await send(
-                Self.authorized(URLRequest(url: Self.baseURL.appending(path: "transcriptions/\(created.id)")), key))
+            let status: TranscriptionResponse = try await send(Self.authorized(URLRequest(url: url), key))
             switch status.status {
             case "completed":
                 let transcript: SonioxProtocol.Response = try await send(
-                    Self.authorized(
-                        URLRequest(url: Self.baseURL.appending(path: "transcriptions/\(created.id)/transcript")), key))
+                    Self.authorized(URLRequest(url: url.appending(path: "transcript")), key))
                 return Self.tokens(transcript)
             case "error":
                 log.error("Soniox async failed: \(status.errorMessage ?? "", privacy: .public)")
-                throw TranscriptionError.server(status.errorMessage ?? "error")
+                throw MeetingFileJobError.gone
             default:
                 guard ContinuousClock.now < deadline else { throw TranscriptionError.timedOut }
                 try await Task.sleep(for: pollInterval)
             }
         }
+    }
+
+    public func discard(_ job: MeetingFileJob, apiKey key: String) async {
+        _ = try? await urlSession.data(for: Self.deleteRequest("transcriptions/\(job.transcriptionID)", apiKey: key))
+        _ = try? await urlSession.data(for: Self.deleteRequest("files/\(job.fileID)", apiKey: key))
     }
 
     // MARK: - Wire format
@@ -203,7 +247,11 @@ public struct SonioxFileTranscriber: MeetingFileTranscriber {
         guard (200..<300).contains(status) else {
             log.error(
                 "Soniox async HTTP \(status): \(String(decoding: data.prefix(500), as: UTF8.self), privacy: .public)")
-            throw status == 401 ? TranscriptionError.unauthorized : TranscriptionError.server("HTTP \(status)")
+            switch status {
+            case 401: throw TranscriptionError.unauthorized
+            case 404: throw MeetingFileJobError.gone
+            default: throw TranscriptionError.server("HTTP \(status)")
+            }
         }
         do {
             return try JSONDecoder().decode(T.self, from: data)

@@ -1,4 +1,5 @@
 import AppKit
+import Network
 import OSLog
 
 /// Composition root: builds every service once and wires them together.
@@ -27,6 +28,9 @@ public final class AppEnvironment {
     private let hud: HUDController
     public let meetingNotes: MeetingNotesPanelController
     private var permissionPollTask: Task<Void, Never>?
+    private var sleepObservers: [NSObjectProtocol] = []
+    private let network = NWPathMonitor()
+    private var wasOnline: Bool?
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "app")
 
     public init() {
@@ -68,6 +72,7 @@ public final class AppEnvironment {
                 meetingTranscribers.first { $0.provider.id == settings.meetingTranscriptionProviderID }
                     ?? meetingTranscribers[0]
             },
+            transcribers: { meetingTranscribers },
             minutesWriter: {
                 ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
                     ClaudeCodeMinutesWriter(executable: $0, instructions: settings.meetingMinutesInstructions ?? "")
@@ -133,6 +138,55 @@ public final class AppEnvironment {
         state.hasAccessibilityPermission = Permissions.isAccessibilityTrusted
         if !state.hasAccessibilityPermission { Permissions.promptForAccessibility() }
         startHotkeyWhenTrusted()
+        observeSleepAndNetwork()
+        meeting.resumeSavedRecordings()
+    }
+
+    /// Ends a meeting before quitting (including for a shutdown or logout), so its file is complete and
+    /// an after-meeting recording is kept for the next launch. Gives up after a few seconds so quitting
+    /// is never held up by the network.
+    public func prepareForTermination(_ done: @escaping @MainActor () -> Void) {
+        var replied = false
+        let reply = {
+            guard !replied else { return }
+            replied = true
+            done()
+        }
+        let meeting = meeting
+        Task { @MainActor in
+            await meeting.prepareForTermination()
+            reply()
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(5))
+            reply()
+        }
+    }
+
+    /// Sleep ends a meeting, and unfinished after-meeting transcriptions are picked up again after
+    /// waking and whenever the network comes back.
+    private func observeSleepAndNetwork() {
+        let center = NSWorkspace.shared.notificationCenter
+        let meeting = meeting
+        sleepObservers = [
+            center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { meeting.systemWillSleep() }
+            },
+            center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { meeting.systemDidWake() }
+            },
+        ]
+        network.pathUpdateHandler = { [weak self] path in
+            let online = path.status == .satisfied
+            Task { @MainActor in
+                guard let self else { return }
+                defer { self.wasOnline = online }
+                // The first update only reports the state at launch, which `start` already covers.
+                guard online, self.wasOnline == false else { return }
+                self.meeting.resumeSavedRecordings()
+            }
+        }
+        network.start(queue: DispatchQueue(label: "io.github.mori-ri.hibivo.network"))
     }
 
     public func applyHotkey(_ trigger: HotkeyTrigger) {

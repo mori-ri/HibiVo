@@ -15,6 +15,8 @@ public enum UserFacingError: Error, Equatable, Sendable {
     case meetingRequiresAPIKey(provider: String)
     case meetingSaveFailed
     case meetingTranscriptionFailed
+    /// The recording is kept and tried again later.
+    case meetingTranscriptionDeferred
     case claudeCodeNotFound
     case meetingMinutesFailed
 
@@ -35,6 +37,7 @@ public enum UserFacingError: Error, Equatable, Sendable {
         case .meetingRequiresAPIKey(let provider): "ミーティングの文字起こしには \(provider) の API Key が必要です"
         case .meetingSaveFailed: "ミーティングの記録を保存できませんでした"
         case .meetingTranscriptionFailed: "ミーティングの文字起こしに失敗しました"
+        case .meetingTranscriptionDeferred: "ミーティングの文字起こしに失敗しました。ネットワークの回復後に自動でやり直します"
         case .claudeCodeNotFound: "Claude Code が見つからないため、議事録を作成できませんでした"
         case .meetingMinutesFailed: "議事録を作成できませんでした。文字起こしは保存済みです"
         }

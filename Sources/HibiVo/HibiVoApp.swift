@@ -29,4 +29,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         env.start()
     }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard env.meeting.isActive else { return .terminateNow }
+        env.prepareForTermination { sender.reply(toApplicationShouldTerminate: true) }
+        return .terminateLater
+    }
 }

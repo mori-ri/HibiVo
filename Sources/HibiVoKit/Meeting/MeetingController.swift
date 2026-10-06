@@ -14,9 +14,14 @@ import OSLog
 /// has no after-meeting mode: it always transcribes as the meeting runs.
 ///
 /// In after-meeting mode (`MeetingTranscriptionTiming.afterMeeting`) there is no STT session while
-/// recording: the mixed audio is kept in memory and sent to the file transcriber once the meeting
-/// ends, which separates speakers far better. That runs in the background, so dictation and the next
-/// meeting are available right away.
+/// recording: the mixed audio is recorded and sent to the file transcriber once the meeting ends, which
+/// separates speakers far better. That runs in the background, so dictation and the next meeting are
+/// available right away. The audio is also kept on disk (`MeetingRecordingStore`) until the transcript
+/// is saved, so a shutdown, a sleep or a lost connection only delays it: unfinished recordings are
+/// picked up again at launch, after waking and when the network comes back.
+///
+/// Sleep ends a meeting: the recording stops as the Mac goes to sleep, and transcription and minutes,
+/// which need the network, wait until it has woken up.
 @MainActor
 public final class MeetingController {
     /// Stops a meeting that was forgotten, so it doesn't bill for hours.
@@ -29,6 +34,8 @@ public final class MeetingController {
 
     @MainActor
     private final class Meeting {
+        /// The start stamp shared by the transcript file and the saved recording.
+        let id: String
         let provider: any MeetingTranscriptionProvider
         /// Set in after-meeting mode only.
         let fileTranscriber: (any MeetingFileTranscriber)?
@@ -39,8 +46,12 @@ public final class MeetingController {
         var transcript = MeetingTranscript()
         /// nil in after-meeting mode.
         var session: (any MeetingTranscriptionSession)?
-        /// The whole meeting's audio, kept in memory (never on disk) in after-meeting mode.
+        /// The whole meeting's audio in after-meeting mode.
         var recorded: Data?
+        /// Whether `recorded` is also kept by the recording store, so a failed transcription can be retried.
+        var isSavedOnDisk = false
+        /// The after-meeting transcription on the provider's side, once submitted.
+        var job: MeetingFileJob?
         /// Bumped per STT session so events from a replaced session are ignored.
         var generation = 0
         var events: Task<Void, Never>?
@@ -55,6 +66,9 @@ public final class MeetingController {
         var sessionHadSpeech = false
         /// nil while only the microphone is recorded.
         var mixer: PCMMixer?
+        var includesSystemAudio = false
+        /// The notices of a meeting resumed from disk, whose capture details are gone.
+        var restoredNotices: [MeetingDocument.Notice]?
         /// System audio was asked for but could not be started.
         var systemAudioUnavailable = false
         var microphoneUnavailable = false
@@ -87,6 +101,7 @@ public final class MeetingController {
             self.config = config
             self.startedAt = startedAt
             self.fileURL = fileURL
+            id = fileURL.deletingPathExtension().lastPathComponent
             self.vocabulary = vocabulary
             self.session = session
             (outgoing, outgoingContinuation) = AsyncStream.makeStream()
@@ -100,6 +115,8 @@ public final class MeetingController {
     private let secrets: any SecretStore
     /// Read when a meeting starts, so a changed setting applies from the next meeting.
     private let transcriber: @MainActor () -> MeetingTranscriber
+    /// Every provider, to resume a saved recording with the one it was recorded for.
+    private let transcribers: @MainActor () -> [MeetingTranscriber]
     /// Built when a meeting is saved, so a changed Claude Code path or setting takes effect; nil when
     /// minutes are off or Claude Code can't be found.
     private let minutesWriter: @MainActor () -> (any MeetingMinutesWriting)?
@@ -108,8 +125,11 @@ public final class MeetingController {
     private let directory: URL
     private let saveInterval: Duration
     private let reconnectDelays: [Duration]
+    /// How long after waking to wait for the network before using it.
+    private let wakeDelay: Duration
     private let onSaved: @MainActor (URL) -> Void
     private let writer = MeetingFileWriter()
+    private let recordings: MeetingRecordingStore
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "meeting")
 
     private var meeting: Meeting?
@@ -119,9 +139,18 @@ public final class MeetingController {
     private var errorDismiss: Task<Void, Never>?
     /// After-meeting transcriptions and minutes still running.
     private var transcriptions: [Task<Void, Never>] = []
+    /// Saved recordings being transcribed, so a resume doesn't start them twice.
+    private var transcribing: Set<String> = []
+    /// From going to sleep until the network has had `wakeDelay` to come back.
+    private var isAsleep = false
+    /// Bumped on every sleep, to tell a failure caused by sleeping.
+    private var sleepCount = 0
+    private var wakeWaiters: [CheckedContinuation<Void, Never>] = []
+    private var waking: Task<Void, Never>?
 
     /// - Parameter systemAudio: Captures the remote side of an online meeting; nil where unsupported.
     ///   Used only while `settings.meetingCapturesSystemAudio` is on.
+    /// - Parameter transcribers: Every provider; defaults to the one `transcriber` returns.
     public init(
         state: AppState,
         audio: any AudioCapturing,
@@ -129,12 +158,14 @@ public final class MeetingController {
         settings: SettingsStore,
         secrets: any SecretStore,
         transcriber: @escaping @MainActor () -> MeetingTranscriber,
+        transcribers: (@MainActor () -> [MeetingTranscriber])? = nil,
         minutesWriter: @escaping @MainActor () -> (any MeetingMinutesWriting)? = { nil },
         vocabulary: @escaping @MainActor () -> [VocabularyEntry] = { [] },
         usage: UsageStore? = nil,
         directory: URL = MeetingController.defaultDirectory,
         saveInterval: Duration = .seconds(5),
         reconnectDelays: [Duration] = MeetingController.defaultReconnectDelays,
+        wakeDelay: Duration = .seconds(10),
         onSaved: @escaping @MainActor (URL) -> Void = { _ in }
     ) {
         self.state = state
@@ -143,13 +174,17 @@ public final class MeetingController {
         self.settings = settings
         self.secrets = secrets
         self.transcriber = transcriber
+        self.transcribers = transcribers ?? { [transcriber()] }
         self.minutesWriter = minutesWriter
         self.vocabulary = vocabulary
         self.usage = usage
         self.directory = directory
         self.saveInterval = saveInterval
         self.reconnectDelays = reconnectDelays.isEmpty ? [.zero] : reconnectDelays
+        self.wakeDelay = wakeDelay
         self.onSaved = onSaved
+        // Hidden inside the Meetings folder, which the archive lists, so it never shows up there.
+        recordings = MeetingRecordingStore(directory: directory.appending(path: ".recordings"))
     }
 
     /// `~/Library/Application Support/HibiVo/Meetings`
@@ -242,6 +277,7 @@ public final class MeetingController {
             fileURL: directory.appending(path: MeetingDocument.fileName(startedAt: startedAt)),
             vocabulary: entries, session: afterMeeting ? nil : provider.makeMeetingSession(config))
         meeting.systemAudioUnavailable = systemAudioUnavailable
+        meeting.includesSystemAudio = system != nil
         meeting.activity = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled, .userInitiated], reason: "Meeting transcription")
         self.meeting = meeting
@@ -250,11 +286,19 @@ public final class MeetingController {
         } else {
             meeting.recorded = Data()
         }
-        meeting.sender = Task {
+        meeting.sender = Task { [recordings] in
+            if afterMeeting {
+                meeting.isSavedOnDisk = await recordings.save(recordingInfo(meeting), id: meeting.id)
+            }
             for await pcm16 in meeting.outgoing {
                 meeting.bytes += pcm16.count
                 if meeting.recorded != nil {
                     meeting.recorded?.append(pcm16)
+                    if meeting.isSavedOnDisk, !(await recordings.append(pcm16, id: meeting.id)) {
+                        // A partial file would be transcribed as the whole meeting; keep memory only.
+                        meeting.isSavedOnDisk = false
+                        await recordings.remove(id: meeting.id)
+                    }
                 } else {
                     // Read the session each time: a reconnect swaps it while audio keeps flowing.
                     await meeting.session?.send(pcm16)
@@ -414,6 +458,10 @@ public final class MeetingController {
         // An autosave already under way must land before the final write, or it would overwrite it.
         await saver?.value
         if meeting.recorded != nil {
+            if meeting.isSavedOnDisk {
+                await recordings.closeAudio(id: meeting.id)
+                await saveRecordingInfo(meeting)
+            }
             handOffForTranscription(meeting)
             return
         }
@@ -463,6 +511,7 @@ public final class MeetingController {
         state.partialTranscript = ""
         if let failure = meeting.failure { show(failure) } else { state.phase = .idle }
         guard meeting.bytes > 0, let fileTranscriber = meeting.fileTranscriber else {
+            transcriptions.append(Task { [recordings] in await recordings.remove(id: meeting.id) })
             if meeting.keepsDocument {
                 let document = markdown(meeting, ended: true)
                 transcriptions.append(
@@ -481,6 +530,7 @@ public final class MeetingController {
             return
         }
         state.meetingTranscriptionsInProgress += 1
+        transcribing.insert(meeting.id)
         log.info("Meeting stopped; transcribing \(self.milliseconds(meeting.bytes, in: meeting) / 1000) s of audio")
         transcriptions.append(
             Task {
@@ -499,29 +549,55 @@ public final class MeetingController {
             })
     }
 
+    /// Expects `meetingTranscriptionsInProgress` to count this meeting and `transcribing` to hold it.
     private func transcribe(_ meeting: Meeting, with transcriber: any MeetingFileTranscriber) async {
+        defer { transcribing.remove(meeting.id) }
         let audio = meeting.recorded ?? Data()
         meeting.recorded = nil
+        let apiKey = meeting.config.apiKey
         var tokens: [MeetingToken]?
         var failure: UserFacingError = .meetingTranscriptionFailed
-        // Retry transient failures: this is the only copy of the meeting's audio.
-        for attempt in 0..<3 {
+        // Retry transient failures. Once submitted, the job is fetched again rather than re-uploaded.
+        var attempt = 0
+        while tokens == nil, attempt < 3 {
+            attempt += 1
+            await untilAwake()
             do {
-                tokens = try await transcriber.transcribe(
-                    pcm16: audio, sampleRate: Int(meeting.provider.sampleRate), config: meeting.config)
-                break
+                let job: MeetingFileJob
+                if let submitted = meeting.job {
+                    job = submitted
+                } else {
+                    job = try await transcriber.submit(
+                        pcm16: audio, sampleRate: Int(meeting.provider.sampleRate), config: meeting.config)
+                    meeting.job = job
+                    await saveRecordingInfo(meeting)
+                }
+                tokens = try await transcriber.result(of: job, apiKey: apiKey)
             } catch TranscriptionError.unauthorized {
                 failure = .invalidAPIKey(provider: meeting.provider.displayName)
                 break
+            } catch MeetingFileJobError.gone {
+                log.notice("Meeting transcription job is gone; submitting the audio again")
+                if let job = meeting.job { await transcriber.discard(job, apiKey: apiKey) }
+                meeting.job = nil
+                await saveRecordingInfo(meeting)
             } catch {
                 log.error("Meeting transcription failed (\(String(describing: error), privacy: .public))")
-                if attempt < 2 { try? await Task.sleep(for: reconnectDelays[min(attempt, reconnectDelays.count - 1)]) }
+                if attempt < 3 {
+                    try? await Task.sleep(for: reconnectDelays[min(attempt - 1, reconnectDelays.count - 1)])
+                }
             }
         }
         state.meetingTranscriptionsInProgress -= 1
 
         guard let tokens else {
-            showUnlessBusy(failure)
+            if meeting.isSavedOnDisk {
+                // The recording and the job stay on disk to be tried again later.
+                showUnlessBusy(failure == .meetingTranscriptionFailed ? .meetingTranscriptionDeferred : failure)
+            } else {
+                await discardRecording(meeting, with: transcriber)
+                showUnlessBusy(failure)
+            }
             return
         }
         usage?.record(
@@ -531,11 +607,13 @@ public final class MeetingController {
                     seconds: Double(milliseconds(audio.count, in: meeting)) / 1000)))
         meeting.transcript.apply(tokens)
         guard !meeting.transcript.isEmpty || meeting.keepsDocument else {
+            await discardRecording(meeting, with: transcriber)
             showUnlessBusy(.nothingRecognized)
             return
         }
         let document = markdown(meeting, ended: true)
         if await writer.write(document, to: meeting.fileURL) {
+            await discardRecording(meeting, with: transcriber)
             log.info("Meeting transcribed (\(meeting.transcript.segments.count) segments)")
             if meeting.transcript.isEmpty {
                 onSaved(meeting.fileURL)
@@ -543,8 +621,139 @@ public final class MeetingController {
                 didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary)
             }
         } else {
+            // With the recording on disk, the next resume fetches the result again and retries the save.
+            if !meeting.isSavedOnDisk { await discardRecording(meeting, with: transcriber) }
             showUnlessBusy(.meetingSaveFailed)
         }
+    }
+
+    /// Deletes the audio from the provider and from disk once it is no longer needed.
+    private func discardRecording(_ meeting: Meeting, with transcriber: any MeetingFileTranscriber) async {
+        if let job = meeting.job {
+            await transcriber.discard(job, apiKey: meeting.config.apiKey)
+            meeting.job = nil
+        }
+        if meeting.isSavedOnDisk {
+            await recordings.remove(id: meeting.id)
+            meeting.isSavedOnDisk = false
+        }
+    }
+
+    private func saveRecordingInfo(_ meeting: Meeting) async {
+        guard meeting.isSavedOnDisk else { return }
+        await recordings.save(recordingInfo(meeting), id: meeting.id)
+    }
+
+    private func recordingInfo(_ meeting: Meeting) -> MeetingRecordingInfo {
+        MeetingRecordingInfo(
+            startedAt: meeting.startedAt, endedAt: meeting.endedAt, providerID: meeting.provider.id,
+            model: meeting.config.model, language: meeting.config.language, vocabulary: meeting.vocabulary,
+            includesSystemAudio: meeting.includesSystemAudio, notices: notices(meeting, ended: meeting.endedAt != nil),
+            notes: meeting.notes, job: meeting.job)
+    }
+
+    // MARK: - Sleep, shutdown and saved recordings
+
+    /// The Mac is going to sleep. A meeting ends here; transcription and minutes, which need the
+    /// network, wait until it has woken up.
+    public func systemWillSleep() {
+        isAsleep = true
+        sleepCount += 1
+        waking?.cancel()
+        if let meeting, !meeting.isStopping {
+            log.info("Stopping the meeting for sleep")
+            stop()
+        }
+    }
+
+    public func systemDidWake() {
+        waking?.cancel()
+        waking = Task { [weak self, wakeDelay] in
+            try? await Task.sleep(for: wakeDelay)
+            guard !Task.isCancelled, let self else { return }
+            self.isAsleep = false
+            let waiters = self.wakeWaiters
+            self.wakeWaiters = []
+            for waiter in waiters { waiter.resume() }
+            self.resumeSavedRecordings()
+        }
+    }
+
+    /// The app is quitting, including for a shutdown or logout. Ends a meeting so its file is complete
+    /// and an after-meeting recording is saved to be transcribed at the next launch.
+    public func prepareForTermination() async {
+        stop()
+        await stopping?.value
+    }
+
+    /// Transcribes after-meeting recordings left unfinished by a shutdown, a sleep or a failed request.
+    /// Called at launch, after waking and when the network comes back.
+    public func resumeSavedRecordings() {
+        guard !isAsleep else { return }
+        transcriptions.append(Task { await resumeSaved() })
+    }
+
+    private func resumeSaved() async {
+        for pending in await recordings.pending() {
+            let id = pending.id
+            let info = pending.info
+            guard !transcribing.contains(id), meeting?.id != id else { continue }
+            let stt = transcribers().first { $0.provider.id == info.providerID }
+            var apiKey = ""
+            if stt?.provider.requiresAPIKey ?? true {
+                apiKey = secrets.secret(for: info.providerID) ?? ""
+            }
+            if Date().timeIntervalSince(info.startedAt) > MeetingRecordingStore.lifetime {
+                log.notice("Dropping a meeting recording that could not be transcribed in time")
+                transcribing.insert(id)
+                if let job = info.job, !apiKey.isEmpty { await stt?.fileTranscriber?.discard(job, apiKey: apiKey) }
+                await recordings.remove(id: id)
+                transcribing.remove(id)
+                continue
+            }
+            // Left for later: the key may be added back, or the recording expires.
+            guard let stt, let fileTranscriber = stt.fileTranscriber, !stt.provider.requiresAPIKey || !apiKey.isEmpty
+            else { continue }
+
+            transcribing.insert(id)
+            let meeting = Meeting(
+                provider: stt.provider, fileTranscriber: fileTranscriber,
+                config: TranscriptionConfig(
+                    apiKey: apiKey, model: info.model, language: info.language,
+                    vocabulary: info.vocabulary.map(\.preferred), readings: info.vocabulary.flatMap(\.readings),
+                    speakerDiarization: true),
+                startedAt: info.startedAt, fileURL: directory.appending(path: "\(id).md"), vocabulary: info.vocabulary,
+                session: nil)
+            // A recording the app never got to stop ends where its audio does.
+            meeting.endedAt = info.endedAt ?? pending.lastWrittenAt ?? info.startedAt
+            meeting.notes = info.notes
+            meeting.includesSystemAudio = info.includesSystemAudio
+            meeting.restoredNotices = info.notices
+            meeting.microphoneUnavailable = info.notices.contains(.microphoneUnavailable)
+            meeting.job = info.job
+            meeting.isSavedOnDisk = true
+            if info.endedAt == nil { await saveRecordingInfo(meeting) }
+            let audio = await recordings.audio(id: id) ?? Data()
+            guard !audio.isEmpty || meeting.job != nil else {
+                // Nothing was recorded; only the notes, if any, are left to keep.
+                if meeting.keepsDocument, await writer.write(markdown(meeting, ended: true), to: meeting.fileURL) {
+                    onSaved(meeting.fileURL)
+                }
+                await recordings.remove(id: id)
+                transcribing.remove(id)
+                continue
+            }
+            meeting.recorded = audio
+            meeting.bytes = audio.count
+            log.info("Resuming a saved meeting recording")
+            state.meetingTranscriptionsInProgress += 1
+            transcriptions.append(Task { await transcribe(meeting, with: fileTranscriber) })
+        }
+    }
+
+    private func untilAwake() async {
+        guard isAsleep else { return }
+        await withCheckedContinuation { wakeWaiters.append($0) }
     }
 
     /// Hands a saved transcript to Claude Code for minutes, or shows it right away when minutes are off.
@@ -576,10 +785,22 @@ public final class MeetingController {
         with minutesWriter: any MeetingMinutesWriting
     ) async {
         defer { state.meetingMinutesInProgress -= 1 }
-        let minutes: String
-        do {
-            minutes = try await minutesWriter.writeMinutes(transcript: document, vocabulary: vocabulary, model: model)
-        } catch {
+        var minutes: String?
+        var failure: Error?
+        // A sleep in the middle cuts Claude Code off from the network; try once more after waking.
+        for _ in 0..<2 where minutes == nil {
+            await untilAwake()
+            let sleeps = sleepCount
+            do {
+                minutes = try await minutesWriter.writeMinutes(
+                    transcript: document, vocabulary: vocabulary, model: model)
+            } catch {
+                failure = error
+                if sleepCount == sleeps { break }
+            }
+        }
+        guard let minutes else {
+            let error = failure ?? MeetingMinutesError.failed("")
             // `.failed` carries Claude Code's own output, which can quote the meeting; keep it out of public logs.
             if case .failed(let text) = error as? MeetingMinutesError {
                 log.error("Minutes failed: \(text, privacy: .private)")
@@ -625,6 +846,7 @@ public final class MeetingController {
         if meeting.notes != state.meetingNotes {
             meeting.notes = state.meetingNotes
             meeting.isDirty = true
+            await saveRecordingInfo(meeting)
         }
         guard meeting.isDirty, !meeting.transcript.isEmpty || meeting.hasNotes else { return }
         meeting.isDirty = false
@@ -634,6 +856,14 @@ public final class MeetingController {
     }
 
     private func markdown(_ meeting: Meeting, ended: Bool) -> String {
+        MeetingDocument.markdown(
+            meeting.transcript, startedAt: meeting.startedAt, endedAt: ended ? (meeting.endedAt ?? Date()) : nil,
+            includesSystemAudio: meeting.includesSystemAudio, identifiesSpeakers: meeting.provider.identifiesSpeakers,
+            notices: notices(meeting, ended: ended), notes: meeting.notes, vocabulary: meeting.vocabulary)
+    }
+
+    private func notices(_ meeting: Meeting, ended: Bool) -> [MeetingDocument.Notice] {
+        if let restored = meeting.restoredNotices { return restored }
         var notices: [MeetingDocument.Notice] = []
         if meeting.systemAudioUnavailable { notices.append(.systemAudioUnavailable) }
         if meeting.microphoneUnavailable { notices.append(.microphoneUnavailable) }
@@ -642,10 +872,7 @@ public final class MeetingController {
         if ended, meeting.mixer != nil, meeting.systemBytes > 0, meeting.systemPeak == 0 {
             notices.append(.systemAudioSilent)
         }
-        return MeetingDocument.markdown(
-            meeting.transcript, startedAt: meeting.startedAt, endedAt: ended ? (meeting.endedAt ?? Date()) : nil,
-            includesSystemAudio: meeting.mixer != nil, identifiesSpeakers: meeting.provider.identifiesSpeakers,
-            notices: notices, notes: meeting.notes, vocabulary: meeting.vocabulary)
+        return notices
     }
 
     private func milliseconds(_ bytes: Int, in meeting: Meeting) -> Int {
