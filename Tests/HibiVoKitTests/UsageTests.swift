@@ -60,12 +60,44 @@ import Testing
         #expect(day.audioSeconds == 605)
     }
 
+    @Test func charactersAndCostAreSplitBetweenDictationAndMeetings() {
+        let store = makeStore()
+        // Both use the same model, so only the meeting's own record can tell their costs apart.
+        store.record(dictation(on: date(2026, 9, 27), characters: 30, seconds: 60, tokens: .init(input: 1, output: 1)))
+        store.record(
+            UsageEvent(
+                date: date(2026, 9, 27), meetings: 1, characters: 2_000,
+                transcription: .init(provider: "soniox", model: "stt-rt-v5", seconds: 1_200)))
+        store.record(
+            UsageEvent(
+                date: date(2026, 9, 27), meetings: 1, characters: 500,
+                transcription: .init(provider: "soniox", model: "stt-async-v5", seconds: 600)))
+        let day = store.days[0]
+        #expect(day.characters == 2_530)
+        #expect(day.meetingCharacters == 2_500)
+
+        let meeting = day.meetingPart
+        #expect(meeting.characters == 2_500)
+        #expect(meeting.audioSeconds == 1_800)
+        #expect(meeting.cleanup.isEmpty)
+        let dictation = day.dictationPart
+        #expect(dictation.characters == 30)
+        #expect(dictation.transcription == [.init(provider: "soniox", model: "stt-rt-v5", seconds: 60)])
+        #expect(dictation.cleanup == day.cleanup)
+
+        let total = UsagePricing.estimate([day]).totalUSD
+        let parts = UsagePricing.estimate([meeting]).totalUSD + UsagePricing.estimate([dictation]).totalUSD
+        #expect(abs(total - parts) < 1e-9)
+    }
+
     @Test func daysSavedBeforeMeetingsWereCountedStillLoad() throws {
         let json = #"[{"day":"2026-09-27","dictations":3,"characters":40,"transcription":[],"cleanup":[]}]"#
         let days = try JSONDecoder().decode([DailyUsage].self, from: Data(json.utf8))
         #expect(days[0].dictations == 3)
         #expect(days[0].meetings == 0)
         #expect(days[0].meetingSeconds == 0)
+        #expect(days[0].meetingCharacters == 0)
+        #expect(days[0].dictationPart.characters == 40)
     }
 
     @Test func differentModelsAreKeptApart() {

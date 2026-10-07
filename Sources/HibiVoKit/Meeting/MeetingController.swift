@@ -600,13 +600,13 @@ public final class MeetingController {
             }
             return
         }
+        meeting.transcript.apply(tokens)
         usage?.record(
             UsageEvent(
-                meetings: 1,
+                meetings: 1, characters: meeting.transcript.characters,
                 transcription: TranscriptionUsage(
                     provider: meeting.provider.id, model: transcriber.model,
                     seconds: Double(milliseconds(audio.count, in: meeting)) / 1000)))
-        meeting.transcript.apply(tokens)
         guard !meeting.transcript.isEmpty || meeting.keepsDocument else {
             await discardRecording(meeting, with: transcriber)
             showUnlessBusy(.nothingRecognized)
@@ -893,7 +893,7 @@ public final class MeetingController {
         guard let usage, meeting.bytes > 0 else { return }
         usage.record(
             UsageEvent(
-                meetings: 1,
+                meetings: 1, characters: meeting.transcript.characters,
                 transcription: TranscriptionUsage(
                     provider: meeting.provider.id, model: meeting.config.model,
                     seconds: Double(milliseconds(meeting.bytes, in: meeting)) / 1000)))

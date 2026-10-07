@@ -46,15 +46,13 @@ enum UsageMetric: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The day's value split by where it came from, for the metrics that can tell the two apart.
-    /// nil means a single bar.
-    func parts(_ day: DailyUsage) -> [(source: UsageSource, value: Double)]? {
-        switch self {
-        case .dictations: [(.dictation, Double(day.dictations)), (.meeting, Double(day.meetings))]
-        case .minutes:
-            [(.dictation, (day.audioSeconds - day.meetingSeconds) / 60), (.meeting, day.meetingSeconds / 60)]
-        case .characters, .cost: nil
-        }
+    /// The day's value split by where it came from. Days saved before meetings were counted apart
+    /// show everything as dictation.
+    func parts(_ day: DailyUsage, yenPerUSD: Double) -> [(source: UsageSource, value: Double)] {
+        [
+            (.dictation, value(day.dictationPart, yenPerUSD: yenPerUSD)),
+            (.meeting, value(day.meetingPart, yenPerUSD: yenPerUSD)),
+        ]
     }
 
     func format(_ value: Double) -> String {
@@ -169,6 +167,10 @@ struct StatTiles: View {
         let uses = days.reduce(0) { $0 + $1.uses }
         let seconds = days.reduce(0) { $0 + $1.audioSeconds }
         let characters = days.reduce(0) { $0 + $1.characters }
+        // Dictation alone: a meeting transcript holds several people's speech and pauses.
+        let dictations = days.map(\.dictationPart)
+        let dictationCharacters = dictations.reduce(0) { $0 + $1.characters }
+        let dictationSeconds = dictations.reduce(0) { $0 + $1.audioSeconds }
         let activeDays = days.filter { $0.uses > 0 }.count
         HStack(spacing: 12) {
             StatTile(
@@ -180,7 +182,8 @@ struct StatTiles: View {
             if showsCharacters {
                 StatTile(
                     title: "文字数", value: "\(characters.formatted()) 文字",
-                    caption: seconds >= 1 ? "\(Int(Double(characters) / (seconds / 60)).formatted()) 文字/分" : nil)
+                    caption: dictationSeconds >= 1
+                        ? "音声入力 \(Int(Double(dictationCharacters) / (dictationSeconds / 60)).formatted()) 文字/分" : nil)
             }
             StatTile(
                 title: "API 料金（概算）", value: UsageFormat.yen(usd: estimate.totalUSD, rate: yenPerUSD),
@@ -238,25 +241,15 @@ struct DailyChart: View {
         Chart {
             ForEach(points, id: \.date) { point in
                 let dim = selected == nil || selected?.date == point.date ? 1 : 0.4
-                if let parts = metric.parts(point.usage) {
-                    ForEach(parts, id: \.source) { part in
-                        BarMark(
-                            x: .value("日付", point.date, unit: .day),
-                            y: .value(metric.title, part.value),
-                            width: .ratio(0.7)
-                        )
-                        .cornerRadius(4)
-                        .foregroundStyle(by: .value("種類", part.source.rawValue))
-                        .opacity(dim)
-                    }
-                } else {
+                ForEach(metric.parts(point.usage, yenPerUSD: yenPerUSD), id: \.source) { part in
                     BarMark(
                         x: .value("日付", point.date, unit: .day),
-                        y: .value(metric.title, point.value),
+                        y: .value(metric.title, part.value),
                         width: .ratio(0.7)
                     )
                     .cornerRadius(4)
-                    .foregroundStyle(.tint.opacity(dim))
+                    .foregroundStyle(by: .value("種類", part.source.rawValue))
+                    .opacity(dim)
                 }
             }
             if let selected {
@@ -279,15 +272,14 @@ struct DailyChart: View {
                             Text(metric.format(selected.value))
                                 .font(.system(size: 12, weight: .semibold))
                                 .monospacedDigit()
-                            if let parts = metric.parts(selected.usage) {
-                                Text(
-                                    parts.map { "\($0.source.rawValue) \(metric.format($0.value))" }.joined(
-                                        separator: " · ")
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                            }
+                            Text(
+                                metric.parts(selected.usage, yenPerUSD: yenPerUSD)
+                                    .map { "\($0.source.rawValue) \(metric.format($0.value))" }
+                                    .joined(separator: " · ")
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
@@ -298,7 +290,7 @@ struct DailyChart: View {
         .chartForegroundStyleScale(
             domain: UsageSource.allCases.map(\.rawValue), range: UsageSource.allCases.map(\.color)
         )
-        .chartLegend(metric.parts(DailyUsage(day: "")) != nil ? .visible : .hidden)
+        .chartLegend(.visible)
         .chartXSelection(value: $hovered)
         .padding(.top, topInset)
         .chartXAxis {
@@ -321,9 +313,7 @@ struct DailyChart: View {
     private var showsDate: Bool { period.labelStride > 1 }
 
     /// Room for the hover label, which has a line per row: date, total and the split by source.
-    private var topInset: CGFloat {
-        (showsDate ? 44 : 28) + (metric.parts(DailyUsage(day: "")) != nil ? 16 : 0)
-    }
+    private var topInset: CGFloat { showsDate ? 60 : 44 }
 
     private func axisLabel(_ value: Double) -> String {
         switch metric {

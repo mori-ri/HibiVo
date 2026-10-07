@@ -257,6 +257,8 @@ import Testing
         #expect(day.meetings == 1)
         #expect(day.dictations == 0)
         #expect(day.uses == 1)
+        #expect(day.meetingCharacters == "始めます".count)
+        #expect(day.characters == "始めます".count)
         // 3,200 bytes of 16 kHz mono PCM16.
         #expect(day.meetingSeconds == 0.1)
         #expect(day.audioSeconds == 0.1)
@@ -579,6 +581,7 @@ import Testing
         await sut.waitUntilIdle()
         let day = try #require(usage.days.first)
         #expect(day.meetings == 1)
+        #expect(day.meetingCharacters == "始めます".count)
         #expect(day.meetingSeconds == 0.1)
     }
 
