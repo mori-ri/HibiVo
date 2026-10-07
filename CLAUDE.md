@@ -55,11 +55,13 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - STT は設定(`meetingTranscriptionProviderID`、音声入力とは別)で選ぶ `MeetingTranscriber`(プロバイダと、あれば終了後用の `MeetingFileTranscriber`)。開始時に固定する。macOS 標準は話者を区別せず、終了後モードもない(常にリアルタイム)。Soniox は話者識別(`enable_speaker_diarization`)を有効にする。辞書は音声入力と同じく、表記と読み(`readings`)をヒントとして渡す(非同期の場合も同じ)。`SonioxSession` は話者識別が有効なときだけ `events` にトークンを流し、文字列は溜めない。
 - `MeetingTranscript`(純粋関数的)が、話者の切り替わりと 4 秒以上の間で段落に分ける。`MeetingDocument` が Markdown に変換する。話者は登場順に「話者1」「話者2」… と番号を振る。再接続後のセッションの話者には新しい番号を振る。ファイルは `Application Support/HibiVo/Meetings/` に数秒ごとにアトミックに書き直す。
 - セッションが切れたら再接続する(不正なキーの場合を除く)。新しいセッションの時刻は、それまでに送った音声の長さだけずらす。話者番号はセッションごとに振り直される。
-- 「終了後にまとめて」モード(`MeetingTranscriptionTiming.afterMeeting`)では STT セッションを開かず、ミックスした PCM をメモリに溜める。終了後に `SonioxFileTranscriber`(非同期 API `stt-async-v5`: アップロード → 作成 → ポーリング → 取得 → ファイルと文字起こしの削除)で処理する。WAV はメモリ上で組み立てる。バックグラウンドで実行し、録音が終わった時点でホットキーは解放する。一時的な失敗は 3 回まで再試行する。
+- 「終了後にまとめて」モード(`MeetingTranscriptionTiming.afterMeeting`)では STT セッションを開かず、ミックスした PCM をメモリに溜める。終了後に `MeetingFileTranscriber` で処理する。手順は `submit`(アップロード → 作成)→ `result`(ポーリング → 取得)→ `discard`(ファイルと文字起こしの削除)。Soniox の実装は `SonioxFileTranscriber`(非同期 API `stt-async-v5`)。WAV はメモリ上で組み立てる。バックグラウンドで実行し、録音が終わった時点でホットキーは解放する。一時的な失敗は 3 回まで再試行し、送信済みのジョブは送り直さず結果だけを取り直す。404 や `error` の状態(`MeetingFileJobError.gone`)のときだけ送り直す。
+- 同じ音声とメタデータ(`MeetingRecordingInfo`: 開始・終了時刻、プロバイダ、辞書、メモ、注記、送信済みジョブ)は `MeetingRecordingStore` が `Meetings/.recordings/<開始日時>.pcm` / `.json` にも書く(0600、バックアップ対象外)。文字起こしを保存できたら、Soniox 側とあわせて削除する。シャットダウン・スリープ・ネットワーク断で残った分は、`resumeSavedRecordings` が起動時、スリープ復帰時、ネットワーク回復時(`NWPathMonitor`)に引き継ぐ。終了時刻がなければ音声ファイルの更新時刻を使う。7 日を過ぎたものは削除する。
 - 保存後、設定で有効なら `ClaudeCodeMinutesWriter` が Claude Code CLI を `claude -p --output-format json --tools "" --strict-mcp-config --setting-sources "" --no-session-persistence --system-prompt …` で実行し、議事録を書く。ファイル名は `<開始日時>_<タイトル>.md` で、タイトルは議事録の 1 行目(`# …`)として Claude に書かせたものを `MeetingMinutesTitle` がファイル名に使える形に整える。取れなかった場合は `_議事録`。プロンプトのうち議事録の内容と書き方の部分(`MeetingMinutesPrompt.defaultInstructions`)は設定で編集でき(`instructionsLimit` 文字まで、nil・空欄・既定と同じ文はデフォルト扱い)、タイトル行・辞書・インジェクション対策・出力形式の指示は固定。ユーザー辞書は通常の整形と同じ形式(`CleanupPromptBuilder.vocabularyLines`)で、`<vocabulary>` として文字起こしの前に渡す。サブスクリプションの枠を使うため、子プロセスの環境から `ANTHROPIC_API_KEY` を取り除き、`--bare`(OAuth を読まない)は使わない。GUI アプリは PATH を引き継がないので、実行ファイルは標準のインストール先から探す。Finder は議事録ができてから 1 回だけ開く。
 - HUD にはマイクのレベルバー、メモと終了のボタンを出す(このときだけ HUD はクリックを SwiftUI に渡す)。終了は押し間違い防止のため 2 回押し(`HUDModel.confirmStop`)。
 - メモ(`AppState.meetingNotes`、Markdown)は開始時に開く非アクティブ化パネル(`MeetingNotesPanelController`)で書く。書式のボタン、Return でのリストの継続、Tab / Shift-Tab の字下げは純粋関数的な `MarkdownEditing`。メモは文字起こしの「## メモ」として先頭に入り(議事録のプロンプトにもそう伝える)、議事録には原文を貼らず、Claude が必要な分だけ取り込む。終了時に固定して欄は空にする。発言がなくてもメモがあればファイルを残す。終了後モードでも数秒ごとの保存でメモを書き出す。
-- 貼り付け・整形・ダッキングは行わない。システムのスリープは抑止し、4 時間で自動終了する。
+- 貼り付け・整形・ダッキングは行わない。アイドルスリープは抑止し、4 時間で自動終了する。
+- スリープ(`NSWorkspace.willSleepNotification`)したらミーティングを終了する。ネットワークを使う後続処理(非同期の文字起こし、議事録)は、復帰後 `wakeDelay`(10 秒)が過ぎるまで待つ。議事録が途中でスリープを挟んで失敗した場合は 1 回だけやり直す。アプリの終了時(シャットダウン・ログアウトを含む)は `applicationShouldTerminate` でミーティングを終了し、最大 5 秒待つ。
 
 **辞書**(`Vocabulary/`): `VocabularyReplacer` は、聞き取り例(`spoken` と `aliases`)を表記(`preferred`)に置き換える。照合は `KanaFolding` で 1 文字ずつ正規化して行う(NFKC で全角英数字と半角カナを揃え、平仮名を片仮名に、ヂ・ヅをジ・ズに)。英数字と仮名の境目の空白は、あってもなくても一致とする(Soniox は英単語の前後に空白を入れるため)。「ー」「・」、それ以外の空白、改行は区別する(「バッター」と「バッタ」のように語を分けるため)。置き換えなかった部分の表記は変えない。2 文字以下の仮名だけの聞き取り例(「あい」→ AI など)は一般的な言葉と区別できないため置き換えず、STT の読みにも含めない。整形プロンプトにだけ「文脈で判断する」という注記付きで渡す(`VocabularyEntry.contextualForms`)。STT には、表記(`TranscriptionConfig.vocabulary`)に加えて、聞き取り例を片仮名にした読み(`readings`)も渡す。Soniox は表記を先に、重複を除いて 200 語までを `context.terms` に入れる。Gemini には表記だけを渡す。
 
@@ -95,7 +97,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - 秘密情報は `SecretStore` / `KeychainService` 経由で Keychain にのみ保存する。
 - `VocabularyStore` / `HistoryStore` は `@MainActor @Observable` なインメモリストアで、`JSONFileStore`(`~/Library/Application Support/HibiVo/`)経由で保存する。書き込み用 actor は古い世代を破棄するため、並行保存でファイルが巻き戻らない。
 - `UsageStore` は日別の利用集計(回数・文字数・送信音声秒数・モデル別トークン)を `usage.json` に保存する。テキストは持たず、履歴の設定とは独立。料金の概算は `UsagePricing` の公開価格表から計算する。
-- 音声はディスクに一切書き込まない。
+- 音声はディスクに書き込まない。例外は「終了後にまとめて」のミーティングの一時保存(`MeetingRecordingStore`)だけで、文字起こしが済んだら削除する。
 
 ## 過去に問題になった並行性ルール
 

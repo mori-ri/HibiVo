@@ -192,7 +192,9 @@ import Testing
     }
 
     private func savedFiles() -> [URL] {
-        (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        // Skips the hidden folder of saved recordings.
+        (try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
     }
 
     /// Lets the controller's event loop take in what a mock session emitted.
@@ -550,8 +552,12 @@ import Testing
         audio.speak()
         sut.stop()
         await sut.waitUntilIdle()
-        #expect(await transcriber.calls.count == 2)
+        // The audio is uploaded once; the retry fetches the same job again.
+        #expect(await transcriber.calls.count == 1)
+        #expect(await transcriber.fetched == [job1, job1])
+        #expect(await transcriber.discarded == [job1])
         #expect(savedFiles().count == 1)
+        #expect(savedRecordings().isEmpty)
     }
 
     @Test func afterMeetingRejectedKeyIsReportedWithoutRetrying() async {
@@ -565,6 +571,212 @@ import Testing
         #expect(await transcriber.calls.count == 1)
         #expect(state.phase == .error(UserFacingError.invalidAPIKey(provider: "Mock").message))
         #expect(savedFiles().isEmpty)
+    }
+
+    private let job1 = MeetingFileJob(fileID: "file-1", transcriptionID: "job-1")
+
+    private var recordingsDirectory: URL { directory.appending(path: ".recordings") }
+
+    private func savedRecordings() -> [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: recordingsDirectory.path)) ?? []).sorted()
+    }
+
+    private func savedInfo(_ id: String) throws -> MeetingRecordingInfo {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(
+            MeetingRecordingInfo.self, from: Data(contentsOf: recordingsDirectory.appending(path: "\(id).json")))
+    }
+
+    private func makeController(
+        fileTranscriber: MockFileTranscriber, minutesWriter: MockMinutesWriter? = nil,
+        onSaved: @escaping @MainActor (URL) -> Void = { _ in }
+    ) -> MeetingController {
+        MeetingController(
+            state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: MockSecrets(),
+            transcriber: { [provider] in MeetingTranscriber(provider: provider, fileTranscriber: fileTranscriber) },
+            minutesWriter: { minutesWriter },
+            vocabulary: { [VocabularyEntry(preferred: "AppSync", spoken: "あっぷしんく")] },
+            directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], wakeDelay: .zero,
+            onSaved: onSaved)
+    }
+
+    @Test func afterMeetingKeepsTheRecordingWhenTranscriptionKeepsFailing() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([.failure(.network("offline"))])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.speak(bytes: 320)
+        audio.speak(bytes: 320)
+        state.meetingNotes = "- 宿題を確認"
+        sut.stop()
+        await sut.waitUntilIdle()
+
+        #expect(state.phase == .error(UserFacingError.meetingTranscriptionDeferred.message))
+        #expect(await transcriber.calls.count == 1)
+        #expect(await transcriber.discarded.isEmpty)
+        let id = try #require(savedRecordings().first?.split(separator: ".").first.map(String.init))
+        #expect(savedRecordings() == ["\(id).json", "\(id).pcm"])
+        let audioFile = recordingsDirectory.appending(path: "\(id).pcm")
+        #expect(try Data(contentsOf: audioFile).count == 640)
+        let attributes = try FileManager.default.attributesOfItem(atPath: audioFile.path)
+        #expect(attributes[.posixPermissions] as? Int == 0o600)
+        let info = try savedInfo(id)
+        #expect(info.job == job1)
+        #expect(info.endedAt != nil)
+        #expect(info.notes == "- 宿題を確認")
+        #expect(info.vocabulary.map(\.preferred) == ["AppSync"])
+    }
+
+    @Test func savedJobIsFetchedAgainAfterRelaunchWithoutUploading() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let first = MockFileTranscriber([.failure(.network("offline"))])
+        let before = makeController(fileTranscriber: first)
+        before.start()
+        audio.speak(bytes: 320)
+        state.meetingNotes = "- 宿題を確認"
+        await before.prepareForTermination()
+        await before.waitUntilIdle()
+
+        // The next launch.
+        let second = MockFileTranscriber([
+            .success([MeetingToken(text: "続きです", isFinal: true, speaker: "1", startMs: 0, endMs: 500)])
+        ])
+        var saved: URL?
+        let after = makeController(fileTranscriber: second, onSaved: { saved = $0 })
+        after.resumeSavedRecordings()
+        await after.waitUntilIdle()
+
+        #expect(await second.calls.isEmpty)
+        #expect(await second.fetched == [job1])
+        #expect(await second.discarded == [job1])
+        let text = try String(contentsOf: try #require(saved), encoding: .utf8)
+        #expect(text.contains("**話者1** 続きです"))
+        #expect(text.contains("- 宿題を確認"))
+        #expect(text.contains("- 終了: "))
+        #expect(savedRecordings().isEmpty)
+        #expect(state.meetingTranscriptionsInProgress == 0)
+    }
+
+    @Test func recordingCutOffByAShutdownIsTranscribedFromDisk() async throws {
+        // What a meeting leaves behind when the Mac shuts down mid-recording: audio, but no end time or job.
+        let startedAt = Date(timeIntervalSinceNow: -600)
+        let id = MeetingDocument.fileName(startedAt: startedAt).replacingOccurrences(of: ".md", with: "")
+        let store = MeetingRecordingStore(directory: recordingsDirectory)
+        let info = MeetingRecordingInfo(
+            startedAt: startedAt, endedAt: nil, providerID: provider.id, model: "m1", language: "ja",
+            vocabulary: [VocabularyEntry(preferred: "AppSync", spoken: "あっぷしんく")], includesSystemAudio: true,
+            notices: [], notes: "", job: nil)
+        #expect(await store.save(info, id: id))
+        #expect(await store.append(Data(count: 960), id: id))
+        await store.closeAudio(id: id)
+
+        let transcriber = MockFileTranscriber([
+            .success([MeetingToken(text: "残っていた", isFinal: true, speaker: "1", startMs: 0, endMs: 500)])
+        ])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.resumeSavedRecordings()
+        await sut.waitUntilIdle()
+
+        let call = try #require(await transcriber.calls.first)
+        #expect(call.bytes == 960)
+        #expect(call.config.vocabulary == ["AppSync"])
+        #expect(call.config.readings == ["アップシンク"])
+        let text = try String(contentsOf: directory.appending(path: "\(id).md"), encoding: .utf8)
+        #expect(text.contains("残っていた"))
+        #expect(text.contains("- 終了: "))
+        #expect(text.contains("マイクとシステム音声"))
+        #expect(savedRecordings().isEmpty)
+    }
+
+    @Test func goneJobIsSubmittedAgain() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber(
+            [.success([MeetingToken(text: "再送", isFinal: true, speaker: "1", startMs: 0, endMs: 500)])], gone: 1)
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.speak(bytes: 320)
+        sut.stop()
+        await sut.waitUntilIdle()
+        #expect(await transcriber.calls.map(\.bytes) == [320, 320])
+        #expect(await transcriber.discarded.map(\.transcriptionID) == ["job-1", "job-2"])
+        #expect(savedFiles().count == 1)
+        #expect(savedRecordings().isEmpty)
+    }
+
+    @Test func sleepEndsTheMeetingAndTranscribesAfterWaking() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([
+            .success([MeetingToken(text: "起きてから", isFinal: true, speaker: "1", startMs: 0, endMs: 500)])
+        ])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        audio.speak(bytes: 320)
+        sut.systemWillSleep()
+        await settle { !sut.isActive }
+        #expect(!sut.isActive)
+        #expect(state.meetingTranscriptionsInProgress == 1)
+        for _ in 0..<50 { await Task.yield() }
+        // Nothing goes out while the Mac is asleep.
+        #expect(await transcriber.calls.isEmpty)
+
+        sut.systemDidWake()
+        await sut.waitUntilIdle()
+        #expect(await transcriber.calls.count == 1)
+        #expect(savedFiles().count == 1)
+        #expect(savedRecordings().isEmpty)
+    }
+
+    @Test func sleepEndsARealtimeMeetingAndSavesIt() async throws {
+        let sut = makeController()
+        sut.start()
+        await provider.sessions[0].emit(
+            .tokens([MeetingToken(text: "ここまで", isFinal: true, speaker: "1", startMs: 0, endMs: 500)]))
+        await settle { state.partialTranscript == "ここまで" }
+        sut.systemWillSleep()
+        await sut.waitUntilIdle()
+        #expect(!sut.isActive)
+        let text = try String(contentsOf: try #require(savedFiles().first), encoding: .utf8)
+        #expect(text.contains("ここまで"))
+        #expect(text.contains("- 終了: "))
+    }
+
+    @Test func minutesWaitForWakingAndRetryAfterASleep() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.success("# 定例\n\n本文"))
+        var shown: [URL] = []
+        let sut = makeController(fileTranscriber: MockFileTranscriber([.success([])]), minutesWriter: writer) {
+            shown.append($0)
+        }
+        sut.start()
+        await provider.sessions[0].emit(
+            .tokens([MeetingToken(text: "議題", isFinal: true, speaker: "1", startMs: 0, endMs: 500)]))
+        await settle { state.partialTranscript == "議題" }
+        sut.systemWillSleep()
+        for _ in 0..<50 { await Task.yield() }
+        #expect(await writer.calls.isEmpty)
+        sut.systemDidWake()
+        await sut.waitUntilIdle()
+        #expect(await writer.calls.count == 1)
+        #expect(shown.first?.lastPathComponent.hasSuffix("_定例.md") == true)
+    }
+
+    @Test func expiredRecordingIsDropped() async throws {
+        let startedAt = Date(timeIntervalSinceNow: -MeetingRecordingStore.lifetime - 60)
+        let store = MeetingRecordingStore(directory: recordingsDirectory)
+        let info = MeetingRecordingInfo(
+            startedAt: startedAt, endedAt: startedAt, providerID: provider.id, model: "m1", language: "ja",
+            vocabulary: [], includesSystemAudio: false, notices: [], notes: "", job: job1)
+        #expect(await store.save(info, id: "old"))
+        #expect(await store.append(Data(count: 320), id: "old"))
+        await store.closeAudio(id: "old")
+        let transcriber = MockFileTranscriber([.success([])])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.resumeSavedRecordings()
+        await sut.waitUntilIdle()
+        #expect(await transcriber.fetched.isEmpty)
+        #expect(await transcriber.discarded == [job1])
+        #expect(savedRecordings().isEmpty)
     }
 
     @Test func afterMeetingFreesTheHotkeyWhileTranscribing() async {
@@ -895,6 +1107,25 @@ import Testing
             ])
     }
 
+    /// A job interrupted by a sleep must stay on Soniox's side so it can be fetched again; one that no
+    /// longer exists or failed has to be submitted again.
+    @Test(arguments: [
+        (404, #"{"error":"not found"}"#), (200, #"{"id":"job-1","status":"error","error_message":"bad"}"#),
+    ])
+    func missingOrFailedJobIsGoneWithoutDeletingAnything(status: Int, body: String) async throws {
+        let session = SonioxStubProtocol.session { request in
+            (request.httpMethod == "DELETE" ? 204 : status, Data(body.utf8))
+        }
+        let transcriber = SonioxFileTranscriber(urlSession: session, pollInterval: .zero)
+        let job = MeetingFileJob(fileID: "file-1", transcriptionID: "job-1")
+        await #expect(throws: MeetingFileJobError.gone) {
+            try await transcriber.result(of: job, apiKey: "k")
+        }
+        let requests = SonioxStubProtocol.requests(of: session)
+        #expect(requests.map(\.httpMethod) == ["GET"])
+        #expect(requests.first?.url?.path == "/v1/transcriptions/job-1")
+    }
+
     @Test func asyncAudioIsPricedLowerThanRealtime() throws {
         let async = try #require(
             UsagePricing.transcriptionUSD(TranscriptionUsage(provider: "soniox", model: "stt-async-v5", seconds: 3600)))
@@ -1022,4 +1253,44 @@ import Testing
         #expect(records[0].transcriptURL == nil)
         #expect(records[0].primaryURL?.lastPathComponent == "2026-09-27_14-00-05_議事録.md")
     }
+}
+
+/// Answers every request of one session with a canned response, and records the requests.
+final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
+    typealias Handler = @Sendable (URLRequest) -> (Int, Data)
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var handlers: [String: Handler] = [:]
+    nonisolated(unsafe) private static var recorded: [String: [URLRequest]] = [:]
+
+    static func session(_ handler: @escaping Handler) -> URLSession {
+        let id = UUID().uuidString
+        lock.withLock { handlers[id] = handler }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SonioxStubProtocol.self]
+        configuration.httpAdditionalHeaders = ["X-Stub": id]
+        return URLSession(configuration: configuration)
+    }
+
+    static func requests(of session: URLSession) -> [URLRequest] {
+        let id = session.configuration.httpAdditionalHeaders?["X-Stub"] as? String ?? ""
+        return lock.withLock { recorded[id] ?? [] }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let id = request.value(forHTTPHeaderField: "X-Stub") ?? ""
+        let handler = Self.lock.withLock {
+            Self.recorded[id, default: []].append(request)
+            return Self.handlers[id]
+        }
+        let (status, data) = handler?(request) ?? (500, Data())
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

@@ -169,17 +169,36 @@ actor MockMeetingSession: MeetingTranscriptionSession {
 actor MockFileTranscriber: MeetingFileTranscriber {
     nonisolated let model = "mock-async"
     private var results: [Result<[MeetingToken], TranscriptionError>]
+    private var gone: Int
+    /// Uploads.
     private(set) var calls: [(bytes: Int, sampleRate: Int, config: TranscriptionConfig)] = []
+    private(set) var fetched: [MeetingFileJob] = []
+    private(set) var discarded: [MeetingFileJob] = []
 
-    /// Each call takes the next result; the last one repeats.
-    init(_ results: [Result<[MeetingToken], TranscriptionError>]) {
+    /// Each result fetch takes the next result; the last one repeats.
+    /// - Parameter gone: How many fetches first report the job as gone.
+    init(_ results: [Result<[MeetingToken], TranscriptionError>], gone: Int = 0) {
         self.results = results
+        self.gone = gone
     }
 
-    func transcribe(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> [MeetingToken] {
+    func submit(pcm16: Data, sampleRate: Int, config: TranscriptionConfig) async throws -> MeetingFileJob {
         calls.append((pcm16.count, sampleRate, config))
+        return MeetingFileJob(fileID: "file-\(calls.count)", transcriptionID: "job-\(calls.count)")
+    }
+
+    func result(of job: MeetingFileJob, apiKey: String) async throws -> [MeetingToken] {
+        fetched.append(job)
+        if gone > 0 {
+            gone -= 1
+            throw MeetingFileJobError.gone
+        }
         let result = results.count > 1 ? results.removeFirst() : results[0]
         return try result.get()
+    }
+
+    func discard(_ job: MeetingFileJob, apiKey: String) async {
+        discarded.append(job)
     }
 }
 

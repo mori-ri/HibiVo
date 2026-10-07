@@ -89,7 +89,7 @@ public struct MeetingTranscript: Equatable, Sendable {
 /// Renders a meeting transcript as the Markdown file saved on disk.
 public enum MeetingDocument {
     /// Something worth telling the reader about how the audio was captured.
-    public enum Notice: Equatable, Sendable {
+    public enum Notice: String, Codable, Equatable, Sendable {
         case microphoneUnavailable
         case systemAudioUnavailable
         case systemAudioSilent
