@@ -80,6 +80,11 @@ import Testing
         #expect(body.outputConfig == nil)
     }
 
+    @Test func haiku55SendsLowEffort() {
+        let body = BedrockCleanupProvider.makeInvokeBody(system: "s", user: "u", model: "anthropic.claude-haiku-5-5")
+        #expect(body.outputConfig?.effort == "low")
+    }
+
     @MainActor @Test func builderUsesBedrockCredentialsFromKeychain() {
         let defaults = UserDefaults(suiteName: "BedrockTests-\(UUID())")!
         let settings = SettingsStore(defaults: defaults)
