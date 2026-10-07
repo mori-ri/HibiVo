@@ -91,7 +91,8 @@ public enum SecretAccount {
 }
 
 enum HTTPJSON {
-    /// - Parameter timeout: Kept above CleanupCoordinator's longest deadline, which is what actually bounds a request.
+    /// - Parameter timeout: Kept at least as long as CleanupCoordinator's longest deadline, which is what actually
+    ///   bounds a request.
     static func post(_ url: URL, headers: [String: String], body: some Encodable, timeout: TimeInterval) throws
         -> URLRequest
     {

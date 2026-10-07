@@ -26,8 +26,8 @@ public struct CleanupCoordinator: Sendable {
     }
 
     /// Time allowed for an empty transcript; each character adds `timeoutPerCharacter`.
-    public var baseTimeout: Duration
-    public var maxTimeout: Duration
+    public let baseTimeout: Duration
+    public let maxTimeout: Duration
     /// 1 s per 50 characters: well under typical output speeds, so only a stalled request hits the limit.
     static let timeoutPerCharacter: Duration = .milliseconds(20)
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "cleanup")
