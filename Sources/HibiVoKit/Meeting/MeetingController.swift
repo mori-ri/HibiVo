@@ -201,7 +201,7 @@ public final class MeetingController {
 
     /// Hotkey actions while a meeting runs. Only a double tap of the trigger (or trigger+M) stops it,
     /// so a trigger used for another shortcut (Fn+←, Fn+volume …) keeps the meeting going.
-    public func handle(_ action: HotkeyAction, at time: ContinuousClock.Instant = .now) {
+    public func handle(_ action: HotkeyAction, at time: ContinuousClock.Instant) {
         if stopGesture.handle(action, at: time) { stop() }
     }
 

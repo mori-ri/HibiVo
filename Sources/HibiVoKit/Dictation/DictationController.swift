@@ -10,6 +10,8 @@ import OSLog
 public final class DictationController {
     /// Peak RMS below this means nobody spoke; skip the upload and the paste.
     static let silenceThreshold: Float = 0.005
+    /// Holding the trigger longer than this is push-to-talk rather than a tap.
+    public nonisolated static let defaultHoldThreshold: Duration = .milliseconds(400)
     /// Safety cap in case the user forgets to stop recording.
     static let maximumRecording: Duration = .seconds(600)
 
@@ -70,7 +72,7 @@ public final class DictationController {
         ducker: (any OutputDucking)? = nil,
         duckingEnabled: @escaping @MainActor () -> Bool = { true },
         minimumDuration: Duration = .milliseconds(250),
-        holdThreshold: Duration = .milliseconds(400)
+        holdThreshold: Duration = DictationController.defaultHoldThreshold
     ) {
         self.state = state
         self.audio = audio

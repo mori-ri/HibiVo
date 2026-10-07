@@ -123,12 +123,15 @@ private func hotkeyTapCallback(
 
 /// NX_SYSDEFINED: media keys arrive as this event type, which CGEventType has no case for.
 private let systemDefinedEventType: UInt32 = 14
+/// NX_SUBTYPE_AUX_CONTROL_BUTTONS: the system-defined subtype of media keys.
+private let auxControlButtonsSubtype: Int16 = 8
 
 /// A media key press (volume, brightness …), so that holding Fn for one counts as using another key.
 /// Only key-downs of NX_SUBTYPE_AUX_CONTROL_BUTTONS; the other system-defined events (aux mouse
 /// buttons, power key …) are not keys the user combines with the trigger.
 private func mediaKeyDown(_ event: CGEvent) -> KeyEvent? {
-    guard let nsEvent = NSEvent(cgEvent: event), nsEvent.type == .systemDefined, nsEvent.subtype.rawValue == 8
+    guard let nsEvent = NSEvent(cgEvent: event), nsEvent.type == .systemDefined,
+        nsEvent.subtype.rawValue == auxControlButtonsSubtype
     else { return nil }
     let data = nsEvent.data1
     // data1: NX_KEYTYPE in the high 16 bits, key state in bits 8-15 (0xA down, 0xB up).

@@ -6,7 +6,7 @@
 /// anything else in between — a long hold, another key, Esc — starts the count over.
 public struct MeetingStopGesture: Sendable {
     /// Longer than this is a hold (e.g. Fn held for a shortcut), not a tap.
-    public static let maximumTap: Duration = .milliseconds(400)
+    public static let maximumTap: Duration = DictationController.defaultHoldThreshold
     /// The second tap has to start this soon after the first one ended.
     public static let maximumGap: Duration = .milliseconds(500)
 

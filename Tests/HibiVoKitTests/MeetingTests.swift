@@ -245,14 +245,14 @@ import Testing
     @Test func otherHotkeyActionsDoNotStopTheMeeting() async {
         let sut = makeController()
         sut.start()
-        sut.handle(.pressed)
-        sut.handle(.interrupted)
-        sut.handle(.escape)
+        sut.handle(.pressed, at: .now)
+        sut.handle(.interrupted, at: .now)
+        sut.handle(.escape, at: .now)
         // A single tap, as Fn+volume looks to macOS, isn't enough either.
-        sut.handle(.pressed)
-        sut.handle(.released)
+        sut.handle(.pressed, at: .now)
+        sut.handle(.released, at: .now)
         #expect(state.phase == .meeting)
-        sut.handle(.meeting)
+        sut.handle(.meeting, at: .now)
         await sut.waitUntilIdle()
         #expect(!sut.isActive)
     }
