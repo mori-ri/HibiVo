@@ -111,8 +111,18 @@ actor AppleSpeechModels {
         await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: language))
     }
 
-    func isInstalled(_ transcriber: SpeechTranscriber) async -> Bool {
-        await AssetInventory.status(forModules: [transcriber]) == .installed
+    /// Whether the model is on this Mac. `AssetInventory.status` only says `.installed` while this app
+    /// holds a reservation for the locale, and reports `.supported` otherwise even though the system
+    /// already has the model and recognition works, so the installed locales are checked too.
+    func isInstalled(_ transcriber: SpeechTranscriber, locale: Locale) async -> Bool {
+        if await AssetInventory.status(forModules: [transcriber]) == .installed { return true }
+        return Self.contains(await SpeechTranscriber.installedLocales, locale)
+    }
+
+    /// Matches by BCP 47 tag: the system's locale lists don't always compare equal to the supported locale.
+    private static func contains(_ locales: some Sequence<Locale>, _ locale: Locale) -> Bool {
+        let id = locale.identifier(.bcp47)
+        return locales.contains { $0.identifier(.bcp47) == id }
     }
 
     func prepare(language: String) async -> AppleSpeechProvider.ModelStatus {
@@ -128,9 +138,16 @@ actor AppleSpeechModels {
             let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
             do {
                 // Keeps the model from being removed while the app uses it; harmless if already reserved.
-                if !(await AssetInventory.reservedLocales).contains(locale) {
-                    _ = try? await AssetInventory.reserve(locale: locale)
+                if !Self.contains(await AssetInventory.reservedLocales, locale) {
+                    do {
+                        _ = try await AssetInventory.reserve(locale: locale)
+                    } catch {
+                        // Not fatal: the model may already be on the Mac, but the system could remove it later.
+                        log.error("Speech model reservation failed: \(String(describing: error), privacy: .public)")
+                    }
                 }
+                // Already on the Mac: an installation request would still take half a minute to finish.
+                if await self.isInstalled(transcriber, locale: locale) { return true }
                 if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
                     log.info("Downloading the speech model for \(key, privacy: .public)")
                     try await request.downloadAndInstall()
@@ -138,7 +155,7 @@ actor AppleSpeechModels {
             } catch {
                 log.error("Speech model install failed: \(String(describing: error), privacy: .public)")
             }
-            return await AssetInventory.status(forModules: [transcriber]) == .installed
+            return await self.isInstalled(transcriber, locale: locale)
         }
         installs[key] = task
         let installed = await task.value
@@ -246,7 +263,7 @@ actor AppleSpeechSession: MeetingTranscriptionSession {
         let transcriber = SpeechTranscriber(
             locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults],
             attributeOptions: [.audioTimeRange])
-        if !(await models.isInstalled(transcriber)) {
+        if !(await models.isInstalled(transcriber, locale: locale)) {
             // Downloading can take minutes; fetch it in the background and let the user retry.
             Task { await models.install(locale) }
             fail(.modelUnavailable)
