@@ -38,6 +38,14 @@ public struct MeetingTranscript: Equatable, Sendable {
         !segments.contains { if case .speech = $0.kind { !$0.text.isEmpty } else { false } }
     }
 
+    /// Characters of what was said, without speaker labels or line breaks. Counted for usage.
+    public var characters: Int {
+        segments.reduce(0) { total, segment in
+            guard case .speech = segment.kind else { return total }
+            return total + segment.text.filter { !$0.isNewline }.count
+        }
+    }
+
     /// The end of the running transcript, final and tentative, for live display.
     public var liveTail: String {
         let last = segments.last { if case .speech = $0.kind { true } else { false } }?.text ?? ""

@@ -39,11 +39,20 @@ enum UsageMetric: String, CaseIterable, Identifiable {
     /// Cost is in yen.
     func value(_ day: DailyUsage, yenPerUSD: Double) -> Double {
         switch self {
-        case .dictations: Double(day.dictations)
+        case .dictations: Double(day.uses)
         case .minutes: day.audioSeconds / 60
         case .characters: Double(day.characters)
         case .cost: UsagePricing.estimate([day]).totalUSD * yenPerUSD
         }
+    }
+
+    /// The day's value split by where it came from. Days saved before meetings were counted apart
+    /// show everything as dictation.
+    func parts(_ day: DailyUsage, yenPerUSD: Double) -> [(source: UsageSource, value: Double)] {
+        [
+            (.dictation, value(day.dictationPart, yenPerUSD: yenPerUSD)),
+            (.meeting, value(day.meetingPart, yenPerUSD: yenPerUSD)),
+        ]
     }
 
     func format(_ value: Double) -> String {
@@ -52,6 +61,20 @@ enum UsageMetric: String, CaseIterable, Identifiable {
         case .minutes: UsageFormat.duration(seconds: value * 60)
         case .characters: "\(Int(value).formatted()) 文字"
         case .cost: UsageFormat.yen(value)
+        }
+    }
+}
+
+enum UsageSource: String, CaseIterable {
+    case dictation = "音声入力"
+    case meeting = "ミーティング"
+
+    /// Dictation follows the system accent like other controls; meetings take a warm colour that
+    /// stands apart from it.
+    var color: Color {
+        switch self {
+        case .dictation: .accentColor
+        case .meeting: Theme.chartMeeting
         }
     }
 }
@@ -142,21 +165,26 @@ struct StatTiles: View {
     var showsCharacters = true
 
     var body: some View {
-        let dictations = days.reduce(0) { $0 + $1.dictations }
+        let uses = days.reduce(0) { $0 + $1.uses }
         let seconds = days.reduce(0) { $0 + $1.audioSeconds }
         let characters = days.reduce(0) { $0 + $1.characters }
-        let activeDays = days.filter { $0.dictations > 0 }.count
+        // Dictation alone: a meeting transcript holds several people's speech and pauses.
+        let dictations = days.map(\.dictationPart)
+        let dictationCharacters = dictations.reduce(0) { $0 + $1.characters }
+        let dictationSeconds = dictations.reduce(0) { $0 + $1.audioSeconds }
+        let activeDays = days.filter { $0.uses > 0 }.count
         HStack(spacing: 12) {
             StatTile(
-                title: "利用回数", value: "\(dictations.formatted()) 回",
+                title: "利用回数", value: "\(uses.formatted()) 回",
                 caption: activeDays > 0 ? "\(activeDays) 日利用" : nil)
             StatTile(
                 title: "話した時間", value: UsageFormat.duration(seconds: seconds),
-                caption: dictations > 0 ? "1 回あたり \(UsageFormat.duration(seconds: seconds / Double(dictations)))" : nil)
+                caption: uses > 0 ? "1 回あたり \(UsageFormat.duration(seconds: seconds / Double(uses)))" : nil)
             if showsCharacters {
                 StatTile(
                     title: "文字数", value: "\(characters.formatted()) 文字",
-                    caption: seconds >= 1 ? "\(Int(Double(characters) / (seconds / 60)).formatted()) 文字/分" : nil)
+                    caption: dictationSeconds >= 1
+                        ? "音声入力 \(Int(Double(dictationCharacters) / (dictationSeconds / 60)).formatted()) 文字/分" : nil)
             }
             StatTile(
                 title: "API 料金（概算）", value: UsageFormat.yen(usd: estimate.totalUSD, rate: yenPerUSD),
@@ -205,19 +233,25 @@ struct DailyChart: View {
     @State private var hovered: Date? = nil
 
     var body: some View {
-        let points = series.map { (date: $0.date, value: metric.value($0.usage, yenPerUSD: yenPerUSD)) }
+        let points = series.map {
+            (date: $0.date, usage: $0.usage, value: metric.value($0.usage, yenPerUSD: yenPerUSD))
+        }
         let selected = hovered.flatMap { hovered in
             points.first { Calendar.current.isDate($0.date, inSameDayAs: hovered) }
         }
         Chart {
             ForEach(points, id: \.date) { point in
-                BarMark(
-                    x: .value("日付", point.date, unit: .day),
-                    y: .value(metric.title, point.value),
-                    width: .ratio(0.7)
-                )
-                .cornerRadius(4)
-                .foregroundStyle(.tint.opacity(selected == nil || selected?.date == point.date ? 1 : 0.45))
+                let dim = selected == nil || selected?.date == point.date ? 1 : 0.4
+                ForEach(metric.parts(point.usage, yenPerUSD: yenPerUSD), id: \.source) { part in
+                    BarMark(
+                        x: .value("日付", point.date, unit: .day),
+                        y: .value(metric.title, part.value),
+                        width: .ratio(0.7)
+                    )
+                    .cornerRadius(4)
+                    .foregroundStyle(by: .value("種類", part.source.rawValue))
+                    .opacity(dim)
+                }
             }
             if let selected {
                 RuleMark(x: .value("日付", selected.date, unit: .day))
@@ -239,6 +273,14 @@ struct DailyChart: View {
                             Text(metric.format(selected.value))
                                 .font(.system(size: 12, weight: .semibold))
                                 .monospacedDigit()
+                            Text(
+                                metric.parts(selected.usage, yenPerUSD: yenPerUSD)
+                                    .map { "\($0.source.rawValue) \(metric.format($0.value))" }
+                                    .joined(separator: " · ")
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
@@ -246,6 +288,10 @@ struct DailyChart: View {
                     }
             }
         }
+        .chartForegroundStyleScale(
+            domain: UsageSource.allCases.map(\.rawValue), range: UsageSource.allCases.map(\.color)
+        )
+        .chartLegend(.visible)
         .chartXSelection(value: $hovered)
         .padding(.top, topInset)
         .chartXAxis {
@@ -267,8 +313,8 @@ struct DailyChart: View {
     /// The axis labels every day only in the week view; longer periods skip days, so the label names it.
     private var showsDate: Bool { period.labelStride > 1 }
 
-    /// Room for the hover label.
-    private var topInset: CGFloat { showsDate ? 44 : 28 }
+    /// Room for the hover label, which has a line per row: date, total and the split by source.
+    private var topInset: CGFloat { showsDate ? 60 : 44 }
 
     private func axisLabel(_ value: Double) -> String {
         switch metric {

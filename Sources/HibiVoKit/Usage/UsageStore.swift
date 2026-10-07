@@ -5,6 +5,10 @@ public struct TranscriptionUsage: Codable, Hashable, Sendable {
     public var provider: String
     public var model: String
     public var seconds: Double
+
+    func isSameModel(as other: TranscriptionUsage) -> Bool {
+        provider == other.provider && model == other.model
+    }
 }
 
 /// Cleanup requests that reported token usage, for one provider/model on one day.
@@ -42,27 +46,77 @@ public struct DailyUsage: Codable, Hashable, Sendable {
     public var day: String
     /// Dictations that produced text (pasted or copied).
     public var dictations = 0
-    /// Characters of the text that was inserted.
+    /// Meetings whose audio was transcribed.
+    public var meetings = 0
+    /// Characters of the text that was inserted, and of meeting transcripts.
     public var characters = 0
+    /// The part of `characters` that came from meetings.
+    public var meetingCharacters = 0
     public var transcription: [TranscriptionUsage] = []
+    /// The part of `transcription` that came from meetings, kept per model so its cost can be told apart.
+    public var meetingTranscription: [TranscriptionUsage] = []
     public var cleanup: [CleanupUsage] = []
 
     public init(day: String) {
         self.day = day
     }
 
+    /// Dictations and meetings together.
+    public var uses: Int { dictations + meetings }
+
+    // Counts added in later versions are missing from older files.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        day = try container.decode(String.self, forKey: .day)
+        dictations = try container.decodeIfPresent(Int.self, forKey: .dictations) ?? 0
+        meetings = try container.decodeIfPresent(Int.self, forKey: .meetings) ?? 0
+        characters = try container.decodeIfPresent(Int.self, forKey: .characters) ?? 0
+        meetingCharacters = try container.decodeIfPresent(Int.self, forKey: .meetingCharacters) ?? 0
+        transcription = try container.decodeIfPresent([TranscriptionUsage].self, forKey: .transcription) ?? []
+        meetingTranscription =
+            try container.decodeIfPresent([TranscriptionUsage].self, forKey: .meetingTranscription) ?? []
+        cleanup = try container.decodeIfPresent([CleanupUsage].self, forKey: .cleanup) ?? []
+    }
+
     public var audioSeconds: Double { transcription.reduce(0) { $0 + $1.seconds } }
     public var tokens: TokenUsage { cleanup.reduce(.zero) { $0 + $1.tokens } }
+    /// The part of `audioSeconds` that came from meetings.
+    public var meetingSeconds: Double { meetingTranscription.reduce(0) { $0 + $1.seconds } }
+
+    /// Only the meetings' share of the day, for pricing it apart. Minutes are written by Claude Code on
+    /// the user's subscription, so meetings have no cleanup tokens.
+    public var meetingPart: DailyUsage {
+        var part = DailyUsage(day: day)
+        part.meetings = meetings
+        part.characters = meetingCharacters
+        part.meetingCharacters = meetingCharacters
+        part.transcription = meetingTranscription
+        part.meetingTranscription = meetingTranscription
+        return part
+    }
+
+    /// Everything but the meetings: dictation and its cleanup, and cleanup re-run from the history.
+    public var dictationPart: DailyUsage {
+        var part = DailyUsage(day: day)
+        part.dictations = dictations
+        part.characters = characters - meetingCharacters
+        part.transcription = transcription.compactMap { usage in
+            var usage = usage
+            usage.seconds -= meetingTranscription.first { $0.isSameModel(as: usage) }?.seconds ?? 0
+            return usage.seconds > 0 ? usage : nil
+        }
+        part.cleanup = cleanup
+        return part
+    }
 
     mutating func add(_ event: UsageEvent) {
         dictations += event.dictations
+        meetings += event.meetings
         characters += event.characters
+        if event.meetings > 0 { meetingCharacters += event.characters }
         if let stt = event.transcription, stt.seconds > 0 {
-            if let index = transcription.firstIndex(where: { $0.provider == stt.provider && $0.model == stt.model }) {
-                transcription[index].seconds += stt.seconds
-            } else {
-                transcription.append(stt)
-            }
+            Self.add(stt, to: &transcription)
+            if event.meetings > 0 { Self.add(stt, to: &meetingTranscription) }
         }
         if let llm = event.cleanup {
             if let index = cleanup.firstIndex(where: { $0.isSameModel(as: llm) }) {
@@ -73,22 +127,32 @@ public struct DailyUsage: Codable, Hashable, Sendable {
             }
         }
     }
+
+    private static func add(_ usage: TranscriptionUsage, to list: inout [TranscriptionUsage]) {
+        if let index = list.firstIndex(where: { $0.isSameModel(as: usage) }) {
+            list[index].seconds += usage.seconds
+        } else {
+            list.append(usage)
+        }
+    }
 }
 
 /// One thing that happened, to be added to its day's totals.
 public struct UsageEvent: Sendable {
     public var date: Date
     public var dictations = 0
+    public var meetings = 0
     public var characters = 0
     public var transcription: TranscriptionUsage?
     public var cleanup: CleanupUsage?
 
     public init(
-        date: Date = Date(), dictations: Int = 0, characters: Int = 0, transcription: TranscriptionUsage? = nil,
-        cleanup: CleanupUsage? = nil
+        date: Date = Date(), dictations: Int = 0, meetings: Int = 0, characters: Int = 0,
+        transcription: TranscriptionUsage? = nil, cleanup: CleanupUsage? = nil
     ) {
         self.date = date
         self.dictations = dictations
+        self.meetings = meetings
         self.characters = characters
         self.transcription = transcription
         self.cleanup = cleanup
