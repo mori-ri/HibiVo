@@ -48,7 +48,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 3. `AudioCaptureService`(録音ごとに新しい AVAudioEngine)が PCM16 モノラルのチャンクを `AsyncStream<AudioChunk>` として流す。ポンプタスクが発話中にそれを STT セッションへ転送する。
 4. 録音終了時: 250 ms 未満で止めた場合(誤ったダブルタップ)はキャンセル、無音(ピーク RMS が閾値未満)はアップロードをスキップ。最前面のアプリが開始時と違えば、貼り付け先をそのアプリに変え、整形モードも開始時に固定した `AppModeTable` から引き直す(読みながら話し始め、返信欄に移ってから止める使い方のため)。HibiVo 自身が最前面なら開始時のアプリのまま。その後 `session.finish()`、`VocabularyReplacer`、`CleanupCoordinator.run`、`TextInsertionService.insert`、`HistoryStore.append` の順に実行する。
 
-**ミーティングモード**(`Meeting/MeetingController.swift`): トリガー + M(`HotkeyAction.meeting`)で開始し、次のトリガーの `.released` で終了する。`.pressed`・`.interrupted`・Esc は無視する(Fn + ← などで誤って終了しないため)。
+**ミーティングモード**(`Meeting/MeetingController.swift`): トリガー + M(`HotkeyAction.meeting`)で開始し、トリガーの素早い 2 回押しかトリガー + M で終了する。判定は純粋関数的な `MeetingStopGesture`(1 回の押下が 0.4 秒以内、2 回目の押し始めが 1 回目を離してから 0.5 秒以内)。長押し・`.interrupted`・Esc が挟まると数え直す(Fn + ← や Fn + 音量キーで誤って終了しないため)。音量・明るさなどのメディアキーは NX_SYSDEFINED で届くため、`HotkeyMonitor` がそれもタップし、トリガーを押している間なら `.interrupted` にする。
 - `AppEnvironment` は、ミーティング中は操作を `MeetingController` に回す。開始時は、トリガーの押下で始まった音声入力をキャンセルしてから開始する。
 - 音声は、マイクと、設定で有効なときはシステム音声(`SystemAudioCaptureService`)。システム音声は Core Audio の process tap(macOS 14.2 以降)を private なアグリゲートデバイスに入れて IO proc で読む。必要なのは「システムオーディオ録音」の権限だけで、拒否されていても例外は出ず、無音が届く。
 - 2 つの音源は `PCMMixer` で 1 本の PCM16 にミックスし、1 つの STT セッションに送る(料金は 1 本分)。片方が止まったときは、300 ms を超えた分を無音で埋めて送る。送信は 1 本のキューで順序を保つ。

@@ -306,7 +306,7 @@ struct MeetingSettingsView: View {
         SettingsPage {
             SettingsSection(
                 footer:
-                    "\(env.settings.hotkey.displayName) を押しながら M で開始し、もう一度 \(env.settings.hotkey.displayName) を押すと終了します。Markdown で保存します。"
+                    "\(env.settings.hotkey.displayName) を押しながら M で開始し、\(env.settings.hotkey.displayName) を素早く 2 回押すと終了します。Markdown で保存します。"
             ) {
                 PickerRow("文字起こし", selection: $settings.meetingTranscriptionProviderID) {
                     ForEach(env.meetingTranscribers, id: \.provider.id) {

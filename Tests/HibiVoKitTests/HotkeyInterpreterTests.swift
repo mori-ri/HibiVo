@@ -43,6 +43,21 @@ import Testing
         #expect(up.action == nil)
     }
 
+    /// Fn+volume: macOS sends the volume key as a system-defined event, not a key press.
+    @Test func mediaKeyWhileHoldingInterruptsAndSuppressesRelease() {
+        var sut = HotkeyInterpreter(trigger: .fn)
+        _ = sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: fnDown))
+        #expect(
+            sut.handle(KeyEvent(kind: .mediaKeyDown, keyCode: 0, flags: 0))
+                == .init(action: .interrupted, consume: false))
+        #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: 0)).action == nil)
+    }
+
+    @Test func mediaKeyWithoutTriggerIsIgnored() {
+        var sut = HotkeyInterpreter(trigger: .fn)
+        #expect(sut.handle(KeyEvent(kind: .mediaKeyDown, keyCode: 0, flags: 0)) == .init(action: nil, consume: false))
+    }
+
     @Test func fnPressAndRelease() {
         var sut = HotkeyInterpreter(trigger: .fn)
         #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: fnDown)).action == .pressed)
@@ -106,7 +121,7 @@ import Testing
             sut.handle(KeyEvent(kind: .keyUp, keyCode: KeyCode.m, flags: fnDown)) == .init(action: nil, consume: true))
         // Letting go of Fn after Fn+M is not a release.
         #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: 0)).action == nil)
-        // The next plain tap is a normal press/release, which the meeting uses to stop.
+        // The next plain tap is a normal press/release, which the meeting counts towards its stop double tap.
         #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: fnDown)).action == .pressed)
         #expect(sut.handle(KeyEvent(kind: .flagsChanged, keyCode: KeyCode.fn, flags: 0)).action == .released)
     }

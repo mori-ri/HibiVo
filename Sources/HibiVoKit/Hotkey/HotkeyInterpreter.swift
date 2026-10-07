@@ -13,7 +13,12 @@ public enum HotkeyAction: Equatable, Sendable {
 
 /// A keyboard event reduced to the fields the interpreter needs. Pure so it can be unit tested.
 public struct KeyEvent: Sendable {
-    public enum Kind: Sendable { case keyDown, keyUp, flagsChanged }
+    public enum Kind: Sendable {
+        case keyDown, keyUp, flagsChanged
+        /// A media key went down (volume, brightness, play …). macOS sends these as system-defined
+        /// events rather than key presses; `keyCode` is the NX_KEYTYPE.
+        case mediaKeyDown
+    }
     public var kind: Kind
     public var keyCode: UInt16
     public var flags: UInt64
@@ -97,7 +102,7 @@ public struct HotkeyInterpreter: Sendable {
             return Output(action: down ? .pressed : .released, consume: false)
         case .keyDown where isHeld && !event.isRepeat && event.keyCode == KeyCode.m:
             return meetingToggle()
-        case .keyDown where isHeld && !event.isRepeat:
+        case .keyDown where isHeld && !event.isRepeat, .mediaKeyDown where isHeld:
             isHeld = false
             return Output(action: .interrupted, consume: false)
         default:
@@ -124,7 +129,7 @@ public struct HotkeyInterpreter: Sendable {
             return Output(action: .released, consume: false)
         case .keyDown where isHeld && event.keyCode == KeyCode.m:
             return meetingToggle()
-        case .keyDown where isHeld:
+        case .keyDown where isHeld, .mediaKeyDown where isHeld:
             isHeld = false
             return Output(action: .interrupted, consume: false)
         default:
