@@ -183,10 +183,26 @@ struct MockCleanupProvider: TextCleanupProvider {
         let provider = MockCleanupProvider(result: .success("遅い"), delay: .seconds(5))
         let clock = ContinuousClock()
         let start = clock.now
-        let out = await CleanupCoordinator(timeout: .milliseconds(100)).run(request(), provider: provider, model: "m")
+        let out = await CleanupCoordinator(baseTimeout: .milliseconds(100), maxTimeout: .milliseconds(100)).run(
+            request(), provider: provider, model: "m")
         #expect(out.failure == .timedOut)
         #expect(out.text == request().raw)
         #expect(clock.now - start < .seconds(1))
+    }
+
+    @Test func timeoutGrowsWithTranscriptLength() {
+        let coordinator = CleanupCoordinator()
+        #expect(coordinator.timeout(for: "") == .seconds(5))
+        #expect(coordinator.timeout(for: String(repeating: "あ", count: 500)) == .seconds(15))
+        #expect(coordinator.timeout(for: String(repeating: "あ", count: 5_000)) == .seconds(30))
+    }
+
+    @Test func longTranscriptGetsMoreThanTheBaseTimeout() async {
+        let raw = String(repeating: "今日は打ち合わせをします。", count: 20)
+        let provider = MockCleanupProvider(result: .success(raw), delay: .milliseconds(300))
+        let out = await CleanupCoordinator(baseTimeout: .milliseconds(100)).run(
+            .init(raw: raw, mode: .natural, vocabulary: [], appName: nil), provider: provider, model: "m")
+        #expect(out.didCleanup)
     }
 
     @Test func missingProviderFallsBackToRaw() async {

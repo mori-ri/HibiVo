@@ -74,7 +74,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 **整形 (Cleanup)**(`Cleanup/`):
 - `TextCleanupProvider.complete(system:user:model:)`。Bedrock はキーペアが必要なため、各プロバイダは自身の認証情報を持って生成される。
-- `CleanupCoordinator` は発話を決して失わない: raw モード、プロバイダなし(nil = 認証情報なし)、エラー、5 秒タイムアウト、`CleanupOutputGuard` による棄却のいずれでも、生の文字起こしと `failure` を返す。
+- `CleanupCoordinator` は発話を決して失わない: raw モード、プロバイダなし(nil = 認証情報なし)、エラー、タイムアウト(5 秒 + 50 文字ごとに 1 秒、最大 30 秒。出力が入力とほぼ同じ長さになるため)、`CleanupOutputGuard` による棄却のいずれでも、生の文字起こしと `failure` を返す。
 - プロンプトは純粋関数的な `CleanupPromptBuilder` が生成する。文字起こしは `<transcript>` で囲まれ、モデルが内容に回答せず書き直すようにしている。
 - Custom モードは、設定の「カスタム指示」(`SettingsStore.customCleanupInstructions`、`CleanupMode.customInstructionsLimit` 文字まで)を `<instructions>` として基本の整形ルールに加える。指示は録音開始時に `DictationContext.Cleanup` に固定する。
 - プロバイダ:

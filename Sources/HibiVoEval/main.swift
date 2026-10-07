@@ -27,9 +27,10 @@ struct Options: Sendable {
     var only: Set<String> = []
     var limit: Int?
     var concurrency = 4
-    /// Ceiling on one case, cleanup and judge together. Cleanup itself still stops at 5 s like production.
+    /// Ceiling on one case, cleanup and judge together. Cleanup itself still stops where production does.
     var caseTimeout: Duration = .seconds(120)
-    /// CleanupCoordinator's timeout. 5 s is production; raise it only for the CLI provider.
+    /// CleanupCoordinator's base timeout (it still grows with length). 5 s is production; raise it only for the CLI
+    /// provider.
     var cleanupTimeout: Duration = .seconds(5)
     /// Where the judge runs: "anthropic" (Claude API) or "bedrock" (InvokeModel with HibiVo's Bedrock API key).
     var judgeProvider = "bedrock"
@@ -609,7 +610,8 @@ func backoff(_ attempt: Int) async {
 func runCase(
     _ evalCase: EvalCase, rep: Int, options: Options, provider: any TextCleanupProvider, judge: Judge
 ) async throws -> CaseOutput {
-    let coordinator = CleanupCoordinator(timeout: options.cleanupTimeout)
+    let coordinator = CleanupCoordinator(
+        baseTimeout: options.cleanupTimeout, maxTimeout: max(options.cleanupTimeout, .seconds(30)))
     var retries = 0
     var cleanup: (raw: String, outcome: CleanupOutcome)
     var latency: Double

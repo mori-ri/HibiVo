@@ -13,6 +13,7 @@ public struct CleanupOutcome: Equatable, Sendable {
 }
 
 /// Runs one cleanup with a hard timeout and falls back to the raw transcript on any problem.
+/// The timeout grows with the transcript, since the model has to write roughly as much as it reads.
 /// Cleanup must never cost the user their utterance.
 public struct CleanupCoordinator: Sendable {
     public struct Request: Sendable {
@@ -24,11 +25,20 @@ public struct CleanupCoordinator: Sendable {
         public var customInstructions: String = ""
     }
 
-    public var timeout: Duration
+    /// Time allowed for an empty transcript; each character adds `timeoutPerCharacter`.
+    public var baseTimeout: Duration
+    public var maxTimeout: Duration
+    /// 1 s per 50 characters: well under typical output speeds, so only a stalled request hits the limit.
+    static let timeoutPerCharacter: Duration = .milliseconds(20)
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "cleanup")
 
-    public init(timeout: Duration = .seconds(5)) {
-        self.timeout = timeout
+    public init(baseTimeout: Duration = .seconds(5), maxTimeout: Duration = .seconds(30)) {
+        self.baseTimeout = baseTimeout
+        self.maxTimeout = max(baseTimeout, maxTimeout)
+    }
+
+    func timeout(for raw: String) -> Duration {
+        min(maxTimeout, baseTimeout + Self.timeoutPerCharacter * raw.count)
     }
 
     /// - Parameter provider: nil when the selected provider has no credentials configured.
@@ -44,7 +54,7 @@ public struct CleanupCoordinator: Sendable {
         let user = CleanupPromptBuilder.userMessage(transcript: raw)
 
         do {
-            let output = try await withTimeout(timeout) {
+            let output = try await withTimeout(timeout(for: raw)) {
                 try await provider.complete(system: system, user: user, model: model)
             }
             guard let text = CleanupOutputGuard.validate(output.text, raw: raw, mode: request.mode) else {

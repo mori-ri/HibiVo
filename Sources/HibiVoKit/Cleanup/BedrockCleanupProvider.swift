@@ -158,10 +158,10 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
             case .invokeModel:
                 try HTTPJSON.post(
                     url, headers: headers, body: Self.makeInvokeBody(system: system, user: user, model: model),
-                    timeout: 15)
+                    timeout: 60)
             case .converse:
                 try HTTPJSON.post(
-                    url, headers: headers, body: Self.makeConverseBody(system: system, user: user), timeout: 15)
+                    url, headers: headers, body: Self.makeConverseBody(system: system, user: user), timeout: 60)
             }
         if case .iam(let credentials) = authentication {
             AWSSigV4.sign(&request, credentials: credentials, region: region, service: "bedrock", date: date)

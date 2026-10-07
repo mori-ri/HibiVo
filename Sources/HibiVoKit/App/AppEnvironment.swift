@@ -253,7 +253,7 @@ public final class AppEnvironment {
         guard !record.rawTranscript.isEmpty else { return false }
         let cleanup = contextBuilder.cleanup(for: nil)
         let mode = record.cleanupMode == .raw ? settings.defaultCleanupMode : record.cleanupMode
-        let outcome = await CleanupCoordinator(timeout: .seconds(20)).run(
+        let outcome = await CleanupCoordinator(baseTimeout: .seconds(20), maxTimeout: .seconds(60)).run(
             .init(
                 raw: record.rawTranscript, mode: mode,
                 vocabulary: vocabulary.activeEntries.map(\.promptTerm), appName: record.appName,
