@@ -119,6 +119,7 @@ struct HomeView: View {
                 ShortcutRow("押している間だけ話す", keys: ["\(key) 長押し"])
                 ShortcutRow("録音をやめる", keys: ["esc"])
                 ShortcutRow("ミーティングを記録", keys: [key, "M"])
+                ShortcutRow("ミーティングを終了", keys: ["\(key) 2 回"])
             }
         }
     }

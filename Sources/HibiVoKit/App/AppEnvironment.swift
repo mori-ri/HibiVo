@@ -107,7 +107,7 @@ public final class AppEnvironment {
             // mics), and a slow callback makes the system disable the event tap.
             Task { @MainActor in
                 if meeting.isActive {
-                    meeting.handle(action)
+                    meeting.handle(action, at: occurredAt)
                 } else if action == .meeting {
                     // The trigger press already began a dictation; drop it and record the meeting instead.
                     dictation.handle(action, at: occurredAt)

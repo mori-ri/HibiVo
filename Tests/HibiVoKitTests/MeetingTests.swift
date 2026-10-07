@@ -225,7 +225,12 @@ import Testing
         await settle { state.partialTranscript == "始めます" }
         #expect(state.partialTranscript == "始めます")
 
-        sut.handle(.released)
+        let t0 = ContinuousClock.now
+        sut.handle(.pressed, at: t0)
+        sut.handle(.released, at: t0 + .milliseconds(100))
+        #expect(state.phase == .meeting)
+        sut.handle(.pressed, at: t0 + .milliseconds(300))
+        sut.handle(.released, at: t0 + .milliseconds(400))
         #expect(state.phase == .processing)
         await sut.waitUntilIdle()
 
@@ -267,11 +272,14 @@ import Testing
     @Test func otherHotkeyActionsDoNotStopTheMeeting() async {
         let sut = makeController()
         sut.start()
-        sut.handle(.pressed)
-        sut.handle(.interrupted)
-        sut.handle(.escape)
+        sut.handle(.pressed, at: .now)
+        sut.handle(.interrupted, at: .now)
+        sut.handle(.escape, at: .now)
+        // A single tap, as Fn+volume looks to macOS, isn't enough either.
+        sut.handle(.pressed, at: .now)
+        sut.handle(.released, at: .now)
         #expect(state.phase == .meeting)
-        sut.handle(.meeting)
+        sut.handle(.meeting, at: .now)
         await sut.waitUntilIdle()
         #expect(!sut.isActive)
     }
@@ -1338,4 +1346,63 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {}
+}
+
+@Suite struct MeetingStopGestureTests {
+    let t0 = ContinuousClock.now
+
+    private func ms(_ value: Int) -> ContinuousClock.Instant { t0 + .milliseconds(value) }
+
+    @Test func doubleTapStops() {
+        var sut = MeetingStopGesture()
+        #expect(sut.handle(.pressed, at: ms(0)) == false)
+        #expect(sut.handle(.released, at: ms(100)) == false)
+        #expect(sut.handle(.pressed, at: ms(400)) == false)
+        #expect(sut.handle(.released, at: ms(500)) == true)
+    }
+
+    @Test func singleTapDoesNotStop() {
+        var sut = MeetingStopGesture()
+        _ = sut.handle(.pressed, at: ms(0))
+        #expect(sut.handle(.released, at: ms(100)) == false)
+    }
+
+    @Test func slowSecondTapStartsOver() {
+        var sut = MeetingStopGesture()
+        _ = sut.handle(.pressed, at: ms(0))
+        _ = sut.handle(.released, at: ms(100))
+        _ = sut.handle(.pressed, at: ms(700))
+        #expect(sut.handle(.released, at: ms(800)) == false)
+        // That late tap counts as the first of a new pair.
+        _ = sut.handle(.pressed, at: ms(1000))
+        #expect(sut.handle(.released, at: ms(1100)) == true)
+    }
+
+    @Test func holdsAreNotTaps() {
+        var sut = MeetingStopGesture()
+        _ = sut.handle(.pressed, at: ms(0))
+        _ = sut.handle(.released, at: ms(100))
+        _ = sut.handle(.pressed, at: ms(200))
+        #expect(sut.handle(.released, at: ms(900)) == false)
+        _ = sut.handle(.pressed, at: ms(1000))
+        #expect(sut.handle(.released, at: ms(1100)) == false)
+    }
+
+    @Test func otherKeysInBetweenStartOver() {
+        for interruption in [HotkeyAction.interrupted, .escape] {
+            var sut = MeetingStopGesture()
+            _ = sut.handle(.pressed, at: ms(0))
+            _ = sut.handle(.released, at: ms(100))
+            _ = sut.handle(.pressed, at: ms(200))
+            // Fn+← (or a media key): the interpreter sends no release after an interruption.
+            _ = sut.handle(interruption, at: ms(250))
+            _ = sut.handle(.pressed, at: ms(400))
+            #expect(sut.handle(.released, at: ms(500)) == false)
+        }
+    }
+
+    @Test func triggerPlusMStops() {
+        var sut = MeetingStopGesture()
+        #expect(sut.handle(.meeting, at: ms(0)) == true)
+    }
 }

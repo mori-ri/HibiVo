@@ -147,6 +147,7 @@ public final class MeetingController {
     private var sleepCount = 0
     private var wakeWaiters: [CheckedContinuation<Void, Never>] = []
     private var waking: Task<Void, Never>?
+    private var stopGesture = MeetingStopGesture()
 
     /// - Parameter systemAudio: Captures the remote side of an online meeting; nil where unsupported.
     ///   Used only while `settings.meetingCapturesSystemAudio` is on.
@@ -198,13 +199,10 @@ public final class MeetingController {
     /// True from start until the file has been saved after stopping.
     public var isActive: Bool { meeting != nil }
 
-    /// Hotkey actions while a meeting runs. Stopping on release rather than press means a trigger
-    /// used together with another key (Fn+←, Fn+F …) is an interruption and keeps the meeting going.
-    public func handle(_ action: HotkeyAction) {
-        switch action {
-        case .released, .meeting: stop()
-        case .pressed, .interrupted, .escape: break
-        }
+    /// Hotkey actions while a meeting runs. Only a double tap of the trigger (or trigger+M) stops it,
+    /// so a trigger used for another shortcut (Fn+←, Fn+volume …) keeps the meeting going.
+    public func handle(_ action: HotkeyAction, at time: ContinuousClock.Instant) {
+        if stopGesture.handle(action, at: time) { stop() }
     }
 
     /// Waits for a stopping meeting to be saved, including after-meeting transcription and minutes.
@@ -222,6 +220,7 @@ public final class MeetingController {
     public func start() {
         guard meeting == nil, !state.phase.isActive else { return }
         errorDismiss?.cancel()
+        stopGesture.reset()
 
         let stt = transcriber()
         let provider = stt.provider
