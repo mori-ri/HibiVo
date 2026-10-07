@@ -181,14 +181,16 @@ import Testing
 
     private func makeController(
         secrets: MockSecrets = MockSecrets(), fileTranscriber: MockFileTranscriber? = nil,
-        minutesWriter: MockMinutesWriter? = nil, onSaved: @escaping @MainActor (URL) -> Void = { _ in }
+        minutesWriter: MockMinutesWriter? = nil, usage: UsageStore? = nil,
+        onSaved: @escaping @MainActor (URL) -> Void = { _ in }
     ) -> MeetingController {
         MeetingController(
             state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: secrets,
             transcriber: { [provider] in MeetingTranscriber(provider: provider, fileTranscriber: fileTranscriber) },
             minutesWriter: { minutesWriter },
             vocabulary: { [VocabularyEntry(preferred: "AppSync", spoken: "あっぷしんく")] },
-            directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved)
+            usage: usage, directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved
+        )
     }
 
     private func savedFiles() -> [URL] {
@@ -235,6 +237,29 @@ import Testing
         let text = try String(contentsOf: url, encoding: .utf8)
         #expect(text.contains("**話者1** 始めます"))
         #expect(text.contains("- 終了: "))
+    }
+
+    private func makeUsage() -> UsageStore {
+        UsageStore(file: JSONFileStore(url: directory.appending(path: "usage.json")))
+    }
+
+    @Test func realtimeMeetingCountsAsAUseWithItsAudio() async throws {
+        let usage = makeUsage()
+        let sut = makeController(usage: usage)
+        sut.start()
+        audio.speak(bytes: 3_200)
+        let session = try #require(provider.sessions.first)
+        await session.emit(.tokens([MeetingToken(text: "始めます", isFinal: true, speaker: "1", startMs: 0, endMs: 80)]))
+        await settle { state.partialTranscript == "始めます" }
+        sut.stop()
+        await sut.waitUntilIdle()
+        let day = try #require(usage.days.first)
+        #expect(day.meetings == 1)
+        #expect(day.dictations == 0)
+        #expect(day.uses == 1)
+        // 3,200 bytes of 16 kHz mono PCM16.
+        #expect(day.meetingSeconds == 0.1)
+        #expect(day.audioSeconds == 0.1)
     }
 
     @Test func otherHotkeyActionsDoNotStopTheMeeting() async {
@@ -541,6 +566,22 @@ import Testing
         #expect(text.contains("- 終了: "))
     }
 
+    @Test func afterMeetingCountsAsAUseOnceTranscribed() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([
+            .success([MeetingToken(text: "始めます", isFinal: true, speaker: "1", startMs: 0, endMs: 80)])
+        ])
+        let usage = makeUsage()
+        let sut = makeController(fileTranscriber: transcriber, usage: usage)
+        sut.start()
+        audio.speak(bytes: 3_200)
+        sut.stop()
+        await sut.waitUntilIdle()
+        let day = try #require(usage.days.first)
+        #expect(day.meetings == 1)
+        #expect(day.meetingSeconds == 0.1)
+    }
+
     @Test func afterMeetingRetriesTransientFailures() async throws {
         settings.meetingTranscriptionTiming = .afterMeeting
         let transcriber = MockFileTranscriber([
@@ -589,7 +630,7 @@ import Testing
     }
 
     private func makeController(
-        fileTranscriber: MockFileTranscriber, minutesWriter: MockMinutesWriter? = nil,
+        fileTranscriber: MockFileTranscriber, minutesWriter: MockMinutesWriter? = nil, usage: UsageStore? = nil,
         onSaved: @escaping @MainActor (URL) -> Void = { _ in }
     ) -> MeetingController {
         MeetingController(
@@ -597,7 +638,8 @@ import Testing
             transcriber: { [provider] in MeetingTranscriber(provider: provider, fileTranscriber: fileTranscriber) },
             minutesWriter: { minutesWriter },
             vocabulary: { [VocabularyEntry(preferred: "AppSync", spoken: "あっぷしんく")] },
-            directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], wakeDelay: .zero,
+            usage: usage, directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero],
+            wakeDelay: .zero,
             onSaved: onSaved)
     }
 

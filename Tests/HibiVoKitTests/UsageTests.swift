@@ -45,6 +45,29 @@ import Testing
             ])
     }
 
+    @Test func meetingsAreCountedApartFromDictations() {
+        let store = makeStore()
+        store.record(dictation(on: date(2026, 9, 27), seconds: 5))
+        store.record(
+            UsageEvent(
+                date: date(2026, 9, 27), meetings: 1,
+                transcription: .init(provider: "soniox", model: "stt-async-v5", seconds: 600)))
+        let day = store.days[0]
+        #expect(day.dictations == 1)
+        #expect(day.meetings == 1)
+        #expect(day.uses == 2)
+        #expect(day.meetingSeconds == 600)
+        #expect(day.audioSeconds == 605)
+    }
+
+    @Test func daysSavedBeforeMeetingsWereCountedStillLoad() throws {
+        let json = #"[{"day":"2026-09-27","dictations":3,"characters":40,"transcription":[],"cleanup":[]}]"#
+        let days = try JSONDecoder().decode([DailyUsage].self, from: Data(json.utf8))
+        #expect(days[0].dictations == 3)
+        #expect(days[0].meetings == 0)
+        #expect(days[0].meetingSeconds == 0)
+    }
+
     @Test func differentModelsAreKeptApart() {
         let store = makeStore()
         store.record(dictation(on: date(2026, 9, 27), tokens: .init(input: 1, output: 1)))

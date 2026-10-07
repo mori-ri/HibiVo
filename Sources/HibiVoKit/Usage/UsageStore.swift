@@ -42,6 +42,10 @@ public struct DailyUsage: Codable, Hashable, Sendable {
     public var day: String
     /// Dictations that produced text (pasted or copied).
     public var dictations = 0
+    /// Meetings whose audio was transcribed.
+    public var meetings = 0
+    /// The part of `audioSeconds` that came from meetings.
+    public var meetingSeconds: Double = 0
     /// Characters of the text that was inserted.
     public var characters = 0
     public var transcription: [TranscriptionUsage] = []
@@ -51,13 +55,30 @@ public struct DailyUsage: Codable, Hashable, Sendable {
         self.day = day
     }
 
+    /// Dictations and meetings together.
+    public var uses: Int { dictations + meetings }
+
+    // Counts added in later versions are missing from older files.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        day = try container.decode(String.self, forKey: .day)
+        dictations = try container.decodeIfPresent(Int.self, forKey: .dictations) ?? 0
+        meetings = try container.decodeIfPresent(Int.self, forKey: .meetings) ?? 0
+        meetingSeconds = try container.decodeIfPresent(Double.self, forKey: .meetingSeconds) ?? 0
+        characters = try container.decodeIfPresent(Int.self, forKey: .characters) ?? 0
+        transcription = try container.decodeIfPresent([TranscriptionUsage].self, forKey: .transcription) ?? []
+        cleanup = try container.decodeIfPresent([CleanupUsage].self, forKey: .cleanup) ?? []
+    }
+
     public var audioSeconds: Double { transcription.reduce(0) { $0 + $1.seconds } }
     public var tokens: TokenUsage { cleanup.reduce(.zero) { $0 + $1.tokens } }
 
     mutating func add(_ event: UsageEvent) {
         dictations += event.dictations
+        meetings += event.meetings
         characters += event.characters
         if let stt = event.transcription, stt.seconds > 0 {
+            if event.meetings > 0 { meetingSeconds += stt.seconds }
             if let index = transcription.firstIndex(where: { $0.provider == stt.provider && $0.model == stt.model }) {
                 transcription[index].seconds += stt.seconds
             } else {
@@ -79,16 +100,18 @@ public struct DailyUsage: Codable, Hashable, Sendable {
 public struct UsageEvent: Sendable {
     public var date: Date
     public var dictations = 0
+    public var meetings = 0
     public var characters = 0
     public var transcription: TranscriptionUsage?
     public var cleanup: CleanupUsage?
 
     public init(
-        date: Date = Date(), dictations: Int = 0, characters: Int = 0, transcription: TranscriptionUsage? = nil,
-        cleanup: CleanupUsage? = nil
+        date: Date = Date(), dictations: Int = 0, meetings: Int = 0, characters: Int = 0,
+        transcription: TranscriptionUsage? = nil, cleanup: CleanupUsage? = nil
     ) {
         self.date = date
         self.dictations = dictations
+        self.meetings = meetings
         self.characters = characters
         self.transcription = transcription
         self.cleanup = cleanup

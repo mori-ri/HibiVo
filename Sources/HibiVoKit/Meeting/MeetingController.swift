@@ -602,6 +602,7 @@ public final class MeetingController {
         }
         usage?.record(
             UsageEvent(
+                meetings: 1,
                 transcription: TranscriptionUsage(
                     provider: meeting.provider.id, model: transcriber.model,
                     seconds: Double(milliseconds(audio.count, in: meeting)) / 1000)))
@@ -892,6 +893,7 @@ public final class MeetingController {
         guard let usage, meeting.bytes > 0 else { return }
         usage.record(
             UsageEvent(
+                meetings: 1,
                 transcription: TranscriptionUsage(
                     provider: meeting.provider.id, model: meeting.config.model,
                     seconds: Double(milliseconds(meeting.bytes, in: meeting)) / 1000)))
