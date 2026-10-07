@@ -10,8 +10,8 @@
 //
 // `--provider claude-code` and `--judge-provider claude-code` go through the Claude Code CLI instead,
 // so they count against the user's Claude subscription rather than API billing. The CLI's start-up
-// time doesn't fit the 5 s production timeout, so pair it with --cleanup-timeout-s and read latency
-// from those runs as CLI overhead, not as what the app would see.
+// time doesn't fit the production timeout (5 s plus 1 s per 50 characters), so pair it with
+// --cleanup-timeout-s and read latency from those runs as CLI overhead, not as what the app would see.
 
 import CryptoKit
 import Foundation
@@ -27,9 +27,10 @@ struct Options: Sendable {
     var only: Set<String> = []
     var limit: Int?
     var concurrency = 4
-    /// Ceiling on one case, cleanup and judge together. Cleanup itself still stops at 5 s like production.
+    /// Ceiling on one case, cleanup and judge together. Cleanup itself still stops where production does.
     var caseTimeout: Duration = .seconds(120)
-    /// CleanupCoordinator's timeout. 5 s is production; raise it only for the CLI provider.
+    /// CleanupCoordinator's base timeout (it grows with length up to 30 s, or not at all past that). 5 s is
+    /// production; raise it only for the CLI provider.
     var cleanupTimeout: Duration = .seconds(5)
     /// Where the judge runs: "anthropic" (Claude API) or "bedrock" (InvokeModel with HibiVo's Bedrock API key).
     var judgeProvider = "bedrock"
@@ -609,7 +610,7 @@ func backoff(_ attempt: Int) async {
 func runCase(
     _ evalCase: EvalCase, rep: Int, options: Options, provider: any TextCleanupProvider, judge: Judge
 ) async throws -> CaseOutput {
-    let coordinator = CleanupCoordinator(timeout: options.cleanupTimeout)
+    let coordinator = CleanupCoordinator(baseTimeout: options.cleanupTimeout, maxTimeout: .seconds(30))
     var retries = 0
     var cleanup: (raw: String, outcome: CleanupOutcome)
     var latency: Double

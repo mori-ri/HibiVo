@@ -81,7 +81,7 @@ public struct GeminiCleanupProvider: TextCleanupProvider {
     public func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
         let request = try HTTPJSON.post(
             Self.endpoint, headers: ["x-goog-api-key": apiKey],
-            body: Self.makeRequest(system: system, user: user, model: model), timeout: 15)
+            body: Self.makeRequest(system: system, user: user, model: model), timeout: 60)
         let (data, response) = try await urlSession.data(for: request)
         // A bad key comes back as 400 API_KEY_INVALID rather than 401.
         if let http = response as? HTTPURLResponse, http.statusCode == 400,

@@ -97,7 +97,7 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         let body = Self.makeRequest(system: system, user: user, model: model)
         var headers = ["x-api-key": apiKey, "anthropic-version": "2023-06-01"]
         if body.fallbacks != nil { headers["anthropic-beta"] = "server-side-fallback-2026-07-01" }
-        let request = try HTTPJSON.post(endpoint, headers: headers, body: body, timeout: 15)
+        let request = try HTTPJSON.post(endpoint, headers: headers, body: body, timeout: 60)
         let (data, response) = try await urlSession.data(for: request)
         try HTTPJSON.checkStatus(response)
         return try Self.parse(data)

@@ -52,7 +52,7 @@ public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
             messages: [.init(role: "system", content: system), .init(role: "user", content: user)])
         let request = try HTTPJSON.post(
             baseURL.appending(path: "chat/completions"),
-            headers: ["Authorization": "Bearer \(apiKey)"], body: body, timeout: 15)
+            headers: ["Authorization": "Bearer \(apiKey)"], body: body, timeout: 60)
         let (data, response) = try await urlSession.data(for: request)
         try HTTPJSON.checkStatus(response)
         return try Self.parse(data)
