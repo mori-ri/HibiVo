@@ -69,11 +69,12 @@ enum UsageSource: String, CaseIterable {
     case dictation = "音声入力"
     case meeting = "ミーティング"
 
-    /// Two shades of the accent colour, so the chart follows the system accent like other controls.
+    /// Dictation follows the system accent like other controls; meetings take a warm colour that
+    /// stands apart from it.
     var color: Color {
         switch self {
         case .dictation: .accentColor
-        case .meeting: .accentColor.opacity(0.45)
+        case .meeting: Theme.chartMeeting
         }
     }
 }

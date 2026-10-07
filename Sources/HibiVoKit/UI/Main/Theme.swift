@@ -32,6 +32,9 @@ enum Theme {
     static let brandLavender = Color(red: 0xC8 / 255, green: 0xB5 / 255, blue: 0xF5 / 255)
     static let brandApricot = Color(red: 0xFF / 255, green: 0x9A / 255, blue: 0x3C / 255)
 
+    /// Meeting bars in the usage chart, next to dictation in the accent colour. See DESIGN.md.
+    static let chartMeeting = brandApricot
+
     /// The logo sweep for small marks (icons, the learned-word notice). Always left to right, like
     /// the logo. See DESIGN.md.
     static let brandGradient = LinearGradient(
