@@ -81,7 +81,8 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
     /// Shared with Bedrock, whose model IDs look like `anthropic.claude-…` or `global.anthropic.claude-…`.
     static func makeRequest(system: String, user: String, model: String, allowFallbacks: Bool = true) -> Request {
         let name = model.range(of: "anthropic.").map { String(model[$0.upperBound...]) } ?? model
-        let supportsEffort = !name.hasPrefix("claude-haiku")
+        // Haiku 4.5 rejects effort; Haiku 5.5 takes it (and defaults to medium, so low is worth sending).
+        let supportsEffort = !name.hasPrefix("claude-haiku-4")
         let supportsFallbacks =
             allowFallbacks
             && ["claude-opus-5", "claude-fable-5", "claude-sonnet-5-5"].contains { name.hasPrefix($0) }

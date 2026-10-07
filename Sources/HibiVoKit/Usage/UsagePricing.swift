@@ -37,6 +37,8 @@ public enum UsagePricing {
         ("claude-opus-4-6", .init(input: 5, output: 25)),
         ("claude-sonnet-5", .init(input: 2, output: 10)),
         ("claude-sonnet-4-6", .init(input: 3, output: 15)),
+        // Prompts up to 100K tokens; cleanup never gets near the higher long-prompt price.
+        ("claude-haiku-5-5", .init(input: 0.10, output: 0.50)),
         ("claude-haiku-4-5", .init(input: 1, output: 5)),
     ]
 
