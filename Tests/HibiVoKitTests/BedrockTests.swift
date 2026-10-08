@@ -80,6 +80,22 @@ import Testing
         #expect(body.outputConfig == nil)
     }
 
+    @Test func haiku55SendsLowEffort() {
+        let body = BedrockCleanupProvider.makeInvokeBody(
+            system: "s", user: "u", model: "global.anthropic.claude-haiku-5-5")
+        #expect(body.outputConfig?.effort == "low")
+    }
+
+    @Test func errorMessageIsReadFromBedrockAndAnthropicBodies() {
+        let bedrock = #"{"message":"Retry your request with the ID or ARN of an inference profile."}"#
+        #expect(
+            HTTPJSON.errorMessage(Data(bedrock.utf8))
+                == "Retry your request with the ID or ARN of an inference profile.")
+        let anthropic = #"{"type":"error","error":{"type":"invalid_request_error","message":"bad"}}"#
+        #expect(HTTPJSON.errorMessage(Data(anthropic.utf8)) == "bad")
+        #expect(HTTPJSON.errorMessage(Data("not json".utf8)) == nil)
+    }
+
     @MainActor @Test func builderUsesBedrockCredentialsFromKeychain() {
         let defaults = UserDefaults(suiteName: "BedrockTests-\(UUID())")!
         let settings = SettingsStore(defaults: defaults)

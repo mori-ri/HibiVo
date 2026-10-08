@@ -256,6 +256,12 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(body.fallbacks == nil)
     }
 
+    @Test func haiku55RequestSendsLowEffortWithoutFallbacks() {
+        let body = AnthropicCleanupProvider.makeRequest(system: "s", user: "u", model: "claude-haiku-5-5")
+        #expect(body.outputConfig?.effort == "low")
+        #expect(body.fallbacks == nil)
+    }
+
     @Test func anthropicParsesTextAndSkipsThinkingBlocks() throws {
         let data = Data(
             #"{"content":[{"type":"thinking","thinking":""},{"type":"text","text":"整形済み"}],"stop_reason":"end_turn","usage":{"input_tokens":120,"output_tokens":30,"cache_read_input_tokens":0}}"#

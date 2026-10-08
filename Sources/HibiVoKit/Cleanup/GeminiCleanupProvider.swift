@@ -89,7 +89,7 @@ public struct GeminiCleanupProvider: TextCleanupProvider {
         {
             throw CleanupError.unauthorized
         }
-        try HTTPJSON.checkStatus(response)
+        try HTTPJSON.checkStatus(response, data: data)
         return try Self.parse(data)
     }
 

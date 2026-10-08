@@ -169,6 +169,8 @@ import Testing
         #expect(UsagePricing.rate(provider: "anthropic", model: "claude-fable-5-1") == .init(input: 10, output: 50))
         #expect(
             UsagePricing.rate(provider: "anthropic", model: "claude-haiku-4-5-20251001") == .init(input: 1, output: 5))
+        #expect(
+            UsagePricing.rate(provider: "anthropic", model: "claude-haiku-5-5") == .init(input: 0.10, output: 0.50))
     }
 
     func expectRate(
