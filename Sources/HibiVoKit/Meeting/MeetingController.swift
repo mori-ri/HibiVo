@@ -807,6 +807,10 @@ public final class MeetingController {
                     transcript: document, vocabulary: vocabulary, model: model)
             } catch {
                 failure = error
+                // A cut-off answer was still billed.
+                if case .outputLimitReached(let tokens?) = error as? MeetingMinutesError {
+                    usage?.record(UsageEvent(minutes: tokens))
+                }
                 if sleepCount == sleeps { break }
             }
         }

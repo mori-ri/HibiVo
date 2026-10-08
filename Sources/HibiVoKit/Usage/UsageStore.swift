@@ -135,7 +135,7 @@ public struct DailyUsage: Codable, Hashable, Sendable {
         if let llm = event.minutes { Self.add(llm, to: &minutes) }
     }
 
-    private static func add(_ usage: CleanupUsage, to list: inout [CleanupUsage]) {
+    static func add(_ usage: CleanupUsage, to list: inout [CleanupUsage]) {
         if let index = list.firstIndex(where: { $0.isSameModel(as: usage) }) {
             list[index].requests += usage.requests
             list[index].tokens = list[index].tokens + usage.tokens

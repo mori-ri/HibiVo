@@ -36,6 +36,12 @@ public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
         struct Choice: Decodable {
             struct Message: Decodable { var content: String? }
             var message: Message
+            var finishReason: String?
+
+            enum CodingKeys: String, CodingKey {
+                case message
+                case finishReason = "finish_reason"
+            }
         }
         struct Usage: Decodable {
             var promptTokens: Int
@@ -68,6 +74,7 @@ public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
             throw CleanupError.invalidResponse
         }
         return CleanupCompletion(
-            text: text, usage: response.usage.map { TokenUsage(input: $0.promptTokens, output: $0.completionTokens) })
+            text: text, usage: response.usage.map { TokenUsage(input: $0.promptTokens, output: $0.completionTokens) },
+            truncated: response.choices.first?.finishReason == "length")
     }
 }

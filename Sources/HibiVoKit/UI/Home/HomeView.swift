@@ -65,7 +65,8 @@ struct HomeView: View {
         guard kind.makeProvider(settings: settings, secrets: env.secrets) != nil else {
             return (engine.displayName, Self.missingKey)
         }
-        return (engine.displayName, settings.resolvedMeetingMinutesModel)
+        let model = settings.resolvedMeetingMinutesModel
+        return (engine.displayName, model.isEmpty ? "モデル未設定" : model)
     }
 
     private var dictationModel: (provider: String, model: String)? {

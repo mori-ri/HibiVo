@@ -145,7 +145,8 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         let text = (response.output.message?.content ?? []).compactMap(\.text).joined()
         guard !text.isEmpty else { throw CleanupError.invalidResponse }
         return CleanupCompletion(
-            text: text, usage: response.usage.map { TokenUsage(input: $0.inputTokens, output: $0.outputTokens) })
+            text: text, usage: response.usage.map { TokenUsage(input: $0.inputTokens, output: $0.outputTokens) },
+            truncated: response.stopReason == "max_tokens")
     }
 
     // MARK: - Request

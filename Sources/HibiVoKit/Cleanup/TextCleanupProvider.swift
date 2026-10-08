@@ -44,10 +44,13 @@ public struct TokenUsage: Codable, Hashable, Sendable {
 public struct CleanupCompletion: Equatable, Sendable {
     public var text: String
     public var usage: TokenUsage?
+    /// True when the model stopped at the output cap, so `text` is cut off.
+    public var truncated: Bool
 
-    public init(text: String, usage: TokenUsage? = nil) {
+    public init(text: String, usage: TokenUsage? = nil, truncated: Bool = false) {
         self.text = text
         self.usage = usage
+        self.truncated = truncated
     }
 }
 

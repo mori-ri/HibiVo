@@ -413,14 +413,7 @@ private struct CostBreakdown: View {
 
     static func merge(_ items: [CleanupUsage]) -> [CleanupUsage] {
         var merged: [CleanupUsage] = []
-        for item in items {
-            if let index = merged.firstIndex(where: { $0.isSameModel(as: item) }) {
-                merged[index].requests += item.requests
-                merged[index].tokens = merged[index].tokens + item.tokens
-            } else {
-                merged.append(item)
-            }
-        }
+        for item in items { DailyUsage.add(item, to: &merged) }
         return merged.sorted { $0.tokens.input + $0.tokens.output > $1.tokens.input + $1.tokens.output }
     }
 }

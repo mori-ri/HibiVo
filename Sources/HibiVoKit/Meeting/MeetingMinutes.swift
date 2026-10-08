@@ -7,6 +7,8 @@ public enum MeetingMinutesError: Error, Equatable, Sendable {
     /// Claude Code ran but reported a failure, e.g. not logged in or usage limit reached.
     case failed(String)
     case timedOut
+    /// The model stopped at the output cap, so the minutes would be cut off. Carries the tokens it still cost.
+    case outputLimitReached(usage: CleanupUsage?)
 }
 
 /// Minutes as written, with the API usage they cost.
@@ -330,28 +332,52 @@ public struct ProviderMinutesWriter: MeetingMinutesWriting {
     let provider: any TextCleanupProvider
     /// The editable part of the system prompt; blank means the default.
     let instructions: String
+    /// Waits before each retry of a busy or failing server (429, 5xx). Claude Code retries these itself.
+    let retryDelays: [Duration]
 
-    public init(provider: any TextCleanupProvider, instructions: String = "") {
+    public init(
+        provider: any TextCleanupProvider, instructions: String = "",
+        retryDelays: [Duration] = [.seconds(5), .seconds(20)]
+    ) {
         self.provider = provider
         self.instructions = instructions
+        self.retryDelays = retryDelays
     }
 
     public func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
         -> WrittenMinutes
     {
+        let system = MeetingMinutesPrompt.system(instructions: instructions)
+        let user = MeetingMinutesPrompt.user(transcript, vocabulary: vocabulary)
+        var delays = retryDelays[...]
         let completion: CleanupCompletion
-        do {
-            completion = try await provider.complete(
-                system: MeetingMinutesPrompt.system(instructions: instructions),
-                user: MeetingMinutesPrompt.user(transcript, vocabulary: vocabulary), model: model)
-        } catch let error as URLError where error.code == .timedOut {
-            throw MeetingMinutesError.timedOut
-        } catch let error as CleanupError {
-            throw MeetingMinutesError.failed("\(provider.displayName): \(error)")
+        while true {
+            do {
+                completion = try await provider.complete(system: system, user: user, model: model)
+                break
+            } catch let error as URLError where error.code == .timedOut {
+                throw MeetingMinutesError.timedOut
+            } catch let error as CleanupError {
+                if Self.isTransient(error), let delay = delays.popFirst() {
+                    try await Task.sleep(for: delay)
+                    continue
+                }
+                throw MeetingMinutesError.failed("\(provider.displayName): \(error)")
+            }
+        }
+        // Cut-off minutes would read as complete; the transcript is still saved.
+        if completion.truncated {
+            throw MeetingMinutesError.outputLimitReached(
+                usage: completion.usage.map { CleanupUsage(provider, model: model, tokens: $0) })
         }
         let text = completion.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw MeetingMinutesError.failed("\(provider.displayName): empty response") }
         return WrittenMinutes(
             text: text, usage: completion.usage.map { CleanupUsage(provider, model: model, tokens: $0) })
+    }
+
+    static func isTransient(_ error: CleanupError) -> Bool {
+        guard case .http(let status) = error else { return false }
+        return status == 429 || status >= 500
     }
 }

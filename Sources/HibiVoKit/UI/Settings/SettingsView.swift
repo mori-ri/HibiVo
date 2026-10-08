@@ -357,7 +357,7 @@ struct MeetingSettingsView: View {
                 }
             }
             SettingsSection(title: "議事録") {
-                ToggleRow("終了後に Claude で議事録を作成する", isOn: $settings.meetingMinutesEnabled)
+                ToggleRow("終了後に議事録を作成する", isOn: $settings.meetingMinutesEnabled)
                 if env.settings.meetingMinutesEnabled {
                     PickerRow("作成方法", selection: $settings.meetingMinutesEngine) {
                         ForEach(MeetingMinutesEngine.allCases) { Text($0.displayName).tag($0) }

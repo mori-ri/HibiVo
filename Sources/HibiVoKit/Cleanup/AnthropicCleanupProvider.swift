@@ -115,6 +115,7 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         if response.stopReason == "refusal" { throw CleanupError.refused }
         let text = response.content.filter { $0.type == "text" }.compactMap(\.text).joined()
         guard !text.isEmpty else { throw CleanupError.invalidResponse }
-        return CleanupCompletion(text: text, usage: response.usage?.tokens)
+        return CleanupCompletion(
+            text: text, usage: response.usage?.tokens, truncated: response.stopReason == "max_tokens")
     }
 }

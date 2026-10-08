@@ -1037,6 +1037,23 @@ import Testing
         #expect(day.dictationPart.minutes.isEmpty)
     }
 
+    @Test func cutOffMinutesFailButTheirTokensAreRecorded() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .anthropic
+        let tokens = CleanupUsage(
+            provider: "anthropic", model: "claude-haiku-5-5", requests: 1,
+            tokens: TokenUsage(input: 9_000, output: 16_000))
+        let writer = MockMinutesWriter(.failure(.outputLimitReached(usage: tokens)))
+        let usage = makeUsage()
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, usage: usage, onSaved: { shown.append($0) })
+        try await recordShortMeeting(sut)
+        await settle { state.meetingMinutesInProgress == 0 }
+        #expect(usage.days.first?.minutes == [tokens])
+        #expect(shown.count == 1)
+        #expect(state.phase == .error(UserFacingError.meetingMinutesFailed.message))
+    }
+
     @Test func claudeCodeMinutesRecordNoTokens() async throws {
         settings.meetingMinutesEnabled = true
         let writer = MockMinutesWriter(.success("# 日程\n\n## 概要\nなし"))
@@ -1509,6 +1526,50 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
     @Test func providerErrorsBecomeMinutesFailures() async {
         let sut = ProviderMinutesWriter(provider: RecordingProvider(.failure(.unauthorized)))
         await #expect(throws: MeetingMinutesError.failed("Recording: unauthorized")) {
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        }
+    }
+
+    actor SequenceProvider: TextCleanupProvider {
+        nonisolated let id = "sequence"
+        nonisolated let displayName = "Sequence"
+        nonisolated let defaultModel = ""
+        private var results: [Result<CleanupCompletion, CleanupError>]
+        private(set) var calls = 0
+
+        init(_ results: [Result<CleanupCompletion, CleanupError>]) { self.results = results }
+
+        func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
+            calls += 1
+            return try results.removeFirst().get()
+        }
+    }
+
+    @Test func busyServersAreRetried() async throws {
+        let provider = SequenceProvider([.failure(.http(529)), .failure(.http(429)), .success(.init(text: "# 題\n本文"))])
+        let sut = ProviderMinutesWriter(provider: provider, retryDelays: [.zero, .zero])
+        let minutes = try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        #expect(minutes.text == "# 題\n本文")
+        #expect(await provider.calls == 3)
+    }
+
+    @Test func clientErrorsAreNotRetried() async {
+        let provider = SequenceProvider([.failure(.http(400)), .success(.init(text: "x"))])
+        let sut = ProviderMinutesWriter(provider: provider, retryDelays: [.zero])
+        await #expect(throws: MeetingMinutesError.failed("Sequence: http(400)")) {
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        }
+        #expect(await provider.calls == 1)
+    }
+
+    @Test func truncatedMinutesAreRejectedWithTheirCost() async {
+        let tokens = TokenUsage(input: 50_000, output: 16_000)
+        let provider = SequenceProvider([.success(.init(text: "# 題\n途中", usage: tokens, truncated: true))])
+        let sut = ProviderMinutesWriter(provider: provider)
+        await #expect(
+            throws: MeetingMinutesError.outputLimitReached(
+                usage: CleanupUsage(provider: "sequence", model: "m", requests: 1, tokens: tokens))
+        ) {
             try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
         }
     }
