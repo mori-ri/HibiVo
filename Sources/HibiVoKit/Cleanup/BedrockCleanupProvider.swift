@@ -39,7 +39,8 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
     /// Model IDs offered as suggestions in Settings. Any other ID can be typed in.
     public static let suggestedModels = [
         "global.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "anthropic.claude-haiku-5-5",
+        // Newer Claude models need an inference profile on InvokeModel; the bare `anthropic.` ID is a 400.
+        "global.anthropic.claude-haiku-5-5",
         "anthropic.claude-opus-5-5",
         "zai.glm-4.7-flash",
         "zai.glm-4.7",
@@ -173,7 +174,7 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
     public func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
         let request = try makeURLRequest(system: system, user: user, model: model)
         let (data, response) = try await urlSession.data(for: request)
-        try HTTPJSON.checkStatus(response)
+        try HTTPJSON.checkStatus(response, data: data)
         switch API(model: model) {
         case .invokeModel: return try AnthropicCleanupProvider.parse(data)
         case .converse: return try Self.parseConverse(data)

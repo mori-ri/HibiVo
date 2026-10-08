@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 public enum CleanupError: Error, Equatable, Sendable {
     case missingAPIKey
@@ -104,12 +105,28 @@ enum HTTPJSON {
         return request
     }
 
-    static func checkStatus(_ response: URLResponse) throws {
+    private static let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "cleanup")
+
+    /// - Parameter data: The response body. On failure, the provider's error message is logged, since the status
+    ///   code alone rarely says what to fix (e.g. a Bedrock model that needs an inference profile).
+    static func checkStatus(_ response: URLResponse, data: Data) throws {
         guard let http = response as? HTTPURLResponse else { throw CleanupError.invalidResponse }
+        if !(200..<300).contains(http.statusCode), let message = errorMessage(data) {
+            log.error("Cleanup HTTP \(http.statusCode, privacy: .public): \(message, privacy: .public)")
+        }
         switch http.statusCode {
         case 200..<300: return
         case 401, 403: throw CleanupError.unauthorized
         default: throw CleanupError.http(http.statusCode)
         }
+    }
+
+    /// The `message` of an error body: top-level (Bedrock) or under `error` (Anthropic, OpenAI, Gemini).
+    /// Error messages describe the request, not its content, so they are safe to log.
+    static func errorMessage(_ data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        let message =
+            (json["message"] as? String) ?? ((json["error"] as? [String: Any])?["message"] as? String)
+        return message.map { String($0.prefix(300)) }
     }
 }
