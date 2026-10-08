@@ -61,16 +61,16 @@ public final class SettingsStore {
     }
     /// Claude Code's model alias for minutes.
     public var meetingMinutesModel: MeetingMinutesModel { didSet { save(meetingMinutesModel, "meetingMinutesModel") } }
-    /// Bedrock model ID for minutes; empty means `BedrockMinutesWriter.defaultModel`.
-    public var meetingMinutesBedrockModel: String {
-        didSet { defaults.set(meetingMinutesBedrockModel, forKey: "meetingMinutesBedrockModel") }
+    /// Model ID for minutes from a cleanup provider; empty means the engine's default.
+    /// Settings clears it when the engine changes, since model names differ per provider.
+    public var meetingMinutesAPIModel: String {
+        didSet { defaults.set(meetingMinutesAPIModel, forKey: "meetingMinutesAPIModel") }
     }
-    /// The model the configured engine writes minutes with.
+    /// The model the configured engine writes minutes with. Empty when an OpenAI-compatible model isn't entered.
     public var resolvedMeetingMinutesModel: String {
         switch meetingMinutesEngine {
         case .claudeCode: meetingMinutesModel.rawValue
-        case .bedrock:
-            meetingMinutesBedrockModel.isEmpty ? BedrockMinutesWriter.defaultModel : meetingMinutesBedrockModel
+        default: meetingMinutesAPIModel.isEmpty ? meetingMinutesEngine.defaultModel : meetingMinutesAPIModel
         }
     }
     /// The editable part of the minutes prompt; nil means the built-in default, so improvements to it
@@ -115,7 +115,7 @@ public final class SettingsStore {
             ?? (ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil)
         meetingMinutesEngine = Self.load("meetingMinutesEngine", from: defaults) ?? .claudeCode
         meetingMinutesModel = Self.load("meetingMinutesModel", from: defaults) ?? .sonnet
-        meetingMinutesBedrockModel = defaults.string(forKey: "meetingMinutesBedrockModel") ?? ""
+        meetingMinutesAPIModel = defaults.string(forKey: "meetingMinutesAPIModel") ?? ""
         meetingMinutesInstructions = defaults.string(forKey: "meetingMinutesInstructions")
             .map { String($0.prefix(MeetingMinutesPrompt.instructionsLimit)) }
         claudeCodePath = defaults.string(forKey: "claudeCodePath") ?? ""

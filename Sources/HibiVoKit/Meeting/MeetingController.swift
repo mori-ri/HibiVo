@@ -764,7 +764,7 @@ public final class MeetingController {
         await withCheckedContinuation { wakeWaiters.append($0) }
     }
 
-    /// Hands a saved transcript to Claude Code or Bedrock for minutes, or shows it right away when minutes are off.
+    /// Hands a saved transcript to Claude Code or a cleanup provider for minutes, or shows it right away when minutes are off.
     /// With minutes, Finder shows the minutes once they exist (or the transcript if they fail), so the
     /// user isn't pulled to Finder twice.
     /// The user's notes reach the minutes through the transcript document, where Claude reads them.
@@ -775,8 +775,10 @@ public final class MeetingController {
         }
         guard let writer = minutesWriter() else {
             onSaved(url)
+            let engine = settings.meetingMinutesEngine
             showUnlessBusy(
-                settings.meetingMinutesEngine == .bedrock ? .bedrockMinutesCredentialsMissing : .claudeCodeNotFound)
+                engine == .claudeCode
+                    ? .claudeCodeNotFound : .minutesProviderNotConfigured(provider: engine.displayName))
             return
         }
         state.meetingMinutesInProgress += 1

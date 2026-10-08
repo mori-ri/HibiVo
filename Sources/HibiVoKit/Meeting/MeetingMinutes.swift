@@ -16,19 +16,44 @@ public protocol MeetingMinutesWriting: Sendable {
         -> String
 }
 
-/// What writes the minutes.
+/// What writes the minutes: Claude Code, or one of the AI cleanup providers with its saved credentials.
 public enum MeetingMinutesEngine: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Claude Code CLI, on the user's Claude subscription.
     case claudeCode
-    /// Amazon Bedrock, with the credentials AI cleanup uses. Billed per token.
+    // Billed per token, like AI cleanup. Raw values match `CleanupProviderKind`.
+    case anthropic
+    case openAICompatible = "openai-compatible"
     case bedrock
+    case gemini
 
     public var id: String { rawValue }
 
+    /// The cleanup provider this engine calls; nil for Claude Code.
+    public var providerKind: CleanupProviderKind? { CleanupProviderKind(rawValue: rawValue) }
+
     public var displayName: String {
+        providerKind?.displayName ?? "Claude Code(サブスクリプション)"
+    }
+
+    /// The model used when none is entered. Empty for OpenAI-compatible endpoints, which have no common model.
+    public var defaultModel: String {
         switch self {
-        case .claudeCode: "Claude Code(サブスクリプション)"
-        case .bedrock: "Amazon Bedrock"
+        case .claudeCode: MeetingMinutesModel.sonnet.rawValue
+        case .anthropic: "claude-haiku-5-5"
+        case .openAICompatible: ""
+        case .bedrock: "global.anthropic.claude-haiku-5-5"
+        case .gemini: "gemini-3.8-flash"
+        }
+    }
+
+    /// Model IDs offered as suggestions in Settings.
+    public var suggestedModels: [String] {
+        switch self {
+        case .claudeCode, .openAICompatible: []
+        case .anthropic: ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"]
+        // Claude models only: the others on Bedrock are suggested for short cleanups.
+        case .bedrock: BedrockCleanupProvider.suggestedModels.filter { $0.contains("anthropic.") }
+        case .gemini: GeminiCleanupProvider.suggestedModels
         }
     }
 }
@@ -286,14 +311,9 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
     }
 }
 
-/// Writes minutes with a Claude model on Amazon Bedrock, using the same prompt as Claude Code.
-public struct BedrockMinutesWriter: MeetingMinutesWriting {
-    public static let defaultModel = "global.anthropic.claude-haiku-5-5"
-    /// Model IDs offered as suggestions in Settings: the Claude models among the cleanup suggestions.
-    public static var suggestedModels: [String] {
-        BedrockCleanupProvider.suggestedModels.filter { $0.contains("anthropic.") }
-    }
-
+/// Writes minutes through an AI cleanup provider, with the same prompt as Claude Code.
+/// The provider should be made with `CleanupLimits.minutes`.
+public struct ProviderMinutesWriter: MeetingMinutesWriting {
     let provider: any TextCleanupProvider
     /// The editable part of the system prompt; blank means the default.
     let instructions: String
@@ -314,10 +334,10 @@ public struct BedrockMinutesWriter: MeetingMinutesWriting {
         } catch let error as URLError where error.code == .timedOut {
             throw MeetingMinutesError.timedOut
         } catch let error as CleanupError {
-            throw MeetingMinutesError.failed("Bedrock: \(error)")
+            throw MeetingMinutesError.failed("\(provider.displayName): \(error)")
         }
         let text = completion.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { throw MeetingMinutesError.failed("Bedrock: empty response") }
+        guard !text.isEmpty else { throw MeetingMinutesError.failed("\(provider.displayName): empty response") }
         return text
     }
 }

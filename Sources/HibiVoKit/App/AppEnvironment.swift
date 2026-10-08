@@ -75,15 +75,14 @@ public final class AppEnvironment {
             transcribers: { meetingTranscribers },
             minutesWriter: {
                 let instructions = settings.meetingMinutesInstructions ?? ""
-                switch settings.meetingMinutesEngine {
-                case .claudeCode:
+                guard let kind = settings.meetingMinutesEngine.providerKind else {
                     return ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
                         ClaudeCodeMinutesWriter(executable: $0, instructions: instructions)
                     }
-                case .bedrock:
-                    return BedrockCleanupProvider.configured(settings: settings, secrets: secrets, limits: .minutes)
-                        .map { BedrockMinutesWriter(provider: $0, instructions: instructions) }
                 }
+                guard !settings.resolvedMeetingMinutesModel.isEmpty else { return nil }
+                return kind.makeProvider(settings: settings, secrets: secrets, limits: .minutes)
+                    .map { ProviderMinutesWriter(provider: $0, instructions: instructions) }
             },
             vocabulary: { vocabulary.activeEntries },
             usage: usage,

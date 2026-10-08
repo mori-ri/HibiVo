@@ -8,13 +8,16 @@ public struct GeminiCleanupProvider: TextCleanupProvider {
     public let defaultModel = CleanupProviderKind.gemini.defaultModel
 
     private let apiKey: String
+    let limits: CleanupLimits
     private let urlSession: URLSession
     static let endpoint = URL(string: "https://generativelanguage.googleapis.com/v1beta/interactions")!
 
     public static let suggestedModels = ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
 
-    public init(apiKey: String, urlSession: URLSession = .shared) {
+    /// - Parameter limits: The output cap is left to the model's default, which already fits minutes.
+    public init(apiKey: String, limits: CleanupLimits = .cleanup, urlSession: URLSession = .shared) {
         self.apiKey = apiKey
+        self.limits = limits
         self.urlSession = urlSession
     }
 
@@ -71,17 +74,18 @@ public struct GeminiCleanupProvider: TextCleanupProvider {
         var usage: Usage?
     }
 
-    static func makeRequest(system: String, user: String, model: String) -> Request {
+    static func makeRequest(system: String, user: String, model: String, limits: CleanupLimits = .cleanup) -> Request {
         // Cleanup is a light rewrite, so keep thinking low. Gemini 3.8 Flash rejects `minimal`,
         // and pre-3 models don't take `thinking_level` at all.
-        let thinking = model.hasPrefix("gemini-3") ? Request.GenerationConfig(thinkingLevel: "low") : nil
+        let thinking =
+            model.hasPrefix("gemini-3") && limits.lowEffort ? Request.GenerationConfig(thinkingLevel: "low") : nil
         return Request(model: model, input: user, systemInstruction: system, generationConfig: thinking)
     }
 
     public func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
         let request = try HTTPJSON.post(
             Self.endpoint, headers: ["x-goog-api-key": apiKey],
-            body: Self.makeRequest(system: system, user: user, model: model), timeout: 60)
+            body: Self.makeRequest(system: system, user: user, model: model, limits: limits), timeout: limits.timeout)
         let (data, response) = try await urlSession.data(for: request)
         // A bad key comes back as 400 API_KEY_INVALID rather than 401.
         if let http = response as? HTTPURLResponse, http.statusCode == 400,

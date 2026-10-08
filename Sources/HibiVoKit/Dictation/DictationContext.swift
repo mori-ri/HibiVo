@@ -83,27 +83,48 @@ public struct DictationContextBuilder {
             ? AppModeTable(overrides: settings.appModeOverrides, fallback: settings.defaultCleanupMode) : nil
         return DictationContext.Cleanup(
             mode: appModes?.mode(for: target?.bundleID) ?? .raw,
-            provider: settings.cleanupEnabled ? makeCleanupProvider(kind) : nil,
+            provider: settings.cleanupEnabled ? kind.makeProvider(settings: settings, secrets: secrets) : nil,
             model: settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel,
             customInstructions: settings.customCleanupInstructions, appModes: appModes)
     }
+}
 
-    private func makeCleanupProvider(_ kind: CleanupProviderKind) -> (any TextCleanupProvider)? {
+extension CleanupProviderKind {
+    /// A provider with the credentials from Settings, or nil when they aren't saved.
+    /// AI cleanup and meeting minutes share them.
+    @MainActor
+    public func makeProvider(settings: SettingsStore, secrets: any SecretStore, limits: CleanupLimits = .cleanup)
+        -> (any TextCleanupProvider)?
+    {
         func secret(_ account: String) -> String? {
             guard let value = secrets.secret(for: account), !value.isEmpty else { return nil }
             return value
         }
-        switch kind {
+        switch self {
         case .anthropic:
-            return secret(SecretAccount.anthropic).map { AnthropicCleanupProvider(apiKey: $0) }
+            return secret(SecretAccount.anthropic).map { AnthropicCleanupProvider(apiKey: $0, limits: limits) }
         case .openAICompatible:
             guard let url = URL(string: settings.openAIBaseURL), let key = secret(SecretAccount.openAICompatible)
             else { return nil }
-            return OpenAICompatibleCleanupProvider(baseURL: url, apiKey: key)
+            return OpenAICompatibleCleanupProvider(baseURL: url, apiKey: key, limits: limits)
         case .bedrock:
-            return BedrockCleanupProvider.configured(settings: settings, secrets: secrets)
+            let region = settings.bedrockRegion.isEmpty ? BedrockCleanupProvider.defaultRegion : settings.bedrockRegion
+            switch settings.bedrockAuth {
+            case .apiKey:
+                return secret(SecretAccount.bedrockAPIKey).map {
+                    BedrockCleanupProvider(region: region, authentication: .apiKey($0), limits: limits)
+                }
+            case .iam:
+                guard let keyID = secret(SecretAccount.awsAccessKeyID),
+                    let secretKey = secret(SecretAccount.awsSecretAccessKey)
+                else { return nil }
+                let credentials = AWSCredentials(
+                    accessKeyID: keyID, secretAccessKey: secretKey,
+                    sessionToken: secret(SecretAccount.awsSessionToken))
+                return BedrockCleanupProvider(region: region, authentication: .iam(credentials), limits: limits)
+            }
         case .gemini:
-            return secret(SecretAccount.gemini).map { GeminiCleanupProvider(apiKey: $0) }
+            return secret(SecretAccount.gemini).map { GeminiCleanupProvider(apiKey: $0, limits: limits) }
         }
     }
 }

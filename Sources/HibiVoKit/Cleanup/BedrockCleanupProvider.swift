@@ -51,28 +51,14 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
     /// Cleanup output is short; this also stays under GLM 4.7's 4K output limit.
     static let maxTokens = 2_000
 
-    /// How long and how large one request may be.
-    public struct Limits: Sendable, Equatable {
-        /// Output cap; nil keeps each API's cleanup default.
-        public var maxTokens: Int?
-        public var timeout: TimeInterval
-        /// Sends low effort to Claude models that take it; otherwise the model's default effort applies.
-        public var lowEffort: Bool
-
-        /// Short rewrites, bounded by CleanupCoordinator's deadline.
-        public static let cleanup = Limits(maxTokens: nil, timeout: 60, lowEffort: true)
-        /// Minutes of an hour-long meeting: long input, a few thousand tokens out (plus thinking), and
-        /// worth the model's default effort. Kept non-streaming, so the cap stays where a single response fits.
-        public static let minutes = Limits(maxTokens: 16_000, timeout: 600, lowEffort: false)
-    }
-
     let region: String
-    let limits: Limits
+    let limits: CleanupLimits
     private let authentication: Authentication
     private let urlSession: URLSession
 
     public init(
-        region: String, authentication: Authentication, limits: Limits = .cleanup, urlSession: URLSession = .shared
+        region: String, authentication: Authentication, limits: CleanupLimits = .cleanup,
+        urlSession: URLSession = .shared
     ) {
         self.region = region
         self.authentication = authentication
@@ -97,16 +83,16 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         }
     }
 
-    static func makeInvokeBody(system: String, user: String, model: String, limits: Limits = .cleanup)
+    static func makeInvokeBody(system: String, user: String, model: String, limits: CleanupLimits = .cleanup)
         -> InvokeBody
     {
         // Same shaping as the first-party API, minus `model` (it is in the URL) and `fallbacks`
         // (not supported on Bedrock).
         let request = AnthropicCleanupProvider.makeRequest(
-            system: system, user: user, model: model, allowFallbacks: false)
+            system: system, user: user, model: model, allowFallbacks: false, limits: limits)
         return InvokeBody(
-            maxTokens: limits.maxTokens ?? request.maxTokens, system: request.system, messages: request.messages,
-            outputConfig: limits.lowEffort ? request.outputConfig : nil)
+            maxTokens: request.maxTokens, system: request.system, messages: request.messages,
+            outputConfig: request.outputConfig)
     }
 
     // MARK: - Converse (everything else)
@@ -144,7 +130,7 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         var usage: Usage?
     }
 
-    static func makeConverseBody(system: String, user: String, limits: Limits = .cleanup) -> ConverseBody {
+    static func makeConverseBody(system: String, user: String, limits: CleanupLimits = .cleanup) -> ConverseBody {
         ConverseBody(
             system: [.init(text: system)],
             messages: [.init(content: [.init(text: user)])],
@@ -201,34 +187,6 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         switch API(model: model) {
         case .invokeModel: return try AnthropicCleanupProvider.parse(data)
         case .converse: return try Self.parseConverse(data)
-        }
-    }
-}
-
-extension BedrockCleanupProvider {
-    /// A provider with the region and credentials from Settings, or nil when the credentials aren't saved.
-    /// AI cleanup and minutes share them.
-    @MainActor
-    public static func configured(settings: SettingsStore, secrets: any SecretStore, limits: Limits = .cleanup)
-        -> BedrockCleanupProvider?
-    {
-        func secret(_ account: String) -> String? {
-            guard let value = secrets.secret(for: account), !value.isEmpty else { return nil }
-            return value
-        }
-        let region = settings.bedrockRegion.isEmpty ? defaultRegion : settings.bedrockRegion
-        switch settings.bedrockAuth {
-        case .apiKey:
-            return secret(SecretAccount.bedrockAPIKey).map {
-                BedrockCleanupProvider(region: region, authentication: .apiKey($0), limits: limits)
-            }
-        case .iam:
-            guard let keyID = secret(SecretAccount.awsAccessKeyID),
-                let secretKey = secret(SecretAccount.awsSecretAccessKey)
-            else { return nil }
-            let credentials = AWSCredentials(
-                accessKeyID: keyID, secretAccessKey: secretKey, sessionToken: secret(SecretAccount.awsSessionToken))
-            return BedrockCleanupProvider(region: region, authentication: .iam(credentials), limits: limits)
         }
     }
 }

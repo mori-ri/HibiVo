@@ -58,15 +58,14 @@ struct HomeView: View {
     private var minutesModel: (provider: String, model: String)? {
         let settings = env.settings
         guard settings.meetingMinutesEnabled else { return nil }
-        switch settings.meetingMinutesEngine {
-        case .claudeCode:
+        let engine = settings.meetingMinutesEngine
+        guard let kind = engine.providerKind else {
             return ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized)
-        case .bedrock:
-            guard BedrockCleanupProvider.configured(settings: settings, secrets: env.secrets) != nil else {
-                return ("Amazon Bedrock", Self.missingKey)
-            }
-            return ("Amazon Bedrock", settings.resolvedMeetingMinutesModel)
         }
+        guard kind.makeProvider(settings: settings, secrets: env.secrets) != nil else {
+            return (engine.displayName, Self.missingKey)
+        }
+        return (engine.displayName, settings.resolvedMeetingMinutesModel)
     }
 
     private var dictationModel: (provider: String, model: String)? {

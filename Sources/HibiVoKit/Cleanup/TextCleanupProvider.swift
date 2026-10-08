@@ -51,6 +51,22 @@ public struct CleanupCompletion: Equatable, Sendable {
     }
 }
 
+/// How long and how large one request may be. Every provider takes one, so the same provider types serve
+/// short cleanups and long meeting minutes.
+public struct CleanupLimits: Sendable, Equatable {
+    /// Output cap; nil keeps each provider's cleanup default (or sends none where it has none).
+    public var maxTokens: Int?
+    public var timeout: TimeInterval
+    /// Asks for low effort or thinking where the model takes it; otherwise the model's default applies.
+    public var lowEffort: Bool
+
+    /// Short rewrites, bounded by CleanupCoordinator's deadline.
+    public static let cleanup = CleanupLimits(maxTokens: nil, timeout: 60, lowEffort: true)
+    /// Minutes of an hour-long meeting: long input, a few thousand tokens out (plus thinking), and worth the
+    /// model's default effort. Requests stay non-streaming, so the cap stays where a single response fits.
+    public static let minutes = CleanupLimits(maxTokens: 16_000, timeout: 600, lowEffort: false)
+}
+
 /// The cleanup providers users can pick in Settings.
 public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
     case anthropic
