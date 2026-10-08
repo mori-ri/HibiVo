@@ -38,10 +38,10 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
 
     /// Model IDs offered as suggestions in Settings. Any other ID can be typed in.
     public static let suggestedModels = [
+        // Claude models need an inference profile on InvokeModel; the bare `anthropic.` ID is a 400.
         "global.anthropic.claude-haiku-4-5-20251001-v1:0",
-        // Newer Claude models need an inference profile on InvokeModel; the bare `anthropic.` ID is a 400.
         "global.anthropic.claude-haiku-5-5",
-        "anthropic.claude-opus-5-5",
+        "global.anthropic.claude-opus-5-5",
         "zai.glm-4.7-flash",
         "zai.glm-4.7",
         "minimax.minimax-m2.5",
