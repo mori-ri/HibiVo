@@ -52,11 +52,27 @@ public final class SettingsStore {
     public var meetingTranscriptionTiming: MeetingTranscriptionTiming {
         didSet { save(meetingTranscriptionTiming, "meetingTranscriptionTiming") }
     }
-    /// Whether Claude Code writes minutes from each saved meeting.
+    /// Whether minutes are written from each saved meeting.
     public var meetingMinutesEnabled: Bool {
         didSet { defaults.set(meetingMinutesEnabled, forKey: "meetingMinutesEnabled") }
     }
+    public var meetingMinutesEngine: MeetingMinutesEngine {
+        didSet { save(meetingMinutesEngine, "meetingMinutesEngine") }
+    }
+    /// Claude Code's model alias for minutes.
     public var meetingMinutesModel: MeetingMinutesModel { didSet { save(meetingMinutesModel, "meetingMinutesModel") } }
+    /// Bedrock model ID for minutes; empty means `BedrockMinutesWriter.defaultModel`.
+    public var meetingMinutesBedrockModel: String {
+        didSet { defaults.set(meetingMinutesBedrockModel, forKey: "meetingMinutesBedrockModel") }
+    }
+    /// The model the configured engine writes minutes with.
+    public var resolvedMeetingMinutesModel: String {
+        switch meetingMinutesEngine {
+        case .claudeCode: meetingMinutesModel.rawValue
+        case .bedrock:
+            meetingMinutesBedrockModel.isEmpty ? BedrockMinutesWriter.defaultModel : meetingMinutesBedrockModel
+        }
+    }
     /// The editable part of the minutes prompt; nil means the built-in default, so improvements to it
     /// reach everyone who hasn't customized it. Use `setMeetingMinutesInstructions` to change it.
     public private(set) var meetingMinutesInstructions: String? {
@@ -97,7 +113,9 @@ public final class SettingsStore {
         meetingMinutesEnabled =
             defaults.object(forKey: "meetingMinutesEnabled") as? Bool
             ?? (ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil)
+        meetingMinutesEngine = Self.load("meetingMinutesEngine", from: defaults) ?? .claudeCode
         meetingMinutesModel = Self.load("meetingMinutesModel", from: defaults) ?? .sonnet
+        meetingMinutesBedrockModel = defaults.string(forKey: "meetingMinutesBedrockModel") ?? ""
         meetingMinutesInstructions = defaults.string(forKey: "meetingMinutesInstructions")
             .map { String($0.prefix(MeetingMinutesPrompt.instructionsLimit)) }
         claudeCodePath = defaults.string(forKey: "claudeCodePath") ?? ""

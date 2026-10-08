@@ -359,18 +359,34 @@ struct MeetingSettingsView: View {
             SettingsSection(title: "議事録") {
                 ToggleRow("終了後に Claude で議事録を作成する", isOn: $settings.meetingMinutesEnabled)
                 if env.settings.meetingMinutesEnabled {
-                    PickerRow("議事録のモデル", selection: $settings.meetingMinutesModel) {
-                        ForEach(MeetingMinutesModel.allCases) { Text($0.displayName).tag($0) }
+                    PickerRow("作成方法", selection: $settings.meetingMinutesEngine) {
+                        ForEach(MeetingMinutesEngine.allCases) { Text($0.displayName).tag($0) }
                     }
-                    TextFieldRow("Claude Code の場所", text: $settings.claudeCodePath, prompt: "自動で検出")
+                    switch env.settings.meetingMinutesEngine {
+                    case .claudeCode:
+                        PickerRow("議事録のモデル", selection: $settings.meetingMinutesModel) {
+                            ForEach(MeetingMinutesModel.allCases) { Text($0.displayName).tag($0) }
+                        }
+                        TextFieldRow("Claude Code の場所", text: $settings.claudeCodePath, prompt: "自動で検出")
+                    case .bedrock:
+                        BedrockMinutesFields(env: env)
+                    }
                     MinutesInstructionsRows(settings: env.settings)
-                    if let path = ClaudeCodeMinutesWriter.locate(configuredPath: env.settings.claudeCodePath) {
+                    switch env.settings.meetingMinutesEngine {
+                    case .claudeCode:
+                        if let path = ClaudeCodeMinutesWriter.locate(configuredPath: env.settings.claudeCodePath) {
+                            NoteRow(
+                                "Claude Code(\(path.path))を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
+                            )
+                        } else {
+                            NoteRow(
+                                "Claude Code が見つかりません。インストールして claude.ai のアカウントでログインするか、実行ファイルの場所を入力してください。",
+                                color: .red)
+                        }
+                    case .bedrock:
                         NoteRow(
-                            "Claude Code(\(path.path))を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
+                            "文字起こしを Amazon Bedrock に送って議事録を作成します。AWS の料金がかかります。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
                         )
-                    } else {
-                        NoteRow(
-                            "Claude Code が見つかりません。インストールして claude.ai のアカウントでログインするか、実行ファイルの場所を入力してください。", color: .red)
                     }
                 }
             }
@@ -456,7 +472,6 @@ private struct BedrockSettingsFields: View {
 
     var body: some View {
         @Bindable var settings = env.settings
-        TextFieldRow("リージョン", text: $settings.bedrockRegion, prompt: BedrockCleanupProvider.defaultRegion)
         LabeledRow("モデル ID") {
             TextField(
                 "モデル ID", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.bedrock.defaultModel)")
@@ -472,6 +487,17 @@ private struct BedrockSettingsFields: View {
             .fixedSize()
         }
         NoteRow("モデル ID または推論プロファイル ID を指定します。Claude は InvokeModel、それ以外（GLM、MiniMax、GPT など）は Converse API で呼び出します。")
+        BedrockConnectionFields(env: env)
+    }
+}
+
+/// Region and credentials, shared by AI cleanup and minutes.
+private struct BedrockConnectionFields: View {
+    let env: AppEnvironment
+
+    var body: some View {
+        @Bindable var settings = env.settings
+        TextFieldRow("リージョン", text: $settings.bedrockRegion, prompt: BedrockCleanupProvider.defaultRegion)
         PickerRow("認証", selection: $settings.bedrockAuth) {
             ForEach(BedrockAuthMethod.allCases) { Text($0.displayName).tag($0) }
         }
@@ -484,6 +510,32 @@ private struct BedrockSettingsFields: View {
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsSessionToken, label: "セッショントークン（一時認証情報のみ）")
             NoteRow("必要な権限: bedrock:InvokeModel（Converse も同じ権限です）。認証情報は Keychain に保存されます。")
         }
+    }
+}
+
+/// Bedrock model and connection for minutes. The connection is the same one AI cleanup uses.
+private struct BedrockMinutesFields: View {
+    let env: AppEnvironment
+
+    var body: some View {
+        @Bindable var settings = env.settings
+        LabeledRow("議事録のモデル ID") {
+            TextField(
+                "議事録のモデル ID", text: $settings.meetingMinutesBedrockModel,
+                prompt: Text("既定: \(BedrockMinutesWriter.defaultModel)")
+            )
+            .labelsHidden()
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 340)
+            Menu("候補") {
+                ForEach(BedrockMinutesWriter.suggestedModels, id: \.self) { model in
+                    Button(model) { settings.meetingMinutesBedrockModel = model }
+                }
+            }
+            .fixedSize()
+        }
+        BedrockConnectionFields(env: env)
+        NoteRow("リージョンと認証情報は AI 整形の Amazon Bedrock と共通です。")
     }
 }
 

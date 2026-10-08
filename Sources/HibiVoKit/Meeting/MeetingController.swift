@@ -764,7 +764,7 @@ public final class MeetingController {
         await withCheckedContinuation { wakeWaiters.append($0) }
     }
 
-    /// Hands a saved transcript to Claude Code for minutes, or shows it right away when minutes are off.
+    /// Hands a saved transcript to Claude Code or Bedrock for minutes, or shows it right away when minutes are off.
     /// With minutes, Finder shows the minutes once they exist (or the transcript if they fail), so the
     /// user isn't pulled to Finder twice.
     /// The user's notes reach the minutes through the transcript document, where Claude reads them.
@@ -775,11 +775,12 @@ public final class MeetingController {
         }
         guard let writer = minutesWriter() else {
             onSaved(url)
-            showUnlessBusy(.claudeCodeNotFound)
+            showUnlessBusy(
+                settings.meetingMinutesEngine == .bedrock ? .bedrockMinutesCredentialsMissing : .claudeCodeNotFound)
             return
         }
         state.meetingMinutesInProgress += 1
-        let model = settings.meetingMinutesModel.rawValue
+        let model = settings.resolvedMeetingMinutesModel
         transcriptions.append(
             Task {
                 await writeMinutes(
@@ -795,7 +796,7 @@ public final class MeetingController {
         defer { state.meetingMinutesInProgress -= 1 }
         var minutes: String?
         var failure: Error?
-        // A sleep in the middle cuts Claude Code off from the network; try once more after waking.
+        // A sleep in the middle cuts the writer off from the network; try once more after waking.
         for _ in 0..<2 where minutes == nil {
             await untilAwake()
             let sleeps = sleepCount

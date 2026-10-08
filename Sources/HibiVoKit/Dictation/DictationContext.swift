@@ -101,21 +101,7 @@ public struct DictationContextBuilder {
             else { return nil }
             return OpenAICompatibleCleanupProvider(baseURL: url, apiKey: key)
         case .bedrock:
-            let region = settings.bedrockRegion.isEmpty ? BedrockCleanupProvider.defaultRegion : settings.bedrockRegion
-            switch settings.bedrockAuth {
-            case .apiKey:
-                return secret(SecretAccount.bedrockAPIKey).map {
-                    BedrockCleanupProvider(region: region, authentication: .apiKey($0))
-                }
-            case .iam:
-                guard let keyID = secret(SecretAccount.awsAccessKeyID),
-                    let secretKey = secret(SecretAccount.awsSecretAccessKey)
-                else { return nil }
-                let credentials = AWSCredentials(
-                    accessKeyID: keyID, secretAccessKey: secretKey,
-                    sessionToken: secret(SecretAccount.awsSessionToken))
-                return BedrockCleanupProvider(region: region, authentication: .iam(credentials))
-            }
+            return BedrockCleanupProvider.configured(settings: settings, secrets: secrets)
         case .gemini:
             return secret(SecretAccount.gemini).map { GeminiCleanupProvider(apiKey: $0) }
         }

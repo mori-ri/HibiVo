@@ -18,6 +18,7 @@ public enum UserFacingError: Error, Equatable, Sendable {
     /// The recording is kept and tried again later.
     case meetingTranscriptionDeferred
     case claudeCodeNotFound
+    case bedrockMinutesCredentialsMissing
     case meetingMinutesFailed
 
     public var message: String {
@@ -39,6 +40,7 @@ public enum UserFacingError: Error, Equatable, Sendable {
         case .meetingTranscriptionFailed: "ミーティングの文字起こしに失敗しました"
         case .meetingTranscriptionDeferred: "ミーティングの文字起こしに失敗しました。ネットワークの回復後に自動でやり直します"
         case .claudeCodeNotFound: "Claude Code が見つからないため、議事録を作成できませんでした"
+        case .bedrockMinutesCredentialsMissing: "Amazon Bedrock の認証情報が未設定のため、議事録を作成できませんでした"
         case .meetingMinutesFailed: "議事録を作成できませんでした。文字起こしは保存済みです"
         }
     }

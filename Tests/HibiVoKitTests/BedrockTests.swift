@@ -152,8 +152,85 @@ import Testing
         #expect(throws: CleanupError.refused) { try BedrockCleanupProvider.parseConverse(data) }
     }
 
+    @Test func minutesLimitsRaiseTheCapAndLeaveEffortToTheModel() throws {
+        let body = BedrockCleanupProvider.makeInvokeBody(
+            system: "s", user: "u", model: "global.anthropic.claude-haiku-5-5", limits: .minutes)
+        #expect(body.maxTokens == 16_000)
+        #expect(body.outputConfig == nil)
+        let converse = BedrockCleanupProvider.makeConverseBody(system: "s", user: "u", limits: .minutes)
+        #expect(converse.inferenceConfig.maxTokens == 16_000)
+
+        let sut = BedrockCleanupProvider(region: "us-east-1", authentication: .apiKey("k"), limits: .minutes)
+        let request = try sut.makeURLRequest(system: "s", user: "u", model: "global.anthropic.claude-haiku-5-5")
+        #expect(request.timeoutInterval == 600)
+    }
+
+    @Test func cleanupLimitsKeepTheShortDefaults() {
+        let body = BedrockCleanupProvider.makeInvokeBody(
+            system: "s", user: "u", model: "global.anthropic.claude-haiku-5-5")
+        #expect(body.maxTokens == 4_000)
+        #expect(body.outputConfig?.effort == "low")
+        #expect(BedrockCleanupProvider.makeConverseBody(system: "s", user: "u").inferenceConfig.maxTokens == 2_000)
+    }
+
+    @MainActor @Test func configuredUsesSavedCredentials() throws {
+        let settings = SettingsStore(defaults: try #require(UserDefaults(suiteName: "BedrockTests-\(UUID())")))
+        settings.bedrockRegion = "us-west-2"
+        settings.bedrockAuth = .apiKey
+        #expect(BedrockCleanupProvider.configured(settings: settings, secrets: MockSecrets()) == nil)
+        let secrets = MockSecrets(values: [SecretAccount.bedrockAPIKey: "KEY"])
+        let provider = try #require(
+            BedrockCleanupProvider.configured(settings: settings, secrets: secrets, limits: .minutes))
+        #expect(provider.region == "us-west-2")
+        #expect(provider.limits == .minutes)
+    }
+
     @Test func converseEmptyOutputIsInvalid() {
         let data = Data(#"{"output":{"message":{"role":"assistant","content":[]}},"stopReason":"end_turn"}"#.utf8)
         #expect(throws: CleanupError.invalidResponse) { try BedrockCleanupProvider.parseConverse(data) }
+    }
+}
+
+@Suite struct BedrockMinutesWriterTests {
+    actor RecordingProvider: TextCleanupProvider {
+        nonisolated let id = "recording"
+        nonisolated let displayName = "Recording"
+        nonisolated let defaultModel = ""
+        let result: Result<String, CleanupError>
+        private(set) var calls: [(system: String, user: String, model: String)] = []
+
+        init(_ result: Result<String, CleanupError>) { self.result = result }
+
+        func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
+            calls.append((system, user, model))
+            return CleanupCompletion(text: try result.get())
+        }
+    }
+
+    @Test func sendsTheMinutesPromptToTheModel() async throws {
+        let provider = RecordingProvider(.success("\n# 日程の確認\n\n## 概要\n決めた。\n"))
+        let sut = BedrockMinutesWriter(provider: provider, instructions: "## 要点")
+        let minutes = try await sut.writeMinutes(
+            transcript: "**話者1** 来週です",
+            vocabulary: [CleanupPromptBuilder.Term(preferred: "AppSync", spokenForms: [])],
+            model: BedrockMinutesWriter.defaultModel)
+        #expect(minutes == "# 日程の確認\n\n## 概要\n決めた。")
+        let call = try #require(await provider.calls.first)
+        #expect(call.model == "global.anthropic.claude-haiku-5-5")
+        #expect(call.system == MeetingMinutesPrompt.system(instructions: "## 要点"))
+        #expect(call.user.contains("<vocabulary>"))
+        #expect(call.user.contains("<transcript>\n**話者1** 来週です\n</transcript>"))
+    }
+
+    @Test func providerErrorsBecomeMinutesFailures() async {
+        let sut = BedrockMinutesWriter(provider: RecordingProvider(.failure(.unauthorized)))
+        await #expect(throws: MeetingMinutesError.failed("Bedrock: unauthorized")) {
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        }
+    }
+
+    @Test func suggestionsAreClaudeModelsOnly() {
+        #expect(BedrockMinutesWriter.suggestedModels.contains(BedrockMinutesWriter.defaultModel))
+        #expect(BedrockMinutesWriter.suggestedModels.allSatisfy { $0.contains("anthropic.") })
     }
 }

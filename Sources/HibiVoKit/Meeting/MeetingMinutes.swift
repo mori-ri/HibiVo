@@ -16,6 +16,23 @@ public protocol MeetingMinutesWriting: Sendable {
         -> String
 }
 
+/// What writes the minutes.
+public enum MeetingMinutesEngine: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Claude Code CLI, on the user's Claude subscription.
+    case claudeCode
+    /// Amazon Bedrock, with the credentials AI cleanup uses. Billed per token.
+    case bedrock
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .claudeCode: "Claude Code(サブスクリプション)"
+        case .bedrock: "Amazon Bedrock"
+        }
+    }
+}
+
 /// Models offered for minutes, as Claude Code aliases (always the latest of each family).
 public enum MeetingMinutesModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case opus, sonnet, haiku
@@ -266,5 +283,41 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
         } onCancel: {
             if process.isRunning { process.terminate() }
         }
+    }
+}
+
+/// Writes minutes with a Claude model on Amazon Bedrock, using the same prompt as Claude Code.
+public struct BedrockMinutesWriter: MeetingMinutesWriting {
+    public static let defaultModel = "global.anthropic.claude-haiku-5-5"
+    /// Model IDs offered as suggestions in Settings: the Claude models among the cleanup suggestions.
+    public static var suggestedModels: [String] {
+        BedrockCleanupProvider.suggestedModels.filter { $0.contains("anthropic.") }
+    }
+
+    let provider: any TextCleanupProvider
+    /// The editable part of the system prompt; blank means the default.
+    let instructions: String
+
+    public init(provider: any TextCleanupProvider, instructions: String = "") {
+        self.provider = provider
+        self.instructions = instructions
+    }
+
+    public func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
+        -> String
+    {
+        let completion: CleanupCompletion
+        do {
+            completion = try await provider.complete(
+                system: MeetingMinutesPrompt.system(instructions: instructions),
+                user: MeetingMinutesPrompt.user(transcript, vocabulary: vocabulary), model: model)
+        } catch let error as URLError where error.code == .timedOut {
+            throw MeetingMinutesError.timedOut
+        } catch let error as CleanupError {
+            throw MeetingMinutesError.failed("Bedrock: \(error)")
+        }
+        let text = completion.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { throw MeetingMinutesError.failed("Bedrock: empty response") }
+        return text
     }
 }

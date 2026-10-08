@@ -50,12 +50,22 @@ struct HomeView: View {
                 ModelRow("音声入力の文字起こし", model: dictationModel) { show(.transcription) }
                 ModelRow("AI 整形", model: cleanupModel) { show(.cleanup) }
                 ModelRow("ミーティングの文字起こし", model: meetingModel) { show(.meeting) }
-                ModelRow(
-                    "議事録",
-                    model: settings.meetingMinutesEnabled
-                        ? ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized) : nil
-                ) { show(.meeting) }
+                ModelRow("議事録", model: minutesModel) { show(.meeting) }
             }
+        }
+    }
+
+    private var minutesModel: (provider: String, model: String)? {
+        let settings = env.settings
+        guard settings.meetingMinutesEnabled else { return nil }
+        switch settings.meetingMinutesEngine {
+        case .claudeCode:
+            return ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized)
+        case .bedrock:
+            guard BedrockCleanupProvider.configured(settings: settings, secrets: env.secrets) != nil else {
+                return ("Amazon Bedrock", Self.missingKey)
+            }
+            return ("Amazon Bedrock", settings.resolvedMeetingMinutesModel)
         }
     }
 

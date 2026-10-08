@@ -1002,6 +1002,28 @@ import Testing
         #expect(state.phase == .error(UserFacingError.claudeCodeNotFound.message))
     }
 
+    @Test func bedrockMinutesUseTheBedrockModel() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .bedrock
+        let writer = MockMinutesWriter(.success("# 日程\n\n## 概要\nなし"))
+        let sut = makeController(minutesWriter: writer)
+        try await recordShortMeeting(sut)
+        #expect(await writer.calls.first?.model == BedrockMinutesWriter.defaultModel)
+
+        settings.meetingMinutesBedrockModel = "global.anthropic.claude-opus-5-5"
+        #expect(settings.resolvedMeetingMinutesModel == "global.anthropic.claude-opus-5-5")
+    }
+
+    @Test func bedrockMinutesWithoutCredentialsExplainWhy() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .bedrock
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: nil, onSaved: { shown.append($0) })
+        try await recordShortMeeting(sut)
+        #expect(shown.count == 1)
+        #expect(state.phase == .error(UserFacingError.bedrockMinutesCredentialsMissing.message))
+    }
+
     @Test func minutesOffShowsTheTranscriptOnly() async throws {
         let writer = MockMinutesWriter(.success("unused"))
         var shown: [URL] = []
