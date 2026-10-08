@@ -9,11 +9,23 @@ public enum MeetingMinutesError: Error, Equatable, Sendable {
     case timedOut
 }
 
+/// Minutes as written, with the API usage they cost.
+public struct WrittenMinutes: Equatable, Sendable {
+    public var text: String
+    /// nil when the writer has no per-token cost to report (Claude Code, on the user's subscription).
+    public var usage: CleanupUsage?
+
+    public init(text: String, usage: CleanupUsage? = nil) {
+        self.text = text
+        self.usage = usage
+    }
+}
+
 /// Writes meeting minutes from a transcript.
 public protocol MeetingMinutesWriting: Sendable {
     /// - Parameter vocabulary: The user's dictionary; its spellings are kept as written.
     func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
-        -> String
+        -> WrittenMinutes
 }
 
 /// What writes the minutes: Claude Code, or one of the AI cleanup providers with its saved credentials.
@@ -234,7 +246,7 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
     }
 
     public func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
-        -> String
+        -> WrittenMinutes
     {
         let executable = executable
         let arguments = Self.arguments(model: model, instructions: instructions)
@@ -248,7 +260,8 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
                 throw MeetingMinutesError.timedOut
             }
             defer { group.cancelAll() }
-            return try await group.next() ?? ""
+            // Runs on the user's subscription, so there's no per-token cost to record.
+            return WrittenMinutes(text: try await group.next() ?? "")
         }
     }
 
@@ -324,7 +337,7 @@ public struct ProviderMinutesWriter: MeetingMinutesWriting {
     }
 
     public func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
-        -> String
+        -> WrittenMinutes
     {
         let completion: CleanupCompletion
         do {
@@ -338,6 +351,7 @@ public struct ProviderMinutesWriter: MeetingMinutesWriting {
         }
         let text = completion.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw MeetingMinutesError.failed("\(provider.displayName): empty response") }
-        return text
+        return WrittenMinutes(
+            text: text, usage: completion.usage.map { CleanupUsage(provider, model: model, tokens: $0) })
     }
 }

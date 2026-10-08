@@ -96,7 +96,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - `SettingsStore` は秘密情報以外の設定を UserDefaults に保存する。
 - 秘密情報は `SecretStore` / `KeychainService` 経由で Keychain にのみ保存する。
 - `VocabularyStore` / `HistoryStore` は `@MainActor @Observable` なインメモリストアで、`JSONFileStore`(`~/Library/Application Support/HibiVo/`)経由で保存する。書き込み用 actor は古い世代を破棄するため、並行保存でファイルが巻き戻らない。
-- `UsageStore` は日別の利用集計(回数・文字数・送信音声秒数・モデル別トークン)を `usage.json` に保存する。テキストは持たず、履歴の設定とは独立。料金の概算は `UsagePricing` の公開価格表から計算する。
+- `UsageStore` は日別の利用集計(回数・文字数・送信音声秒数・モデル別トークン)を `usage.json` に保存する。議事録のトークンは AI 整形とは別の `minutes` に入れ、ミーティング側の利用として数える。Claude Code はサブスクリプションの枠を使うため記録しない(`WrittenMinutes.usage` が nil)。Haiku 5.5 のように入力 10 万トークン超で単価が上がるモデルがあるため、そうしたリクエストは `longPrompt` で分けて集計する。テキストは持たず、履歴の設定とは独立。料金の概算は `UsagePricing` の公開価格表から計算する。
 - 音声はディスクに書き込まない。例外は「終了後にまとめて」のミーティングの一時保存(`MeetingRecordingStore`)だけで、文字起こしが済んだら削除する。
 
 ## 過去に問題になった並行性ルール

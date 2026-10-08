@@ -1019,6 +1019,34 @@ import Testing
         #expect(settings.resolvedMeetingMinutesModel.isEmpty)
     }
 
+    @Test func minutesTokensAreRecordedAsMeetingUsage() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .anthropic
+        let tokens = CleanupUsage(
+            provider: "anthropic", model: "claude-haiku-5-5", requests: 1, tokens: TokenUsage(input: 5_000, output: 800)
+        )
+        let writer = MockMinutesWriter(.success("# 日程\n\n## 概要\nなし"), usage: tokens)
+        let usage = makeUsage()
+        let sut = makeController(minutesWriter: writer, usage: usage)
+        try await recordShortMeeting(sut)
+        await settle { usage.days.first?.minutes.isEmpty == false }
+        let day = try #require(usage.days.first)
+        #expect(day.minutes == [tokens])
+        #expect(day.cleanup.isEmpty)
+        #expect(day.meetingPart.minutes == [tokens])
+        #expect(day.dictationPart.minutes.isEmpty)
+    }
+
+    @Test func claudeCodeMinutesRecordNoTokens() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.success("# 日程\n\n## 概要\nなし"))
+        let usage = makeUsage()
+        let sut = makeController(minutesWriter: writer, usage: usage)
+        try await recordShortMeeting(sut)
+        #expect(await writer.calls.count == 1)
+        #expect(usage.days.allSatisfy { $0.minutes.isEmpty })
+    }
+
     @Test func providerMinutesWithoutSettingsExplainWhy() async throws {
         settings.meetingMinutesEnabled = true
         settings.meetingMinutesEngine = .gemini
@@ -1444,22 +1472,33 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
         let result: Result<String, CleanupError>
         private(set) var calls: [(system: String, user: String, model: String)] = []
 
-        init(_ result: Result<String, CleanupError>) { self.result = result }
+        let usage: TokenUsage?
+
+        init(_ result: Result<String, CleanupError>, usage: TokenUsage? = nil) {
+            self.result = result
+            self.usage = usage
+        }
 
         func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
             calls.append((system, user, model))
-            return CleanupCompletion(text: try result.get())
+            return CleanupCompletion(text: try result.get(), usage: usage)
         }
     }
 
     @Test func sendsTheMinutesPromptToTheModel() async throws {
-        let provider = RecordingProvider(.success("\n# 日程の確認\n\n## 概要\n決めた。\n"))
+        let provider = RecordingProvider(
+            .success("\n# 日程の確認\n\n## 概要\n決めた。\n"), usage: TokenUsage(input: 1_200, output: 300))
         let sut = ProviderMinutesWriter(provider: provider, instructions: "## 要点")
         let minutes = try await sut.writeMinutes(
             transcript: "**話者1** 来週です",
             vocabulary: [CleanupPromptBuilder.Term(preferred: "AppSync", spokenForms: [])],
             model: "claude-haiku-5-5")
-        #expect(minutes == "# 日程の確認\n\n## 概要\n決めた。")
+        #expect(minutes.text == "# 日程の確認\n\n## 概要\n決めた。")
+        #expect(
+            minutes.usage
+                == CleanupUsage(
+                    provider: "recording", model: "claude-haiku-5-5", requests: 1,
+                    tokens: TokenUsage(input: 1_200, output: 300)))
         let call = try #require(await provider.calls.first)
         #expect(call.model == "claude-haiku-5-5")
         #expect(call.system == MeetingMinutesPrompt.system(instructions: "## 要点"))

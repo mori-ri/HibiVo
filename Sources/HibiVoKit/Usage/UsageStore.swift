@@ -11,19 +11,27 @@ public struct TranscriptionUsage: Codable, Hashable, Sendable {
     }
 }
 
-/// Cleanup requests that reported token usage, for one provider/model on one day.
+/// LLM requests (cleanup or minutes) that reported token usage, for one provider/model on one day.
 public struct CleanupUsage: Codable, Hashable, Sendable {
     public var provider: String
     public var model: String
     /// AWS Region for Bedrock, whose prices differ by Region. nil for other providers.
     public var region: String?
+    /// True for requests whose prompt went over `UsagePricing.longPromptThreshold`, which some models
+    /// price higher. Kept apart because the price depends on each request's size, not the day's total.
+    /// nil (not false) otherwise, so older files and short requests stay the same.
+    public var longPrompt: Bool?
     public var requests: Int
     public var tokens: TokenUsage
 
-    public init(provider: String, model: String, region: String? = nil, requests: Int, tokens: TokenUsage) {
+    public init(
+        provider: String, model: String, region: String? = nil, longPrompt: Bool? = nil, requests: Int,
+        tokens: TokenUsage
+    ) {
         self.provider = provider
         self.model = model
         self.region = region
+        self.longPrompt = longPrompt
         self.requests = requests
         self.tokens = tokens
     }
@@ -31,12 +39,13 @@ public struct CleanupUsage: Codable, Hashable, Sendable {
     /// One request's worth of usage for `provider`.
     public init(_ provider: any TextCleanupProvider, model: String, tokens: TokenUsage) {
         self.init(
-            provider: provider.id, model: model, region: (provider as? BedrockCleanupProvider)?.region, requests: 1,
-            tokens: tokens)
+            provider: provider.id, model: model, region: (provider as? BedrockCleanupProvider)?.region,
+            longPrompt: tokens.input > UsagePricing.longPromptThreshold ? true : nil, requests: 1, tokens: tokens)
     }
 
     func isSameModel(as other: CleanupUsage) -> Bool {
         provider == other.provider && model == other.model && region == other.region
+            && longPrompt == other.longPrompt
     }
 }
 
@@ -56,6 +65,8 @@ public struct DailyUsage: Codable, Hashable, Sendable {
     /// The part of `transcription` that came from meetings, kept per model so its cost can be told apart.
     public var meetingTranscription: [TranscriptionUsage] = []
     public var cleanup: [CleanupUsage] = []
+    /// Meeting minutes written through an API. Claude Code runs on the user's subscription and isn't counted.
+    public var minutes: [CleanupUsage] = []
 
     public init(day: String) {
         self.day = day
@@ -76,15 +87,16 @@ public struct DailyUsage: Codable, Hashable, Sendable {
         meetingTranscription =
             try container.decodeIfPresent([TranscriptionUsage].self, forKey: .meetingTranscription) ?? []
         cleanup = try container.decodeIfPresent([CleanupUsage].self, forKey: .cleanup) ?? []
+        minutes = try container.decodeIfPresent([CleanupUsage].self, forKey: .minutes) ?? []
     }
 
     public var audioSeconds: Double { transcription.reduce(0) { $0 + $1.seconds } }
-    public var tokens: TokenUsage { cleanup.reduce(.zero) { $0 + $1.tokens } }
+    /// Cleanup and minutes together.
+    public var tokens: TokenUsage { (cleanup + minutes).reduce(.zero) { $0 + $1.tokens } }
     /// The part of `audioSeconds` that came from meetings.
     public var meetingSeconds: Double { meetingTranscription.reduce(0) { $0 + $1.seconds } }
 
-    /// Only the meetings' share of the day, for pricing it apart. Minutes are written by Claude Code on
-    /// the user's subscription, so meetings have no cleanup tokens.
+    /// Only the meetings' share of the day, for pricing it apart: their transcription and minutes.
     public var meetingPart: DailyUsage {
         var part = DailyUsage(day: day)
         part.meetings = meetings
@@ -92,6 +104,7 @@ public struct DailyUsage: Codable, Hashable, Sendable {
         part.meetingCharacters = meetingCharacters
         part.transcription = meetingTranscription
         part.meetingTranscription = meetingTranscription
+        part.minutes = minutes
         return part
     }
 
@@ -118,13 +131,16 @@ public struct DailyUsage: Codable, Hashable, Sendable {
             Self.add(stt, to: &transcription)
             if event.meetings > 0 { Self.add(stt, to: &meetingTranscription) }
         }
-        if let llm = event.cleanup {
-            if let index = cleanup.firstIndex(where: { $0.isSameModel(as: llm) }) {
-                cleanup[index].requests += llm.requests
-                cleanup[index].tokens = cleanup[index].tokens + llm.tokens
-            } else {
-                cleanup.append(llm)
-            }
+        if let llm = event.cleanup { Self.add(llm, to: &cleanup) }
+        if let llm = event.minutes { Self.add(llm, to: &minutes) }
+    }
+
+    private static func add(_ usage: CleanupUsage, to list: inout [CleanupUsage]) {
+        if let index = list.firstIndex(where: { $0.isSameModel(as: usage) }) {
+            list[index].requests += usage.requests
+            list[index].tokens = list[index].tokens + usage.tokens
+        } else {
+            list.append(usage)
         }
     }
 
@@ -145,10 +161,11 @@ public struct UsageEvent: Sendable {
     public var characters = 0
     public var transcription: TranscriptionUsage?
     public var cleanup: CleanupUsage?
+    public var minutes: CleanupUsage?
 
     public init(
         date: Date = Date(), dictations: Int = 0, meetings: Int = 0, characters: Int = 0,
-        transcription: TranscriptionUsage? = nil, cleanup: CleanupUsage? = nil
+        transcription: TranscriptionUsage? = nil, cleanup: CleanupUsage? = nil, minutes: CleanupUsage? = nil
     ) {
         self.date = date
         self.dictations = dictations
@@ -156,6 +173,7 @@ public struct UsageEvent: Sendable {
         self.characters = characters
         self.transcription = transcription
         self.cleanup = cleanup
+        self.minutes = minutes
     }
 }
 

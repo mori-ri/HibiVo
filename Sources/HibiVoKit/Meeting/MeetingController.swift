@@ -796,7 +796,7 @@ public final class MeetingController {
         with minutesWriter: any MeetingMinutesWriting
     ) async {
         defer { state.meetingMinutesInProgress -= 1 }
-        var minutes: String?
+        var minutes: WrittenMinutes?
         var failure: Error?
         // A sleep in the middle cuts the writer off from the network; try once more after waking.
         for _ in 0..<2 where minutes == nil {
@@ -823,7 +823,9 @@ public final class MeetingController {
                 error as? MeetingMinutesError == .claudeCodeNotFound ? .claudeCodeNotFound : .meetingMinutesFailed)
             return
         }
-        let (title, body) = MeetingMinutesTitle.split(minutes)
+        // The tokens are spent even if the file can't be written below.
+        if let usage, let tokens = minutes.usage { usage.record(UsageEvent(minutes: tokens)) }
+        let (title, body) = MeetingMinutesTitle.split(minutes.text)
         let url = Self.minutesURL(for: transcriptURL, title: title)
         let text = MeetingDocument.minutes(
             title: title, body: body, transcriptFileName: transcriptURL.lastPathComponent)

@@ -37,9 +37,17 @@ public enum UsagePricing {
         ("claude-opus-4-6", .init(input: 5, output: 25)),
         ("claude-sonnet-5", .init(input: 2, output: 10)),
         ("claude-sonnet-4-6", .init(input: 3, output: 15)),
-        // Prompts up to 100K tokens; cleanup never gets near the higher long-prompt price.
+        // Prompts up to 100K tokens; longer ones use `claudeLongPromptRates`.
         ("claude-haiku-5-5", .init(input: 0.10, output: 0.50)),
         ("claude-haiku-4-5", .init(input: 1, output: 5)),
+    ]
+
+    /// Prompt size above which the models in `claudeLongPromptRates` charge more. Only minutes of long
+    /// meetings get there.
+    public static let longPromptThreshold = 100_000
+    /// Whole-request prices for prompts over `longPromptThreshold`. Other models keep one price.
+    static let claudeLongPromptRates: [(prefix: String, rate: TokenRate)] = [
+        ("claude-haiku-5-5", .init(input: 0.50, output: 2.50))
     ]
 
     /// Bedrock charges Claude at Anthropic's rates on global inference profiles, and 10% more for
@@ -112,17 +120,22 @@ public enum UsagePricing {
 
     /// nil for models without a built-in price (OpenAI-compatible endpoints, unlisted Bedrock models).
     /// `day` (`yyyy-MM-dd`) picks time-limited prices; nil means today.
-    public static func rate(provider: String, model: String, region: String? = nil, day: String? = nil) -> TokenRate? {
+    public static func rate(
+        provider: String, model: String, region: String? = nil, longPrompt: Bool = false, day: String? = nil
+    ) -> TokenRate? {
         switch CleanupProviderKind(rawValue: provider) {
-        case .anthropic: claudeRate(model)
-        case .bedrock: bedrockRate(model: model, region: region)
+        case .anthropic: claudeRate(model, longPrompt: longPrompt)
+        case .bedrock: bedrockRate(model: model, region: region, longPrompt: longPrompt)
         case .gemini: geminiRate(model, day: day ?? Date().formatted(.iso8601.year().month().day()))
         case .openAICompatible, nil: nil
         }
     }
 
-    static func claudeRate(_ name: String) -> TokenRate? {
-        claudeRates.first { name.hasPrefix($0.prefix) }?.rate
+    static func claudeRate(_ name: String, longPrompt: Bool = false) -> TokenRate? {
+        if longPrompt, let rate = claudeLongPromptRates.first(where: { name.hasPrefix($0.prefix) })?.rate {
+            return rate
+        }
+        return claudeRates.first { name.hasPrefix($0.prefix) }?.rate
     }
 
     static func geminiRate(_ model: String, day: String) -> TokenRate? {
@@ -131,13 +144,15 @@ public enum UsagePricing {
         return entry.standard
     }
 
-    static func bedrockRate(model: String, region: String?) -> TokenRate? {
+    static func bedrockRate(model: String, region: String?, longPrompt: Bool = false) -> TokenRate? {
         let parts = model.split(separator: ".", maxSplits: 1).map(String.init)
         let scope = parts.count == 2 && inferenceProfileScopes.contains(parts[0]) ? parts[0] : nil
         let name = scope == nil ? model : parts[1]
 
         if name.hasPrefix("anthropic.") {
-            guard let rate = claudeRate(String(name.dropFirst("anthropic.".count))) else { return nil }
+            guard let rate = claudeRate(String(name.dropFirst("anthropic.".count)), longPrompt: longPrompt) else {
+                return nil
+            }
             return scope == "global" ? rate : rate.scaled(bedrockRegionalPremium)
         }
         guard let entry = bedrockModels.first(where: { name.hasPrefix($0.id) }) else { return nil }
@@ -147,19 +162,22 @@ public enum UsagePricing {
     }
 
     public static func cleanupUSD(_ usage: CleanupUsage, day: String? = nil) -> Double? {
-        guard let rate = rate(provider: usage.provider, model: usage.model, region: usage.region, day: day) else {
-            return nil
-        }
+        guard
+            let rate = rate(
+                provider: usage.provider, model: usage.model, region: usage.region,
+                longPrompt: usage.longPrompt == true, day: day)
+        else { return nil }
         return (Double(usage.tokens.input) * rate.input + Double(usage.tokens.output) * rate.output) / 1_000_000
     }
 
     public struct Estimate: Equatable, Sendable {
         public var transcriptionUSD: Double = 0
         public var cleanupUSD: Double = 0
+        public var minutesUSD: Double = 0
         /// Models that were used but have no known price, so they are missing from the total.
         public var unpricedModels: [String] = []
 
-        public var totalUSD: Double { transcriptionUSD + cleanupUSD }
+        public var totalUSD: Double { transcriptionUSD + cleanupUSD + minutesUSD }
     }
 
     public static func estimate(_ days: some Sequence<DailyUsage>) -> Estimate {
@@ -176,6 +194,13 @@ public enum UsagePricing {
             for llm in day.cleanup {
                 if let usd = cleanupUSD(llm, day: day.day) {
                     estimate.cleanupUSD += usd
+                } else {
+                    unpriced.insert(llm.model)
+                }
+            }
+            for llm in day.minutes {
+                if let usd = cleanupUSD(llm, day: day.day) {
+                    estimate.minutesUSD += usd
                 } else {
                     unpriced.insert(llm.model)
                 }
