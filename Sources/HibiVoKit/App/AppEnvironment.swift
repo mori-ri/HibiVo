@@ -74,9 +74,15 @@ public final class AppEnvironment {
             },
             transcribers: { meetingTranscribers },
             minutesWriter: {
-                ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
-                    ClaudeCodeMinutesWriter(executable: $0, instructions: settings.meetingMinutesInstructions ?? "")
+                let instructions = settings.meetingMinutesInstructions ?? ""
+                guard let kind = settings.meetingMinutesEngine.providerKind else {
+                    return ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath).map {
+                        ClaudeCodeMinutesWriter(executable: $0, instructions: instructions)
+                    }
                 }
+                guard !settings.resolvedMeetingMinutesModel.isEmpty else { return nil }
+                return kind.makeProvider(settings: settings, secrets: secrets, limits: .minutes)
+                    .map { ProviderMinutesWriter(provider: $0, instructions: instructions) }
             },
             vocabulary: { vocabulary.activeEntries },
             usage: usage,

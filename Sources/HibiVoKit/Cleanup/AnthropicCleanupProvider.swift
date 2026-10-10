@@ -6,12 +6,14 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
     public let displayName = "Anthropic (Claude)"
     public let defaultModel = CleanupProviderKind.anthropic.defaultModel
 
+    let limits: CleanupLimits
     private let apiKey: String
     private let urlSession: URLSession
     private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
-    public init(apiKey: String, urlSession: URLSession = .shared) {
+    public init(apiKey: String, limits: CleanupLimits = .cleanup, urlSession: URLSession = .shared) {
         self.apiKey = apiKey
+        self.limits = limits
         self.urlSession = urlSession
     }
 
@@ -79,26 +81,30 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
     }
 
     /// Shared with Bedrock, whose model IDs look like `anthropic.claude-…` or `global.anthropic.claude-…`.
-    static func makeRequest(system: String, user: String, model: String, allowFallbacks: Bool = true) -> Request {
+    static func makeRequest(
+        system: String, user: String, model: String, allowFallbacks: Bool = true, limits: CleanupLimits = .cleanup
+    ) -> Request {
         let name = model.range(of: "anthropic.").map { String(model[$0.upperBound...]) } ?? model
         // Haiku 4.5 rejects effort; Haiku 5.5 takes it (and defaults to medium, so low is worth sending).
         let supportsEffort = !name.hasPrefix("claude-haiku-4")
         let supportsFallbacks =
             allowFallbacks
             && ["claude-opus-5", "claude-fable-5", "claude-sonnet-5-5"].contains { name.hasPrefix($0) }
-        return Request(
+        var request = Request(
             model: model,
             system: system,
             messages: [.init(content: user)],
-            outputConfig: supportsEffort ? .init(effort: "low") : nil,
+            outputConfig: supportsEffort && limits.lowEffort ? .init(effort: "low") : nil,
             fallbacks: supportsFallbacks ? "default" : nil)
+        if let maxTokens = limits.maxTokens { request.maxTokens = maxTokens }
+        return request
     }
 
     public func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
-        let body = Self.makeRequest(system: system, user: user, model: model)
+        let body = Self.makeRequest(system: system, user: user, model: model, limits: limits)
         var headers = ["x-api-key": apiKey, "anthropic-version": "2023-06-01"]
         if body.fallbacks != nil { headers["anthropic-beta"] = "server-side-fallback-2026-07-01" }
-        let request = try HTTPJSON.post(endpoint, headers: headers, body: body, timeout: 60)
+        let request = try HTTPJSON.post(endpoint, headers: headers, body: body, timeout: limits.timeout)
         let (data, response) = try await urlSession.data(for: request)
         try HTTPJSON.checkStatus(response, data: data)
         return try Self.parse(data)
@@ -109,6 +115,7 @@ public struct AnthropicCleanupProvider: TextCleanupProvider {
         if response.stopReason == "refusal" { throw CleanupError.refused }
         let text = response.content.filter { $0.type == "text" }.compactMap(\.text).joined()
         guard !text.isEmpty else { throw CleanupError.invalidResponse }
-        return CleanupCompletion(text: text, usage: response.usage?.tokens)
+        return CleanupCompletion(
+            text: text, usage: response.usage?.tokens, truncated: response.stopReason == "max_tokens")
     }
 }

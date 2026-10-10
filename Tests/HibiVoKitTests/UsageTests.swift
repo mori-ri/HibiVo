@@ -163,6 +163,45 @@ import Testing
         #expect(usd == 0.12)
     }
 
+    @Test func longPromptsArePricedPerRequest() {
+        let short = CleanupUsage(
+            MockCleanupProvider(result: .success("")), model: "claude-haiku-5-5",
+            tokens: TokenUsage(input: 100_000, output: 10))
+        #expect(short.longPrompt == nil)
+        let long = CleanupUsage(
+            AnthropicCleanupProvider(apiKey: "k"), model: "claude-haiku-5-5",
+            tokens: TokenUsage(input: 100_001, output: 10))
+        #expect(long.longPrompt == true)
+        #expect(!long.isSameModel(as: short))
+        #expect(
+            UsagePricing.rate(provider: "anthropic", model: "claude-haiku-5-5", longPrompt: true)
+                == .init(input: 0.50, output: 2.50))
+        // Bedrock's global profile charges Anthropic's rates; models without a long-prompt price keep theirs.
+        #expect(
+            UsagePricing.rate(
+                provider: "bedrock", model: "global.anthropic.claude-haiku-5-5", longPrompt: true)
+                == .init(input: 0.50, output: 2.50))
+        #expect(
+            UsagePricing.rate(provider: "anthropic", model: "claude-opus-5-5", longPrompt: true)
+                == .init(input: 4, output: 20))
+    }
+
+    @Test func minutesAreInTheEstimateAndTheMeetingsShare() {
+        var day = DailyUsage(day: "2026-10-08")
+        day.add(
+            UsageEvent(
+                minutes: .init(
+                    provider: "anthropic", model: "claude-haiku-5-5", requests: 1,
+                    tokens: .init(input: 1_000_000, output: 100_000))))
+        let estimate = UsagePricing.estimate([day])
+        #expect(abs(estimate.minutesUSD - 0.15) < 1e-9)
+        #expect(estimate.cleanupUSD == 0)
+        #expect(abs(estimate.totalUSD - 0.15) < 1e-9)
+        #expect(abs(UsagePricing.estimate([day.meetingPart]).totalUSD - 0.15) < 1e-9)
+        #expect(UsagePricing.estimate([day.dictationPart]).totalUSD == 0)
+        #expect(day.tokens == .init(input: 1_000_000, output: 100_000))
+    }
+
     @Test func claudeRatesMatchTheLongestPrefix() {
         #expect(UsagePricing.rate(provider: "anthropic", model: "claude-opus-5") == .init(input: 5, output: 25))
         #expect(UsagePricing.rate(provider: "anthropic", model: "claude-opus-5-5") == .init(input: 4, output: 20))

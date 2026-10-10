@@ -52,11 +52,27 @@ public final class SettingsStore {
     public var meetingTranscriptionTiming: MeetingTranscriptionTiming {
         didSet { save(meetingTranscriptionTiming, "meetingTranscriptionTiming") }
     }
-    /// Whether Claude Code writes minutes from each saved meeting.
+    /// Whether minutes are written from each saved meeting.
     public var meetingMinutesEnabled: Bool {
         didSet { defaults.set(meetingMinutesEnabled, forKey: "meetingMinutesEnabled") }
     }
+    public var meetingMinutesEngine: MeetingMinutesEngine {
+        didSet { save(meetingMinutesEngine, "meetingMinutesEngine") }
+    }
+    /// Claude Code's model alias for minutes.
     public var meetingMinutesModel: MeetingMinutesModel { didSet { save(meetingMinutesModel, "meetingMinutesModel") } }
+    /// Model ID for minutes from a cleanup provider; empty means the engine's default.
+    /// Settings clears it when the engine changes, since model names differ per provider.
+    public var meetingMinutesAPIModel: String {
+        didSet { defaults.set(meetingMinutesAPIModel, forKey: "meetingMinutesAPIModel") }
+    }
+    /// The model the configured engine writes minutes with. Empty when an OpenAI-compatible model isn't entered.
+    public var resolvedMeetingMinutesModel: String {
+        switch meetingMinutesEngine {
+        case .claudeCode: meetingMinutesModel.rawValue
+        default: meetingMinutesAPIModel.isEmpty ? meetingMinutesEngine.defaultModel : meetingMinutesAPIModel
+        }
+    }
     /// The editable part of the minutes prompt; nil means the built-in default, so improvements to it
     /// reach everyone who hasn't customized it. Use `setMeetingMinutesInstructions` to change it.
     public private(set) var meetingMinutesInstructions: String? {
@@ -97,7 +113,9 @@ public final class SettingsStore {
         meetingMinutesEnabled =
             defaults.object(forKey: "meetingMinutesEnabled") as? Bool
             ?? (ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil)
+        meetingMinutesEngine = Self.load("meetingMinutesEngine", from: defaults) ?? .claudeCode
         meetingMinutesModel = Self.load("meetingMinutesModel", from: defaults) ?? .sonnet
+        meetingMinutesAPIModel = defaults.string(forKey: "meetingMinutesAPIModel") ?? ""
         meetingMinutesInstructions = defaults.string(forKey: "meetingMinutesInstructions")
             .map { String($0.prefix(MeetingMinutesPrompt.instructionsLimit)) }
         claudeCodePath = defaults.string(forKey: "claudeCodePath") ?? ""

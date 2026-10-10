@@ -357,20 +357,37 @@ struct MeetingSettingsView: View {
                 }
             }
             SettingsSection(title: "議事録") {
-                ToggleRow("終了後に Claude で議事録を作成する", isOn: $settings.meetingMinutesEnabled)
+                ToggleRow("終了後に議事録を作成する", isOn: $settings.meetingMinutesEnabled)
                 if env.settings.meetingMinutesEnabled {
-                    PickerRow("議事録のモデル", selection: $settings.meetingMinutesModel) {
-                        ForEach(MeetingMinutesModel.allCases) { Text($0.displayName).tag($0) }
+                    PickerRow("作成方法", selection: $settings.meetingMinutesEngine) {
+                        ForEach(MeetingMinutesEngine.allCases) { Text($0.displayName).tag($0) }
                     }
-                    TextFieldRow("Claude Code の場所", text: $settings.claudeCodePath, prompt: "自動で検出")
-                    MinutesInstructionsRows(settings: env.settings)
-                    if let path = ClaudeCodeMinutesWriter.locate(configuredPath: env.settings.claudeCodePath) {
-                        NoteRow(
-                            "Claude Code(\(path.path))を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
-                        )
+                    // Model names differ per provider, so go back to the new provider's default.
+                    .onChange(of: settings.meetingMinutesEngine) { settings.meetingMinutesAPIModel = "" }
+                    if let kind = env.settings.meetingMinutesEngine.providerKind {
+                        ProviderMinutesFields(env: env, kind: kind)
                     } else {
+                        PickerRow("議事録のモデル", selection: $settings.meetingMinutesModel) {
+                            ForEach(MeetingMinutesModel.allCases) { Text($0.displayName).tag($0) }
+                        }
+                        TextFieldRow("Claude Code の場所", text: $settings.claudeCodePath, prompt: "自動で検出")
+                    }
+                    MinutesInstructionsRows(settings: env.settings)
+                    switch env.settings.meetingMinutesEngine {
+                    case .claudeCode:
+                        if let path = ClaudeCodeMinutesWriter.locate(configuredPath: env.settings.claudeCodePath) {
+                            NoteRow(
+                                "Claude Code(\(path.path))を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
+                            )
+                        } else {
+                            NoteRow(
+                                "Claude Code が見つかりません。インストールして claude.ai のアカウントでログインするか、実行ファイルの場所を入力してください。",
+                                color: .red)
+                        }
+                    case let engine:
                         NoteRow(
-                            "Claude Code が見つかりません。インストールして claude.ai のアカウントでログインするか、実行ファイルの場所を入力してください。", color: .red)
+                            "文字起こしを \(engine.displayName) に送って議事録を作成します。API の料金がかかります。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
+                        )
                     }
                 }
             }
@@ -456,7 +473,6 @@ private struct BedrockSettingsFields: View {
 
     var body: some View {
         @Bindable var settings = env.settings
-        TextFieldRow("リージョン", text: $settings.bedrockRegion, prompt: BedrockCleanupProvider.defaultRegion)
         LabeledRow("モデル ID") {
             TextField(
                 "モデル ID", text: $settings.cleanupModel, prompt: Text("既定: \(CleanupProviderKind.bedrock.defaultModel)")
@@ -472,6 +488,17 @@ private struct BedrockSettingsFields: View {
             .fixedSize()
         }
         NoteRow("モデル ID または推論プロファイル ID を指定します。Claude は InvokeModel、それ以外（GLM、MiniMax、GPT など）は Converse API で呼び出します。")
+        BedrockConnectionFields(env: env)
+    }
+}
+
+/// Region and credentials, shared by AI cleanup and minutes.
+private struct BedrockConnectionFields: View {
+    let env: AppEnvironment
+
+    var body: some View {
+        @Bindable var settings = env.settings
+        TextFieldRow("リージョン", text: $settings.bedrockRegion, prompt: BedrockCleanupProvider.defaultRegion)
         PickerRow("認証", selection: $settings.bedrockAuth) {
             ForEach(BedrockAuthMethod.allCases) { Text($0.displayName).tag($0) }
         }
@@ -483,6 +510,60 @@ private struct BedrockSettingsFields: View {
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsSecretAccessKey, label: "シークレットアクセスキー")
             APIKeyField(secrets: env.secrets, account: SecretAccount.awsSessionToken, label: "セッショントークン（一時認証情報のみ）")
             NoteRow("必要な権限: bedrock:InvokeModel（Converse も同じ権限です）。認証情報は Keychain に保存されます。")
+        }
+    }
+}
+
+/// Model and credentials for minutes from a cleanup provider. The credentials are the ones AI cleanup uses.
+private struct ProviderMinutesFields: View {
+    let env: AppEnvironment
+    let kind: CleanupProviderKind
+
+    var body: some View {
+        @Bindable var settings = env.settings
+        let engine = settings.meetingMinutesEngine
+        LabeledRow("議事録のモデル") {
+            TextField(
+                "議事録のモデル", text: $settings.meetingMinutesAPIModel,
+                prompt: Text(engine.defaultModel.isEmpty ? "例: gpt-4.1" : "既定: \(engine.defaultModel)")
+            )
+            .labelsHidden()
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 340)
+            if !engine.suggestedModels.isEmpty {
+                Menu("候補") {
+                    ForEach(engine.suggestedModels, id: \.self) { model in
+                        Button(model) { settings.meetingMinutesAPIModel = model }
+                    }
+                }
+                .fixedSize()
+            }
+        }
+        switch kind {
+        case .anthropic:
+            APIKeyField(secrets: env.secrets, account: SecretAccount.anthropic, label: "Anthropic API Key")
+        case .openAICompatible:
+            TextFieldRow(
+                "Base URL", text: $settings.openAIBaseURL, prompt: OpenAICompatibleCleanupProvider.defaultBaseURL)
+            APIKeyField(secrets: env.secrets, account: SecretAccount.openAICompatible, label: "API Key")
+        case .bedrock:
+            BedrockConnectionFields(env: env)
+        case .gemini:
+            APIKeyField(secrets: env.secrets, account: SecretAccount.gemini, label: "Google Gemini API Key")
+        }
+        NoteRow("\(sharedSettings)は AI 整形の \(kind.displayName) と共通です。")
+        if settings.resolvedMeetingMinutesModel.isEmpty {
+            NoteRow("議事録に使うモデルを入力してください。", color: .red)
+        }
+    }
+}
+
+extension ProviderMinutesFields {
+    private var sharedSettings: String {
+        switch kind {
+        case .bedrock: "リージョンと認証情報"
+        case .openAICompatible: "Base URL と API キー"
+        case .anthropic, .gemini: "API キー"
         }
     }
 }

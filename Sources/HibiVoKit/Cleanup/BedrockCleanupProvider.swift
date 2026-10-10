@@ -52,12 +52,17 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
     static let maxTokens = 2_000
 
     let region: String
+    let limits: CleanupLimits
     private let authentication: Authentication
     private let urlSession: URLSession
 
-    public init(region: String, authentication: Authentication, urlSession: URLSession = .shared) {
+    public init(
+        region: String, authentication: Authentication, limits: CleanupLimits = .cleanup,
+        urlSession: URLSession = .shared
+    ) {
         self.region = region
         self.authentication = authentication
+        self.limits = limits
         self.urlSession = urlSession
     }
 
@@ -78,11 +83,13 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         }
     }
 
-    static func makeInvokeBody(system: String, user: String, model: String) -> InvokeBody {
+    static func makeInvokeBody(system: String, user: String, model: String, limits: CleanupLimits = .cleanup)
+        -> InvokeBody
+    {
         // Same shaping as the first-party API, minus `model` (it is in the URL) and `fallbacks`
         // (not supported on Bedrock).
         let request = AnthropicCleanupProvider.makeRequest(
-            system: system, user: user, model: model, allowFallbacks: false)
+            system: system, user: user, model: model, allowFallbacks: false, limits: limits)
         return InvokeBody(
             maxTokens: request.maxTokens, system: request.system, messages: request.messages,
             outputConfig: request.outputConfig)
@@ -123,11 +130,11 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         var usage: Usage?
     }
 
-    static func makeConverseBody(system: String, user: String) -> ConverseBody {
+    static func makeConverseBody(system: String, user: String, limits: CleanupLimits = .cleanup) -> ConverseBody {
         ConverseBody(
             system: [.init(text: system)],
             messages: [.init(content: [.init(text: user)])],
-            inferenceConfig: .init(maxTokens: maxTokens))
+            inferenceConfig: .init(maxTokens: limits.maxTokens ?? maxTokens))
     }
 
     static func parseConverse(_ data: Data) throws -> CleanupCompletion {
@@ -138,7 +145,8 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
         let text = (response.output.message?.content ?? []).compactMap(\.text).joined()
         guard !text.isEmpty else { throw CleanupError.invalidResponse }
         return CleanupCompletion(
-            text: text, usage: response.usage.map { TokenUsage(input: $0.inputTokens, output: $0.outputTokens) })
+            text: text, usage: response.usage.map { TokenUsage(input: $0.inputTokens, output: $0.outputTokens) },
+            truncated: response.stopReason == "max_tokens")
     }
 
     // MARK: - Request
@@ -159,11 +167,13 @@ public struct BedrockCleanupProvider: TextCleanupProvider {
             switch API(model: model) {
             case .invokeModel:
                 try HTTPJSON.post(
-                    url, headers: headers, body: Self.makeInvokeBody(system: system, user: user, model: model),
-                    timeout: 60)
+                    url, headers: headers,
+                    body: Self.makeInvokeBody(system: system, user: user, model: model, limits: limits),
+                    timeout: limits.timeout)
             case .converse:
                 try HTTPJSON.post(
-                    url, headers: headers, body: Self.makeConverseBody(system: system, user: user), timeout: 60)
+                    url, headers: headers, body: Self.makeConverseBody(system: system, user: user, limits: limits),
+                    timeout: limits.timeout)
             }
         if case .iam(let credentials) = authentication {
             AWSSigV4.sign(&request, credentials: credentials, region: region, service: "bedrock", date: date)

@@ -14,10 +14,12 @@ struct ClaudeCodeIntegrationTests {
             [00:00:06] **話者2** では、私がリリースノートを月曜までに書きます。
             [00:00:12] **話者1** お願いします。テストは話者3さんに頼みましょう。
             """
-        let minutes = try await ClaudeCodeMinutesWriter(executable: executable)
+        let written = try await ClaudeCodeMinutesWriter(executable: executable)
             .writeMinutes(
                 transcript: transcript, vocabulary: [.init(preferred: "AppSync", spokenForms: ["アップシンク"])],
                 model: "haiku")
+        #expect(written.usage == nil)
+        let minutes = written.text
         let title = MeetingMinutesTitle.split(minutes).title
         print("Minutes title: \(title ?? "(none)")")
         #expect(title != nil)

@@ -289,6 +289,18 @@ struct MockCleanupProvider: TextCleanupProvider {
         let data = Data(#"{"choices":[{"message":{"role":"assistant","content":"整形済み"}}]}"#.utf8)
         #expect(try OpenAICompatibleCleanupProvider.parse(data).usage == nil)
     }
+
+    @Test func outputCapIsReportedAsTruncated() throws {
+        let anthropic = Data(#"{"content":[{"type":"text","text":"途中"}],"stop_reason":"max_tokens"}"#.utf8)
+        #expect(try AnthropicCleanupProvider.parse(anthropic).truncated)
+        let openAI = Data(#"{"choices":[{"message":{"content":"途中"},"finish_reason":"length"}]}"#.utf8)
+        #expect(try OpenAICompatibleCleanupProvider.parse(openAI).truncated)
+        let converse = Data(
+            #"{"output":{"message":{"content":[{"text":"途中"}]}},"stopReason":"max_tokens"}"#.utf8)
+        #expect(try BedrockCleanupProvider.parseConverse(converse).truncated)
+        let finished = Data(#"{"content":[{"type":"text","text":"完了"}],"stop_reason":"end_turn"}"#.utf8)
+        #expect(try !AnthropicCleanupProvider.parse(finished).truncated)
+    }
 }
 
 @Suite struct VocabularyReplacerTests {

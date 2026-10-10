@@ -7,13 +7,69 @@ public enum MeetingMinutesError: Error, Equatable, Sendable {
     /// Claude Code ran but reported a failure, e.g. not logged in or usage limit reached.
     case failed(String)
     case timedOut
+    /// The model stopped at the output cap, so the minutes would be cut off. Carries the tokens it still cost.
+    case outputLimitReached(usage: CleanupUsage?)
+}
+
+/// Minutes as written, with the API usage they cost.
+public struct WrittenMinutes: Equatable, Sendable {
+    public var text: String
+    /// nil when the writer has no per-token cost to report (Claude Code, on the user's subscription).
+    public var usage: CleanupUsage?
+
+    public init(text: String, usage: CleanupUsage? = nil) {
+        self.text = text
+        self.usage = usage
+    }
 }
 
 /// Writes meeting minutes from a transcript.
 public protocol MeetingMinutesWriting: Sendable {
     /// - Parameter vocabulary: The user's dictionary; its spellings are kept as written.
     func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
-        -> String
+        -> WrittenMinutes
+}
+
+/// What writes the minutes: Claude Code, or one of the AI cleanup providers with its saved credentials.
+public enum MeetingMinutesEngine: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Claude Code CLI, on the user's Claude subscription.
+    case claudeCode
+    // Billed per token, like AI cleanup. Raw values match `CleanupProviderKind`.
+    case anthropic
+    case openAICompatible = "openai-compatible"
+    case bedrock
+    case gemini
+
+    public var id: String { rawValue }
+
+    /// The cleanup provider this engine calls; nil for Claude Code.
+    public var providerKind: CleanupProviderKind? { CleanupProviderKind(rawValue: rawValue) }
+
+    public var displayName: String {
+        providerKind?.displayName ?? "Claude Code(サブスクリプション)"
+    }
+
+    /// The model used when none is entered. Empty for OpenAI-compatible endpoints, which have no common model.
+    public var defaultModel: String {
+        switch self {
+        case .claudeCode: MeetingMinutesModel.sonnet.rawValue
+        case .anthropic: "claude-haiku-5-5"
+        case .openAICompatible: ""
+        case .bedrock: "global.anthropic.claude-haiku-5-5"
+        case .gemini: "gemini-3.8-flash"
+        }
+    }
+
+    /// Model IDs offered as suggestions in Settings.
+    public var suggestedModels: [String] {
+        switch self {
+        case .claudeCode, .openAICompatible: []
+        case .anthropic: ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"]
+        // Claude models only: the others on Bedrock are suggested for short cleanups.
+        case .bedrock: BedrockCleanupProvider.suggestedModels.filter { $0.contains("anthropic.") }
+        case .gemini: GeminiCleanupProvider.suggestedModels
+        }
+    }
 }
 
 /// Models offered for minutes, as Claude Code aliases (always the latest of each family).
@@ -192,7 +248,7 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
     }
 
     public func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
-        -> String
+        -> WrittenMinutes
     {
         let executable = executable
         let arguments = Self.arguments(model: model, instructions: instructions)
@@ -206,7 +262,8 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
                 throw MeetingMinutesError.timedOut
             }
             defer { group.cancelAll() }
-            return try await group.next() ?? ""
+            // Runs on the user's subscription, so there's no per-token cost to record.
+            return WrittenMinutes(text: try await group.next() ?? "")
         }
     }
 
@@ -266,5 +323,61 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
         } onCancel: {
             if process.isRunning { process.terminate() }
         }
+    }
+}
+
+/// Writes minutes through an AI cleanup provider, with the same prompt as Claude Code.
+/// The provider should be made with `CleanupLimits.minutes`.
+public struct ProviderMinutesWriter: MeetingMinutesWriting {
+    let provider: any TextCleanupProvider
+    /// The editable part of the system prompt; blank means the default.
+    let instructions: String
+    /// Waits before each retry of a busy or failing server (429, 5xx). Claude Code retries these itself.
+    let retryDelays: [Duration]
+
+    public init(
+        provider: any TextCleanupProvider, instructions: String = "",
+        retryDelays: [Duration] = [.seconds(5), .seconds(20)]
+    ) {
+        self.provider = provider
+        self.instructions = instructions
+        self.retryDelays = retryDelays
+    }
+
+    public func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
+        -> WrittenMinutes
+    {
+        let system = MeetingMinutesPrompt.system(instructions: instructions)
+        let user = MeetingMinutesPrompt.user(transcript, vocabulary: vocabulary)
+        var delays = retryDelays[...]
+        let completion: CleanupCompletion
+        while true {
+            do {
+                completion = try await provider.complete(system: system, user: user, model: model)
+                break
+            } catch let error as URLError where error.code == .timedOut {
+                throw MeetingMinutesError.timedOut
+            } catch let error as CleanupError {
+                if Self.isTransient(error), let delay = delays.popFirst() {
+                    try await Task.sleep(for: delay)
+                    continue
+                }
+                throw MeetingMinutesError.failed("\(provider.displayName): \(error)")
+            }
+        }
+        // Cut-off minutes would read as complete; the transcript is still saved.
+        if completion.truncated {
+            throw MeetingMinutesError.outputLimitReached(
+                usage: completion.usage.map { CleanupUsage(provider, model: model, tokens: $0) })
+        }
+        let text = completion.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { throw MeetingMinutesError.failed("\(provider.displayName): empty response") }
+        return WrittenMinutes(
+            text: text, usage: completion.usage.map { CleanupUsage(provider, model: model, tokens: $0) })
+    }
+
+    static func isTransient(_ error: CleanupError) -> Bool {
+        guard case .http(let status) = error else { return false }
+        return status == 429 || status >= 500
     }
 }

@@ -152,6 +152,40 @@ import Testing
         #expect(throws: CleanupError.refused) { try BedrockCleanupProvider.parseConverse(data) }
     }
 
+    @Test func minutesLimitsRaiseTheCapAndLeaveEffortToTheModel() throws {
+        let body = BedrockCleanupProvider.makeInvokeBody(
+            system: "s", user: "u", model: "global.anthropic.claude-haiku-5-5", limits: .minutes)
+        #expect(body.maxTokens == 16_000)
+        #expect(body.outputConfig == nil)
+        let converse = BedrockCleanupProvider.makeConverseBody(system: "s", user: "u", limits: .minutes)
+        #expect(converse.inferenceConfig.maxTokens == 16_000)
+
+        let sut = BedrockCleanupProvider(region: "us-east-1", authentication: .apiKey("k"), limits: .minutes)
+        let request = try sut.makeURLRequest(system: "s", user: "u", model: "global.anthropic.claude-haiku-5-5")
+        #expect(request.timeoutInterval == 600)
+    }
+
+    @Test func cleanupLimitsKeepTheShortDefaults() {
+        let body = BedrockCleanupProvider.makeInvokeBody(
+            system: "s", user: "u", model: "global.anthropic.claude-haiku-5-5")
+        #expect(body.maxTokens == 4_000)
+        #expect(body.outputConfig?.effort == "low")
+        #expect(BedrockCleanupProvider.makeConverseBody(system: "s", user: "u").inferenceConfig.maxTokens == 2_000)
+    }
+
+    @MainActor @Test func providerIsMadeFromSavedCredentials() throws {
+        let settings = SettingsStore(defaults: try #require(UserDefaults(suiteName: "BedrockTests-\(UUID())")))
+        settings.bedrockRegion = "us-west-2"
+        settings.bedrockAuth = .apiKey
+        #expect(CleanupProviderKind.bedrock.makeProvider(settings: settings, secrets: MockSecrets()) == nil)
+        let secrets = MockSecrets(values: [SecretAccount.bedrockAPIKey: "KEY"])
+        let provider = try #require(
+            CleanupProviderKind.bedrock.makeProvider(settings: settings, secrets: secrets, limits: .minutes)
+                as? BedrockCleanupProvider)
+        #expect(provider.region == "us-west-2")
+        #expect(provider.limits == .minutes)
+    }
+
     @Test func converseEmptyOutputIsInvalid() {
         let data = Data(#"{"output":{"message":{"role":"assistant","content":[]}},"stopReason":"end_turn"}"#.utf8)
         #expect(throws: CleanupError.invalidResponse) { try BedrockCleanupProvider.parseConverse(data) }

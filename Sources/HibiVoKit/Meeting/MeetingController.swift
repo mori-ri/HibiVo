@@ -764,7 +764,7 @@ public final class MeetingController {
         await withCheckedContinuation { wakeWaiters.append($0) }
     }
 
-    /// Hands a saved transcript to Claude Code for minutes, or shows it right away when minutes are off.
+    /// Hands a saved transcript to Claude Code or a cleanup provider for minutes, or shows it right away when minutes are off.
     /// With minutes, Finder shows the minutes once they exist (or the transcript if they fail), so the
     /// user isn't pulled to Finder twice.
     /// The user's notes reach the minutes through the transcript document, where Claude reads them.
@@ -775,11 +775,14 @@ public final class MeetingController {
         }
         guard let writer = minutesWriter() else {
             onSaved(url)
-            showUnlessBusy(.claudeCodeNotFound)
+            let engine = settings.meetingMinutesEngine
+            showUnlessBusy(
+                engine == .claudeCode
+                    ? .claudeCodeNotFound : .minutesProviderNotConfigured(provider: engine.displayName))
             return
         }
         state.meetingMinutesInProgress += 1
-        let model = settings.meetingMinutesModel.rawValue
+        let model = settings.resolvedMeetingMinutesModel
         transcriptions.append(
             Task {
                 await writeMinutes(
@@ -793,9 +796,9 @@ public final class MeetingController {
         with minutesWriter: any MeetingMinutesWriting
     ) async {
         defer { state.meetingMinutesInProgress -= 1 }
-        var minutes: String?
+        var minutes: WrittenMinutes?
         var failure: Error?
-        // A sleep in the middle cuts Claude Code off from the network; try once more after waking.
+        // A sleep in the middle cuts the writer off from the network; try once more after waking.
         for _ in 0..<2 where minutes == nil {
             await untilAwake()
             let sleeps = sleepCount
@@ -804,6 +807,10 @@ public final class MeetingController {
                     transcript: document, vocabulary: vocabulary, model: model)
             } catch {
                 failure = error
+                // A cut-off answer was still billed.
+                if case .outputLimitReached(let tokens?) = error as? MeetingMinutesError {
+                    usage?.record(UsageEvent(minutes: tokens))
+                }
                 if sleepCount == sleeps { break }
             }
         }
@@ -820,7 +827,9 @@ public final class MeetingController {
                 error as? MeetingMinutesError == .claudeCodeNotFound ? .claudeCodeNotFound : .meetingMinutesFailed)
             return
         }
-        let (title, body) = MeetingMinutesTitle.split(minutes)
+        // The tokens are spent even if the file can't be written below.
+        if let usage, let tokens = minutes.usage { usage.record(UsageEvent(minutes: tokens)) }
+        let (title, body) = MeetingMinutesTitle.split(minutes.text)
         let url = Self.minutesURL(for: transcriptURL, title: title)
         let text = MeetingDocument.minutes(
             title: title, body: body, transcriptFileName: transcriptURL.lastPathComponent)

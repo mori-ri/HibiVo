@@ -340,6 +340,7 @@ private struct CostBreakdown: View {
     var body: some View {
         let stt = Self.merge(days.flatMap(\.transcription))
         let llm = Self.merge(days.flatMap(\.cleanup))
+        let minutes = Self.merge(days.flatMap(\.minutes))
         let rate = settings.usdJPYRate
         SettingsSection(
             title: "API 料金の内訳",
@@ -357,7 +358,7 @@ private struct CostBreakdown: View {
                     Text("円").foregroundStyle(.secondary)
                 }
             }
-            if stt.isEmpty && llm.isEmpty {
+            if stt.isEmpty && llm.isEmpty && minutes.isEmpty {
                 NoteRow("この期間の利用はまだありません。")
             }
             ForEach(stt, id: \.self) { usage in
@@ -367,23 +368,29 @@ private struct CostBreakdown: View {
                     cost: UsagePricing.transcriptionUSD(usage).map { $0 * rate })
             }
             ForEach(llm, id: \.self) { usage in
-                BreakdownRow(
-                    title: "AI 整形", model: usage.region.map { "\(usage.model)（\($0)）" } ?? usage.model,
-                    detail:
-                        "\(usage.requests.formatted()) 回・入力 \(usage.tokens.input.formatted()) / 出力 \(usage.tokens.output.formatted()) トークン",
-                    cost: Self.cleanupUSD(usage, in: days).map { $0 * rate })
+                TokenBreakdownRow(
+                    title: "AI 整形", usage: usage, cost: Self.cleanupUSD(usage, in: days, \.cleanup).map { $0 * rate })
+            }
+            ForEach(minutes, id: \.self) { usage in
+                TokenBreakdownRow(
+                    title: "議事録", usage: usage, cost: Self.cleanupUSD(usage, in: days, \.minutes).map { $0 * rate })
             }
             if !estimate.unpricedModels.isEmpty {
                 NoteRow("料金が登録されていないモデルは合計に含めていません。トークン数を各サービスの料金表と照らし合わせてください。")
+            }
+            if settings.meetingMinutesEnabled, settings.meetingMinutesEngine == .claudeCode {
+                NoteRow("Claude Code で作成した議事録は Claude のサブスクリプションの利用枠を使うため、ここには含まれません。")
             }
         }
     }
 
     /// Priced day by day, since some prices are time-limited.
-    static func cleanupUSD(_ usage: CleanupUsage, in days: [DailyUsage]) -> Double? {
+    static func cleanupUSD(
+        _ usage: CleanupUsage, in days: [DailyUsage], _ list: KeyPath<DailyUsage, [CleanupUsage]>
+    ) -> Double? {
         var total = 0.0
         for day in days {
-            for item in day.cleanup where item.isSameModel(as: usage) {
+            for item in day[keyPath: list] where item.isSameModel(as: usage) {
                 guard let usd = UsagePricing.cleanupUSD(item, day: day.day) else { return nil }
                 total += usd
             }
@@ -406,15 +413,28 @@ private struct CostBreakdown: View {
 
     static func merge(_ items: [CleanupUsage]) -> [CleanupUsage] {
         var merged: [CleanupUsage] = []
-        for item in items {
-            if let index = merged.firstIndex(where: { $0.isSameModel(as: item) }) {
-                merged[index].requests += item.requests
-                merged[index].tokens = merged[index].tokens + item.tokens
-            } else {
-                merged.append(item)
-            }
-        }
+        for item in items { DailyUsage.add(item, to: &merged) }
         return merged.sorted { $0.tokens.input + $0.tokens.output > $1.tokens.input + $1.tokens.output }
+    }
+}
+
+/// An LLM's requests and tokens, with the Region and prompt size it was priced by.
+private struct TokenBreakdownRow: View {
+    let title: String
+    let usage: CleanupUsage
+    /// In yen.
+    let cost: Double?
+
+    var body: some View {
+        var model = usage.region.map { "\(usage.model)（\($0)）" } ?? usage.model
+        if usage.longPrompt == true {
+            model += "・入力 \((UsagePricing.longPromptThreshold / 10_000).formatted()) 万トークン超"
+        }
+        return BreakdownRow(
+            title: title, model: model,
+            detail:
+                "\(usage.requests.formatted()) 回・入力 \(usage.tokens.input.formatted()) / 出力 \(usage.tokens.output.formatted()) トークン",
+            cost: cost)
     }
 }
 

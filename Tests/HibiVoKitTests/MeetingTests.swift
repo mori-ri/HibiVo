@@ -1002,6 +1002,80 @@ import Testing
         #expect(state.phase == .error(UserFacingError.claudeCodeNotFound.message))
     }
 
+    @Test func providerMinutesUseTheEngineModel() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .bedrock
+        let writer = MockMinutesWriter(.success("# 日程\n\n## 概要\nなし"))
+        let sut = makeController(minutesWriter: writer)
+        try await recordShortMeeting(sut)
+        #expect(await writer.calls.first?.model == "global.anthropic.claude-haiku-5-5")
+
+        settings.meetingMinutesAPIModel = "global.anthropic.claude-opus-5-5"
+        #expect(settings.resolvedMeetingMinutesModel == "global.anthropic.claude-opus-5-5")
+        settings.meetingMinutesEngine = .anthropic
+        settings.meetingMinutesAPIModel = ""
+        #expect(settings.resolvedMeetingMinutesModel == "claude-haiku-5-5")
+        settings.meetingMinutesEngine = .openAICompatible
+        #expect(settings.resolvedMeetingMinutesModel.isEmpty)
+    }
+
+    @Test func minutesTokensAreRecordedAsMeetingUsage() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .anthropic
+        let tokens = CleanupUsage(
+            provider: "anthropic", model: "claude-haiku-5-5", requests: 1, tokens: TokenUsage(input: 5_000, output: 800)
+        )
+        let writer = MockMinutesWriter(.success("# 日程\n\n## 概要\nなし"), usage: tokens)
+        let usage = makeUsage()
+        let sut = makeController(minutesWriter: writer, usage: usage)
+        try await recordShortMeeting(sut)
+        await settle { usage.days.first?.minutes.isEmpty == false }
+        let day = try #require(usage.days.first)
+        #expect(day.minutes == [tokens])
+        #expect(day.cleanup.isEmpty)
+        #expect(day.meetingPart.minutes == [tokens])
+        #expect(day.dictationPart.minutes.isEmpty)
+    }
+
+    @Test func cutOffMinutesFailButTheirTokensAreRecorded() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .anthropic
+        let tokens = CleanupUsage(
+            provider: "anthropic", model: "claude-haiku-5-5", requests: 1,
+            tokens: TokenUsage(input: 9_000, output: 16_000))
+        let writer = MockMinutesWriter(.failure(.outputLimitReached(usage: tokens)))
+        let usage = makeUsage()
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, usage: usage, onSaved: { shown.append($0) })
+        try await recordShortMeeting(sut)
+        await settle { state.meetingMinutesInProgress == 0 }
+        #expect(usage.days.first?.minutes == [tokens])
+        #expect(shown.count == 1)
+        #expect(state.phase == .error(UserFacingError.meetingMinutesFailed.message))
+    }
+
+    @Test func claudeCodeMinutesRecordNoTokens() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.success("# 日程\n\n## 概要\nなし"))
+        let usage = makeUsage()
+        let sut = makeController(minutesWriter: writer, usage: usage)
+        try await recordShortMeeting(sut)
+        #expect(await writer.calls.count == 1)
+        #expect(usage.days.allSatisfy { $0.minutes.isEmpty })
+    }
+
+    @Test func providerMinutesWithoutSettingsExplainWhy() async throws {
+        settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .gemini
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: nil, onSaved: { shown.append($0) })
+        try await recordShortMeeting(sut)
+        #expect(shown.count == 1)
+        #expect(
+            state.phase
+                == .error(UserFacingError.minutesProviderNotConfigured(provider: "Google Gemini").message))
+    }
+
     @Test func minutesOffShowsTheTranscriptOnly() async throws {
         let writer = MockMinutesWriter(.success("unused"))
         var shown: [URL] = []
@@ -1404,5 +1478,143 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
     @Test func triggerPlusMStops() {
         var sut = MeetingStopGesture()
         #expect(sut.handle(.meeting, at: ms(0)) == true)
+    }
+}
+
+@Suite struct ProviderMinutesWriterTests {
+    actor RecordingProvider: TextCleanupProvider {
+        nonisolated let id = "recording"
+        nonisolated let displayName = "Recording"
+        nonisolated let defaultModel = ""
+        let result: Result<String, CleanupError>
+        private(set) var calls: [(system: String, user: String, model: String)] = []
+
+        let usage: TokenUsage?
+
+        init(_ result: Result<String, CleanupError>, usage: TokenUsage? = nil) {
+            self.result = result
+            self.usage = usage
+        }
+
+        func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
+            calls.append((system, user, model))
+            return CleanupCompletion(text: try result.get(), usage: usage)
+        }
+    }
+
+    @Test func sendsTheMinutesPromptToTheModel() async throws {
+        let provider = RecordingProvider(
+            .success("\n# 日程の確認\n\n## 概要\n決めた。\n"), usage: TokenUsage(input: 1_200, output: 300))
+        let sut = ProviderMinutesWriter(provider: provider, instructions: "## 要点")
+        let minutes = try await sut.writeMinutes(
+            transcript: "**話者1** 来週です",
+            vocabulary: [CleanupPromptBuilder.Term(preferred: "AppSync", spokenForms: [])],
+            model: "claude-haiku-5-5")
+        #expect(minutes.text == "# 日程の確認\n\n## 概要\n決めた。")
+        #expect(
+            minutes.usage
+                == CleanupUsage(
+                    provider: "recording", model: "claude-haiku-5-5", requests: 1,
+                    tokens: TokenUsage(input: 1_200, output: 300)))
+        let call = try #require(await provider.calls.first)
+        #expect(call.model == "claude-haiku-5-5")
+        #expect(call.system == MeetingMinutesPrompt.system(instructions: "## 要点"))
+        #expect(call.user.contains("<vocabulary>"))
+        #expect(call.user.contains("<transcript>\n**話者1** 来週です\n</transcript>"))
+    }
+
+    @Test func providerErrorsBecomeMinutesFailures() async {
+        let sut = ProviderMinutesWriter(provider: RecordingProvider(.failure(.unauthorized)))
+        await #expect(throws: MeetingMinutesError.failed("Recording: unauthorized")) {
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        }
+    }
+
+    actor SequenceProvider: TextCleanupProvider {
+        nonisolated let id = "sequence"
+        nonisolated let displayName = "Sequence"
+        nonisolated let defaultModel = ""
+        private var results: [Result<CleanupCompletion, CleanupError>]
+        private(set) var calls = 0
+
+        init(_ results: [Result<CleanupCompletion, CleanupError>]) { self.results = results }
+
+        func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
+            calls += 1
+            return try results.removeFirst().get()
+        }
+    }
+
+    @Test func busyServersAreRetried() async throws {
+        let provider = SequenceProvider([.failure(.http(529)), .failure(.http(429)), .success(.init(text: "# 題\n本文"))])
+        let sut = ProviderMinutesWriter(provider: provider, retryDelays: [.zero, .zero])
+        let minutes = try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        #expect(minutes.text == "# 題\n本文")
+        #expect(await provider.calls == 3)
+    }
+
+    @Test func clientErrorsAreNotRetried() async {
+        let provider = SequenceProvider([.failure(.http(400)), .success(.init(text: "x"))])
+        let sut = ProviderMinutesWriter(provider: provider, retryDelays: [.zero])
+        await #expect(throws: MeetingMinutesError.failed("Sequence: http(400)")) {
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        }
+        #expect(await provider.calls == 1)
+    }
+
+    @Test func truncatedMinutesAreRejectedWithTheirCost() async {
+        let tokens = TokenUsage(input: 50_000, output: 16_000)
+        let provider = SequenceProvider([.success(.init(text: "# 題\n途中", usage: tokens, truncated: true))])
+        let sut = ProviderMinutesWriter(provider: provider)
+        await #expect(
+            throws: MeetingMinutesError.outputLimitReached(
+                usage: CleanupUsage(provider: "sequence", model: "m", requests: 1, tokens: tokens))
+        ) {
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        }
+    }
+
+    @Test func everyCleanupProviderCanWriteMinutes() {
+        #expect(MeetingMinutesEngine.claudeCode.providerKind == nil)
+        for kind in CleanupProviderKind.allCases {
+            #expect(MeetingMinutesEngine(rawValue: kind.rawValue)?.providerKind == kind)
+        }
+        for engine in MeetingMinutesEngine.allCases where !engine.defaultModel.isEmpty && engine != .claudeCode {
+            #expect(engine.suggestedModels.contains(engine.defaultModel))
+        }
+        #expect(MeetingMinutesEngine.bedrock.suggestedModels.allSatisfy { $0.contains("anthropic.") })
+    }
+
+    @MainActor @Test func providersAreMadeWithMinutesLimits() throws {
+        let settings = SettingsStore(defaults: try #require(UserDefaults(suiteName: "MinutesTests-\(UUID())")))
+        let secrets = MockSecrets(values: [
+            SecretAccount.anthropic: "a", SecretAccount.openAICompatible: "o", SecretAccount.gemini: "g",
+        ])
+        let anthropic = try #require(
+            CleanupProviderKind.anthropic.makeProvider(settings: settings, secrets: secrets, limits: .minutes)
+                as? AnthropicCleanupProvider)
+        #expect(anthropic.limits == .minutes)
+        let openAI = try #require(
+            CleanupProviderKind.openAICompatible.makeProvider(settings: settings, secrets: secrets, limits: .minutes)
+                as? OpenAICompatibleCleanupProvider)
+        #expect(openAI.limits == .minutes)
+        let gemini = try #require(
+            CleanupProviderKind.gemini.makeProvider(settings: settings, secrets: secrets, limits: .minutes)
+                as? GeminiCleanupProvider)
+        #expect(gemini.limits == .minutes)
+    }
+
+    @Test func minutesLimitsShapeEachRequest() {
+        let anthropic = AnthropicCleanupProvider.makeRequest(
+            system: "s", user: "u", model: "claude-haiku-5-5", limits: .minutes)
+        #expect(anthropic.maxTokens == 16_000)
+        #expect(anthropic.outputConfig == nil)
+        let cleanup = AnthropicCleanupProvider.makeRequest(system: "s", user: "u", model: "claude-haiku-5-5")
+        #expect(cleanup.maxTokens == 4_000)
+        #expect(cleanup.outputConfig?.effort == "low")
+
+        let gemini = GeminiCleanupProvider.makeRequest(
+            system: "s", user: "u", model: "gemini-3.8-flash", limits: .minutes)
+        #expect(gemini.generationConfig == nil)
     }
 }

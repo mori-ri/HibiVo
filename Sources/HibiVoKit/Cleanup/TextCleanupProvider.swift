@@ -44,11 +44,30 @@ public struct TokenUsage: Codable, Hashable, Sendable {
 public struct CleanupCompletion: Equatable, Sendable {
     public var text: String
     public var usage: TokenUsage?
+    /// True when the model stopped at the output cap, so `text` is cut off.
+    public var truncated: Bool
 
-    public init(text: String, usage: TokenUsage? = nil) {
+    public init(text: String, usage: TokenUsage? = nil, truncated: Bool = false) {
         self.text = text
         self.usage = usage
+        self.truncated = truncated
     }
+}
+
+/// How long and how large one request may be. Every provider takes one, so the same provider types serve
+/// short cleanups and long meeting minutes.
+public struct CleanupLimits: Sendable, Equatable {
+    /// Output cap; nil keeps each provider's cleanup default (or sends none where it has none).
+    public var maxTokens: Int?
+    public var timeout: TimeInterval
+    /// Asks for low effort or thinking where the model takes it; otherwise the model's default applies.
+    public var lowEffort: Bool
+
+    /// Short rewrites, bounded by CleanupCoordinator's deadline.
+    public static let cleanup = CleanupLimits(maxTokens: nil, timeout: 60, lowEffort: true)
+    /// Minutes of an hour-long meeting: long input, a few thousand tokens out (plus thinking), and worth the
+    /// model's default effort. Requests stay non-streaming, so the cap stays where a single response fits.
+    public static let minutes = CleanupLimits(maxTokens: 16_000, timeout: 600, lowEffort: false)
 }
 
 /// The cleanup providers users can pick in Settings.

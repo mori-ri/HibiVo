@@ -50,13 +50,23 @@ struct HomeView: View {
                 ModelRow("音声入力の文字起こし", model: dictationModel) { show(.transcription) }
                 ModelRow("AI 整形", model: cleanupModel) { show(.cleanup) }
                 ModelRow("ミーティングの文字起こし", model: meetingModel) { show(.meeting) }
-                ModelRow(
-                    "議事録",
-                    model: settings.meetingMinutesEnabled
-                        ? ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized) : nil
-                ) { show(.meeting) }
+                ModelRow("議事録", model: minutesModel) { show(.meeting) }
             }
         }
+    }
+
+    private var minutesModel: (provider: String, model: String)? {
+        let settings = env.settings
+        guard settings.meetingMinutesEnabled else { return nil }
+        let engine = settings.meetingMinutesEngine
+        guard let kind = engine.providerKind else {
+            return ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized)
+        }
+        guard kind.makeProvider(settings: settings, secrets: env.secrets) != nil else {
+            return (engine.displayName, Self.missingKey)
+        }
+        let model = settings.resolvedMeetingMinutesModel
+        return (engine.displayName, model.isEmpty ? "モデル未設定" : model)
     }
 
     private var dictationModel: (provider: String, model: String)? {
