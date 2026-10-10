@@ -94,6 +94,8 @@ public struct DictationContextBuilder {
             return value
         }
         switch kind {
+        case .apple:
+            return AppleIntelligenceCleanupProvider.isAvailable ? AppleIntelligenceCleanupProvider() : nil
         case .anthropic:
             return secret(SecretAccount.anthropic).map { AnthropicCleanupProvider(apiKey: $0) }
         case .openAICompatible:

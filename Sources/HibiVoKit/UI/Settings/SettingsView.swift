@@ -166,6 +166,11 @@ struct CleanupSettingsView: View {
                 .onChange(of: settings.cleanupProviderID) { settings.cleanupModel = "" }
 
                 switch CleanupProviderKind(rawValue: settings.cleanupProviderID) ?? .anthropic {
+                case .apple:
+                    NoteRow(
+                        AppleIntelligenceCleanupProvider.unavailableReason
+                            ?? "Mac の中で Apple Intelligence のモデルを使います。文章は外部に送信されず、API キーも不要です。小さいモデルのため、クラウドのモデルより整形の質が落ちます。Mac によっては時間がかかり、5 秒を超えると整形せずにそのまま入力します。"
+                    )
                 case .anthropic:
                     TextFieldRow(
                         "モデル", text: $settings.cleanupModel, prompt: "既定: \(CleanupProviderKind.anthropic.defaultModel)"
