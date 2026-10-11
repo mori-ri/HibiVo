@@ -4,7 +4,10 @@ import Foundation
 /// listed here, Soniox output tokens, price changes), so the UI always labels these as estimates.
 public enum UsagePricing {
     /// When the prices below were last checked. Shown next to estimates.
-    public static let pricesAsOf = "2026年10月"
+    public static var pricesAsOf: String {
+        let date = Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 10, day: 1))!
+        return date.formatted(.dateTime.year().month(.wide))
+    }
     /// USD/JPY around the time the prices were checked; users can change it in the usage page.
     public static let defaultUSDJPYRate = 157.0
 

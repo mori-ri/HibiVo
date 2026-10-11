@@ -46,7 +46,7 @@ public enum MeetingMinutesEngine: String, Codable, CaseIterable, Identifiable, S
     public var providerKind: CleanupProviderKind? { CleanupProviderKind(rawValue: rawValue) }
 
     public var displayName: String {
-        providerKind?.displayName ?? "Claude Code(サブスクリプション)"
+        providerKind?.displayName ?? String(localized: "Claude Code(サブスクリプション)")
     }
 
     /// The model used when none is entered. Empty for OpenAI-compatible endpoints, which have no common model.
@@ -80,9 +80,9 @@ public enum MeetingMinutesModel: String, Codable, CaseIterable, Identifiable, Se
 
     public var displayName: String {
         switch self {
-        case .opus: "Opus(高品質・利用枠を多く使う)"
-        case .sonnet: "Sonnet(標準)"
-        case .haiku: "Haiku(高速・軽量)"
+        case .opus: String(localized: "Opus(高品質・利用枠を多く使う)")
+        case .sonnet: String(localized: "Sonnet(標準)")
+        case .haiku: String(localized: "Haiku(高速・軽量)")
         }
     }
 }
@@ -238,7 +238,7 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
     static func parse(_ output: Data) throws -> String {
         guard let result = try? JSONDecoder().decode(Result.self, from: output) else {
             let text = String(decoding: output.prefix(300), as: UTF8.self)
-            throw MeetingMinutesError.failed(text.isEmpty ? "応答がありませんでした" : text)
+            throw MeetingMinutesError.failed(text.isEmpty ? "応答がありませんでした" : text)  // no-l10n
         }
         let text = (result.result ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard result.isError != true, result.subtype == nil || result.subtype == "success", !text.isEmpty else {

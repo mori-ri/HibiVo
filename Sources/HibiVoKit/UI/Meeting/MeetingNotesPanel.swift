@@ -49,7 +49,7 @@ public final class MeetingNotesPanelController {
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 320),
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
             backing: .buffered, defer: true)
-        panel.title = "ミーティングのメモ"
+        panel.title = String(localized: "ミーティングのメモ")
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.becomesKeyOnlyIfNeeded = true
@@ -100,7 +100,7 @@ struct MeetingNotesView: View {
         }
     }
 
-    private func button(_ style: MarkdownStyle, _ symbol: String, _ label: String) -> some View {
+    private func button(_ style: MarkdownStyle, _ symbol: String, _ label: LocalizedStringKey) -> some View {
         Button {
             editor.apply(style)
         } label: {
@@ -162,7 +162,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
         textView.smartInsertDeleteEnabled = false
         textView.string = text
         textView.delegate = context.coordinator
-        textView.setAccessibilityLabel("ミーティングのメモ")
+        textView.setAccessibilityLabel(String(localized: "ミーティングのメモ"))
         proxy.textView = textView
         return scrollView
     }

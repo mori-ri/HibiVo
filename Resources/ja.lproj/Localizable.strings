@@ -1,0 +1,2 @@
+/* Japanese is the development text: keys are shown as written in code. This table only exists so
+   that Japanese does not fall back to the English table (CFBundleDevelopmentRegion is en). */

@@ -129,8 +129,11 @@ private struct HistoryRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(record.finalText.isEmpty ? (record.errorMessage ?? "（空）") : record.finalText)
-                .lineLimit(2)
+            Text(
+                verbatim: record.finalText.isEmpty
+                    ? (record.errorMessage ?? String(localized: "（空）")) : record.finalText
+            )
+            .lineLimit(2)
             HStack(spacing: 6) {
                 Text(record.timestamp, format: .dateTime.month().day().hour().minute())
                 if let app = record.appName { Text(app) }
@@ -183,7 +186,7 @@ private struct HistoryDetail: View {
                     section("文字起こし（原文）", text: record.rawTranscript)
                 }
                 if let error = record.errorMessage, record.status == .failed {
-                    Text(error).foregroundStyle(.red)
+                    Text(verbatim: error).foregroundStyle(.red)
                 }
 
                 HStack {
@@ -214,17 +217,17 @@ private struct HistoryDetail: View {
         }
     }
 
-    private func section(_ title: String, text: String) -> some View {
+    private func section(_ title: LocalizedStringKey, text: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-            Text(text).font(.system(size: 14)).lineSpacing(3).textSelection(.enabled)
+            Text(verbatim: text).font(.system(size: 14)).lineSpacing(3).textSelection(.enabled)
         }
     }
 
-    private func info(_ label: String, _ value: String) -> some View {
+    private func info(_ label: LocalizedStringKey, _ value: String) -> some View {
         GridRow {
             Text(label)
-            Text(value)
+            Text(verbatim: value)
         }
     }
 
@@ -297,7 +300,7 @@ private struct MeetingRow: View {
                 .frame(width: 16)
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
-                Text(record.title ?? "ミーティング")
+                (record.title.map { Text(verbatim: $0) } ?? Text("ミーティング"))
                     .lineLimit(2)
                 HStack(spacing: 6) {
                     Text(record.startedAt, format: .dateTime.month().day().hour().minute())
@@ -348,9 +351,9 @@ private struct MeetingDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(record.title ?? "ミーティング")
+                    (record.title.map { Text(verbatim: $0) } ?? Text("ミーティング"))
                         .font(.system(size: 17, weight: .semibold))
-                    Text(record.startedAt.formatted(date: .abbreviated, time: .shortened))
+                    Text(verbatim: record.startedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -368,7 +371,7 @@ private struct MeetingDetail: View {
                         Text(record.minutesURL != nil ? "議事録" : "文字起こし")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text(preview).font(.system(size: 13)).lineSpacing(3).textSelection(.enabled)
+                        Text(verbatim: preview).font(.system(size: 13)).lineSpacing(3).textSelection(.enabled)
                     }
                 }
             }
@@ -385,9 +388,10 @@ private struct MeetingDetail: View {
             return
         }
         let limit = Self.previewLimit
+        let more = String(localized: "…（続きはファイルを開いてください）")
         preview = await Task.detached {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-            return text.count > limit ? String(text.prefix(limit)) + "\n\n…（続きはファイルを開いてください）" : text
+            return text.count > limit ? String(text.prefix(limit)) + "\n\n" + more : text
         }.value
     }
 }

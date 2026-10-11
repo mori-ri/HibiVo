@@ -71,8 +71,8 @@ public enum MeetingTranscriptionTiming: String, Codable, CaseIterable, Identifia
 
     public var displayName: String {
         switch self {
-        case .realtime: "リアルタイム"
-        case .afterMeeting: "終了後にまとめて(話者の識別が高精度)"
+        case .realtime: String(localized: "リアルタイム")
+        case .afterMeeting: String(localized: "終了後にまとめて(話者の識別が高精度)")
         }
     }
 }

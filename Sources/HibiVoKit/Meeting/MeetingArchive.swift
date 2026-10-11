@@ -12,7 +12,7 @@ public struct MeetingRecord: Identifiable, Hashable, Sendable {
     public var title: String? {
         guard let minutesURL else { return nil }
         let name = minutesURL.deletingPathExtension().lastPathComponent.dropFirst(id.count + 1)
-        return name.isEmpty || name == "議事録" ? nil : String(name)
+        return name.isEmpty || name == "議事録" ? nil : String(name)  // no-l10n
     }
 
     /// The file worth opening first.

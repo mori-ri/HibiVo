@@ -7,7 +7,7 @@ enum UsagePeriod: Int, CaseIterable, Identifiable {
     case quarter = 90
 
     var id: Int { rawValue }
-    var title: String { "\(rawValue)日" }
+    var title: String { String(localized: "\(rawValue)日") }
 
     /// Spacing between x-axis labels, in days.
     var labelStride: Int {
@@ -29,10 +29,10 @@ enum UsageMetric: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .dictations: "回数"
-        case .minutes: "時間"
-        case .characters: "文字数"
-        case .cost: "料金"
+        case .dictations: String(localized: "回数")
+        case .minutes: String(localized: "時間")
+        case .characters: String(localized: "文字数")
+        case .cost: String(localized: "料金")
         }
     }
 
@@ -57,17 +57,24 @@ enum UsageMetric: String, CaseIterable, Identifiable {
 
     func format(_ value: Double) -> String {
         switch self {
-        case .dictations: "\(Int(value)) 回"
+        case .dictations: String(localized: "\(Int(value).formatted()) 回")
         case .minutes: UsageFormat.duration(seconds: value * 60)
-        case .characters: "\(Int(value).formatted()) 文字"
+        case .characters: String(localized: "\(Int(value).formatted()) 文字")
         case .cost: UsageFormat.yen(value)
         }
     }
 }
 
 enum UsageSource: String, CaseIterable {
-    case dictation = "音声入力"
-    case meeting = "ミーティング"
+    case dictation
+    case meeting
+
+    var title: String {
+        switch self {
+        case .dictation: String(localized: "音声入力")
+        case .meeting: String(localized: "ミーティング")
+        }
+    }
 
     /// Dictation follows the system accent like other controls; meetings take a warm colour that
     /// stands apart from it.
@@ -83,17 +90,22 @@ enum UsageFormat {
     static func duration(seconds: Double) -> String {
         let total = Int(seconds.rounded())
         let (hours, minutes, secs) = (total / 3600, total % 3600 / 60, total % 60)
-        if hours > 0 { return "\(hours)時間\(minutes)分" }
-        if minutes > 0 { return "\(minutes)分\(secs)秒" }
-        return "\(secs)秒"
+        if hours > 0 { return String(localized: "\(hours)時間\(minutes)分") }
+        if minutes > 0 { return String(localized: "\(minutes)分\(secs)秒") }
+        return String(localized: "\(secs)秒")
     }
 
     /// Estimates are often fractions of a yen, so small amounts keep a decimal.
     static func yen(_ value: Double) -> String {
-        if value == 0 { return "0円" }
-        if value < 0.1 { return "0.1円未満" }
-        if value < 10 { return "\(value.formatted(.number.precision(.fractionLength(1))))円" }
-        return "\(Int(value.rounded()).formatted())円"
+        if value == 0 { return amount("0") }
+        if value < 0.1 { return String(localized: "0.1円未満") }
+        if value < 10 { return amount(value.formatted(.number.precision(.fractionLength(1)))) }
+        return amount(Int(value.rounded()).formatted())
+    }
+
+    /// A formatted number with the currency sign: "1,234円" in Japanese, "¥1,234" in English.
+    static func amount(_ number: String) -> String {
+        String(localized: "\(number)円")
     }
 
     static func yen(usd: Double, rate: Double) -> String { yen(usd * rate) }
@@ -175,26 +187,31 @@ struct StatTiles: View {
         let activeDays = days.filter { $0.uses > 0 }.count
         HStack(spacing: 12) {
             StatTile(
-                title: "利用回数", value: "\(uses.formatted()) 回",
-                caption: activeDays > 0 ? "\(activeDays) 日利用" : nil)
+                title: "利用回数", value: String(localized: "\(uses.formatted()) 回"),
+                caption: activeDays > 0 ? String(localized: "\(activeDays) 日利用") : nil)
             StatTile(
                 title: "話した時間", value: UsageFormat.duration(seconds: seconds),
-                caption: uses > 0 ? "1 回あたり \(UsageFormat.duration(seconds: seconds / Double(uses)))" : nil)
+                caption: uses > 0
+                    ? String(localized: "1 回あたり \(UsageFormat.duration(seconds: seconds / Double(uses)))") : nil)
             if showsCharacters {
                 StatTile(
-                    title: "文字数", value: "\(characters.formatted()) 文字",
+                    title: "文字数", value: String(localized: "\(characters.formatted()) 文字"),
                     caption: dictationSeconds >= 1
-                        ? "音声入力 \(Int(Double(dictationCharacters) / (dictationSeconds / 60)).formatted()) 文字/分" : nil)
+                        ? String(
+                            localized:
+                                "音声入力 \(Int(Double(dictationCharacters) / (dictationSeconds / 60)).formatted()) 文字/分")
+                        : nil)
             }
             StatTile(
                 title: "API 料金（概算）", value: UsageFormat.yen(usd: estimate.totalUSD, rate: yenPerUSD),
-                caption: estimate.unpricedModels.isEmpty ? "公開価格から計算" : "一部のモデルは含まず")
+                caption: estimate.unpricedModels.isEmpty
+                    ? String(localized: "公開価格から計算") : String(localized: "一部のモデルは含まず"))
         }
     }
 }
 
 struct StatTile: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let caption: String?
 
@@ -204,12 +221,12 @@ struct StatTile: View {
             Text(title)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text(value)
+            Text(verbatim: value)
                 .font(.system(size: 20, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            Text(caption ?? " ")
+            Text(verbatim: caption ?? " ")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -249,7 +266,7 @@ struct DailyChart: View {
                         width: .ratio(0.7)
                     )
                     .cornerRadius(4)
-                    .foregroundStyle(by: .value("種類", part.source.rawValue))
+                    .foregroundStyle(by: .value("種類", part.source.title))
                     .opacity(dim)
                 }
             }
@@ -270,12 +287,12 @@ struct DailyChart: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            Text(metric.format(selected.value))
+                            Text(verbatim: metric.format(selected.value))
                                 .font(.system(size: 12, weight: .semibold))
                                 .monospacedDigit()
                             Text(
-                                metric.parts(selected.usage, yenPerUSD: yenPerUSD)
-                                    .map { "\($0.source.rawValue) \(metric.format($0.value))" }
+                                verbatim: metric.parts(selected.usage, yenPerUSD: yenPerUSD)
+                                    .map { "\($0.source.title) \(metric.format($0.value))" }
                                     .joined(separator: " · ")
                             )
                             .font(.caption)
@@ -289,7 +306,7 @@ struct DailyChart: View {
             }
         }
         .chartForegroundStyleScale(
-            domain: UsageSource.allCases.map(\.rawValue), range: UsageSource.allCases.map(\.color)
+            domain: UsageSource.allCases.map(\.title), range: UsageSource.allCases.map(\.color)
         )
         .chartLegend(.visible)
         .chartXSelection(value: $hovered)
@@ -303,11 +320,11 @@ struct DailyChart: View {
             AxisMarks(position: .leading) { value in
                 AxisGridLine().foregroundStyle(Theme.separator)
                 AxisValueLabel {
-                    if let number = value.as(Double.self) { Text(axisLabel(number)) }
+                    if let number = value.as(Double.self) { Text(verbatim: axisLabel(number)) }
                 }
             }
         }
-        .accessibilityLabel("日別の\(metric.title)")
+        .accessibilityLabel(Text("日別の\(metric.title)"))
     }
 
     /// The axis labels every day only in the week view; longer periods skip days, so the label names it.
@@ -318,8 +335,8 @@ struct DailyChart: View {
 
     private func axisLabel(_ value: Double) -> String {
         switch metric {
-        case .cost: "\(value.formatted(.number.precision(.fractionLength(0...1))))円"
-        case .minutes: "\(value.formatted(.number.precision(.fractionLength(0...1))))分"
+        case .cost: UsageFormat.amount(value.formatted(.number.precision(.fractionLength(0...1))))
+        case .minutes: String(localized: "\(value.formatted(.number.precision(.fractionLength(0...1))))分")
         default: value.formatted(.number.notation(.compactName))
         }
     }
@@ -420,26 +437,29 @@ private struct CostBreakdown: View {
 
 /// An LLM's requests and tokens, with the Region and prompt size it was priced by.
 private struct TokenBreakdownRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let usage: CleanupUsage
     /// In yen.
     let cost: Double?
 
     var body: some View {
-        var model = usage.region.map { "\(usage.model)（\($0)）" } ?? usage.model
+        var model = usage.region.map { String(localized: "\(usage.model)（\($0)）") } ?? usage.model
         if usage.longPrompt == true {
-            model += "・入力 \((UsagePricing.longPromptThreshold / 10_000).formatted()) 万トークン超"
+            model += String(
+                localized: "・入力 \(UsagePricing.longPromptThreshold.formatted(.number.notation(.compactName))) トークン超")
         }
         return BreakdownRow(
             title: title, model: model,
-            detail:
-                "\(usage.requests.formatted()) 回・入力 \(usage.tokens.input.formatted()) / 出力 \(usage.tokens.output.formatted()) トークン",
+            detail: String(
+                localized:
+                    "\(usage.requests.formatted()) 回・入力 \(usage.tokens.input.formatted()) / 出力 \(usage.tokens.output.formatted()) トークン"
+            ),
             cost: cost)
     }
 }
 
 private struct BreakdownRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let model: String
     let detail: String
     /// In yen.
@@ -450,12 +470,12 @@ private struct BreakdownRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(title)
-                    Text(model).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Text(verbatim: model).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
-                Text(detail).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                Text(verbatim: detail).font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
         } control: {
-            Text(cost.map { UsageFormat.yen($0) } ?? "料金不明")
+            Text(verbatim: cost.map { UsageFormat.yen($0) } ?? String(localized: "料金不明"))
                 .monospacedDigit()
                 .foregroundStyle(cost == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
         }

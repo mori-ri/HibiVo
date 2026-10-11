@@ -1,3 +1,5 @@
+[English](en/cleanup-modes.md) | 日本語
+
 # AI 整形のモード
 
 HibiVo は、文字起こしした文章を LLM で整えてから入力します。どう整えるかを 5 つのモードから選べます。
