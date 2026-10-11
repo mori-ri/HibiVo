@@ -15,6 +15,17 @@ struct GeneralSettingsView: View {
                 ToggleRow("ログイン時に起動", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
                 if let launchError { NoteRow(launchError, color: .red) }
+                PickerRow("表示言語", selection: $settings.appLanguage) {
+                    Text("システム既定").tag(AppLanguage.system)
+                    // Each language is named in itself so it can be found from either UI.
+                    Text(verbatim: "日本語").tag(AppLanguage.japanese)  // no-l10n
+                    Text(verbatim: "English").tag(AppLanguage.english)
+                }
+                if settings.appLanguage != settings.appLanguageAtLaunch {
+                    LabeledRow("再起動すると表示言語が切り替わります。") {
+                        Button("今すぐ再起動") { AppRelauncher.relaunch() }
+                    }
+                }
             }
             SettingsSection(title: "操作") {
                 PickerRow("ホットキー（押すと録音開始、もう一度押すと終了）", selection: hotkeyBinding) {
@@ -53,14 +64,14 @@ struct GeneralSettingsView: View {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             launchError = nil
         } catch {
-            launchError = "設定できませんでした。HibiVo.app を「アプリケーション」フォルダに置いてください。"
+            launchError = String(localized: "設定できませんでした。HibiVo.app を「アプリケーション」フォルダに置いてください。")
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }
     }
 }
 
 private struct PermissionRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let granted: Bool
     let open: () -> Void
 
@@ -269,7 +280,7 @@ private struct CleanupModeSection: View {
         .clipShape(shape)
     }
 
-    private func sampleText(_ title: String, _ text: String, secondary: Bool = false) -> some View {
+    private func sampleText(_ title: LocalizedStringKey, _ text: String, secondary: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.system(size: 11))
@@ -329,10 +340,11 @@ struct MeetingSettingsView: View {
                 }
                 switch transcriber.fileTranscriber == nil ? .realtime : env.settings.meetingTranscriptionTiming {
                 case .realtime:
-                    NoteRow(
-                        identifiesSpeakers
-                            ? "会議中に文字起こしし、数秒ごとにファイルへ書き足します。話者の区別はやや粗くなります。"
-                            : "会議中に文字起こしし、数秒ごとにファイルへ書き足します。")
+                    if identifiesSpeakers {
+                        NoteRow("会議中に文字起こしし、数秒ごとにファイルへ書き足します。話者の区別はやや粗くなります。")
+                    } else {
+                        NoteRow("会議中に文字起こしし、数秒ごとにファイルへ書き足します。")
+                    }
                 case .afterMeeting:
                     NoteRow(
                         "会議中は録音だけを行い、終了後に音声全体から文字起こしするため、話者を正確に区別できます。結果は 1 時間の会議で数分ほどで届きます。音声は終了までメモリに置くだけで保存しないため、途中でアプリが終了するとその会議は記録されません。"
@@ -347,10 +359,15 @@ struct MeetingSettingsView: View {
                 if !SystemAudioCaptureService.isSupported {
                     NoteRow("システム音声の記録には macOS 14.2 以降が必要です。", color: .red)
                 } else if env.settings.meetingCapturesSystemAudio {
-                    NoteRow(
-                        (identifiesSpeakers ? "マイクの音と混ぜて 1 本にし、全員を話者 1・2… として識別します。" : "マイクの音と混ぜて 1 本にして文字起こしします。")
-                            + "初回はシステムオーディオ録音の許可を求められます。スピーカーで聞くと相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあるため、イヤホンの使用をおすすめします。"
-                    )
+                    if identifiesSpeakers {
+                        NoteRow(
+                            "マイクの音と混ぜて 1 本にし、全員を話者 1・2… として識別します。初回はシステムオーディオ録音の許可を求められます。スピーカーで聞くと相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあるため、イヤホンの使用をおすすめします。"
+                        )
+                    } else {
+                        NoteRow(
+                            "マイクの音と混ぜて 1 本にして文字起こしします。初回はシステムオーディオ録音の許可を求められます。スピーカーで聞くと相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあるため、イヤホンの使用をおすすめします。"
+                        )
+                    }
                     LabeledRow("システムオーディオ録音の権限") {
                         Button("設定を開く…") { Permissions.openSystemAudioSettings() }
                     }
@@ -399,7 +416,7 @@ struct MeetingSettingsView: View {
 struct APIKeyField: View {
     let secrets: any SecretStore
     let account: String
-    let label: String
+    let label: LocalizedStringKey
     @State private var value = ""
     @State private var saved = false
     @State private var savedValue = ""
@@ -412,7 +429,7 @@ struct APIKeyField: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 340)
                 .onSubmit(save)
-            Button(saved ? "保存済み" : "保存", action: save)
+            Button(saved ? LocalizedStringKey("保存済み") : LocalizedStringKey("保存"), action: save)
                 .disabled(saved)
         }
         .onAppear { load() }
@@ -525,7 +542,7 @@ private struct ProviderMinutesFields: View {
         LabeledRow("議事録のモデル") {
             TextField(
                 "議事録のモデル", text: $settings.meetingMinutesAPIModel,
-                prompt: Text(engine.defaultModel.isEmpty ? "例: gpt-4.1" : "既定: \(engine.defaultModel)")
+                prompt: engine.defaultModel.isEmpty ? Text("例: gpt-4.1") : Text("既定: \(engine.defaultModel)")
             )
             .labelsHidden()
             .textFieldStyle(.roundedBorder)
@@ -551,7 +568,7 @@ private struct ProviderMinutesFields: View {
         case .gemini:
             APIKeyField(secrets: env.secrets, account: SecretAccount.gemini, label: "Google Gemini API Key")
         }
-        NoteRow("\(sharedSettings)は AI 整形の \(kind.displayName) と共通です。")
+        NoteRow(sharedSettings)
         if settings.resolvedMeetingMinutesModel.isEmpty {
             NoteRow("議事録に使うモデルを入力してください。", color: .red)
         }
@@ -561,9 +578,9 @@ private struct ProviderMinutesFields: View {
 extension ProviderMinutesFields {
     private var sharedSettings: String {
         switch kind {
-        case .bedrock: "リージョンと認証情報"
-        case .openAICompatible: "Base URL と API キー"
-        case .anthropic, .gemini: "API キー"
+        case .bedrock: String(localized: "リージョンと認証情報は AI 整形の \(kind.displayName) と共通です。")
+        case .openAICompatible: String(localized: "Base URL と API キーは AI 整形の \(kind.displayName) と共通です。")
+        case .anthropic, .gemini: String(localized: "API キーは AI 整形の \(kind.displayName) と共通です。")
         }
     }
 }

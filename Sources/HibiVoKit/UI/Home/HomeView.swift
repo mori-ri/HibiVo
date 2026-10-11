@@ -66,7 +66,7 @@ struct HomeView: View {
             return (engine.displayName, Self.missingKey)
         }
         let model = settings.resolvedMeetingMinutesModel
-        return (engine.displayName, model.isEmpty ? "モデル未設定" : model)
+        return (engine.displayName, model.isEmpty ? String(localized: "モデル未設定") : model)
     }
 
     private var dictationModel: (provider: String, model: String)? {
@@ -86,7 +86,7 @@ struct HomeView: View {
         // Without credentials every dictation is pasted raw, so don't present the model as in use.
         guard env.hasCleanupCredentials else { return (kind.displayName, Self.missingKey) }
         let model = settings.cleanupModel.isEmpty ? kind.defaultModel : settings.cleanupModel
-        return (kind.displayName, model.isEmpty ? "モデル未設定" : model)
+        return (kind.displayName, model.isEmpty ? String(localized: "モデル未設定") : model)
     }
 
     private var meetingModel: (provider: String, model: String)? {
@@ -103,7 +103,7 @@ struct HomeView: View {
         return (stt.provider.displayName, Self.model(settings.transcriptionModel, of: stt.provider))
     }
 
-    private static let missingKey = "API キー未設定"
+    private static var missingKey: String { String(localized: "API キー未設定") }
 
     private func hasKey(for provider: any TranscriptionProvider) -> Bool {
         !provider.requiresAPIKey || env.secrets.secret(for: provider.id)?.isEmpty == false
@@ -112,7 +112,7 @@ struct HomeView: View {
     /// A model saved for another provider falls back to this one's default, as `DictationContextBuilder` does.
     /// macOS's recognizer has no model name worth showing, so it says where the audio is processed instead.
     private static func model(_ saved: String, of provider: any TranscriptionProvider) -> String {
-        if provider is AppleSpeechProvider { return "端末内" }
+        if provider is AppleSpeechProvider { return String(localized: "端末内") }
         return provider.models.contains(saved) ? saved : provider.defaultModel
     }
 
@@ -126,10 +126,10 @@ struct HomeView: View {
             }
             SettingsSection {
                 ShortcutRow("話す・入力する", keys: [key])
-                ShortcutRow("押している間だけ話す", keys: ["\(key) 長押し"])
+                ShortcutRow("押している間だけ話す", keys: [String(localized: "\(key) 長押し")])
                 ShortcutRow("録音をやめる", keys: ["esc"])
                 ShortcutRow("ミーティングを記録", keys: [key, "M"])
-                ShortcutRow("ミーティングを終了", keys: ["\(key) 2 回"])
+                ShortcutRow("ミーティングを終了", keys: [String(localized: "\(key) 2 回")])
             }
         }
     }
@@ -192,7 +192,7 @@ struct HomeView: View {
 
 /// Section title with a link-style action on the right.
 private struct HomeSectionHeader<Action: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder var action: Action
 
     var body: some View {
@@ -211,11 +211,11 @@ private struct HomeSectionHeader<Action: View>: View {
 /// The step on the left, the service and model it uses on the right ("オフ" when the step is off),
 /// and a button to the page where it is set.
 private struct ModelRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let model: (provider: String, model: String)?
     let change: () -> Void
 
-    init(_ title: String, model: (provider: String, model: String)?, change: @escaping () -> Void) {
+    init(_ title: LocalizedStringKey, model: (provider: String, model: String)?, change: @escaping () -> Void) {
         self.title = title
         self.model = model
         self.change = change
@@ -242,10 +242,10 @@ private struct ModelRow: View {
 
 /// What the user does on the left, the keys on the right.
 private struct ShortcutRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let keys: [String]
 
-    init(_ title: String, keys: [String]) {
+    init(_ title: LocalizedStringKey, keys: [String]) {
         self.title = title
         self.keys = keys
     }

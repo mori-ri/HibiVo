@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "話した内容を文字起こしするためにマイクを使用します。音声は保存されません。";
+"NSAudioCaptureUsageDescription" = "ミーティングの文字起こしで、オンライン会議の相手の声を記録するためにシステム音声を使用します。音声は保存されません。";

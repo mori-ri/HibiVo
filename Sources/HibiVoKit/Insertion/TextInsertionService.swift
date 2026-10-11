@@ -37,15 +37,15 @@ public final class TextInsertionService: TextInserting {
 
     public func insert(_ text: String, into target: TargetApplication?) async -> InsertionOutcome {
         guard AXIsProcessTrusted() else {
-            return copyOnly(text, reason: "アクセシビリティ権限がありません")
+            return copyOnly(text, reason: String(localized: "アクセシビリティ権限がありません"))
         }
         // Password fields enable Secure Input, which drops synthetic key events.
         guard !IsSecureEventInputEnabled() else {
-            return copyOnly(text, reason: "パスワード入力中のため貼り付けできません")
+            return copyOnly(text, reason: String(localized: "パスワード入力中のため貼り付けできません"))
         }
         if let target {
             guard let app = NSRunningApplication(processIdentifier: target.processID), !app.isTerminated else {
-                return copyOnly(text, reason: "\(target.name) が終了しています")
+                return copyOnly(text, reason: String(localized: "\(target.name) が終了しています"))
             }
             if !app.isActive {
                 app.activate()

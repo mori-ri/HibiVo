@@ -13,7 +13,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
 
     public var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .home: "ホーム"
         case .history: "履歴"
@@ -27,7 +27,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var subtitle: String {
+    var subtitle: LocalizedStringKey {
         switch self {
         case .home: "利用状況のまとめと使い方"
         case .history: "入力したテキストを、この Mac に最大 \(HistoryStore.limit) 件保存します。音声は保存しません"
@@ -211,7 +211,7 @@ private struct SidebarItem: View {
 
 /// Opens a project page in the browser; quieter than `SidebarItem` so it doesn't read as a page.
 private struct SidebarLink: View {
-    let title: String
+    let title: LocalizedStringKey
     let symbol: String
     let url: URL
     @State private var isHovered = false

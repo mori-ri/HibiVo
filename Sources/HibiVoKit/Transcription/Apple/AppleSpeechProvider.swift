@@ -9,7 +9,7 @@ import os
 /// meeting transcribed with it has no speaker labels.
 public struct AppleSpeechProvider: MeetingTranscriptionProvider {
     public let id = "apple"
-    public let displayName = "macOS 標準"
+    public let displayName = String(localized: "macOS 標準")
     public let sampleRate: Double = 16_000
     public let models = [AppleSpeechProvider.model]
     public let defaultModel = AppleSpeechProvider.model

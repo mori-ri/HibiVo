@@ -82,7 +82,7 @@ public enum CleanupProviderKind: String, CaseIterable, Identifiable, Sendable {
     public var displayName: String {
         switch self {
         case .anthropic: "Anthropic (Claude)"
-        case .openAICompatible: "OpenAI 互換"
+        case .openAICompatible: String(localized: "OpenAI 互換")
         case .bedrock: "Amazon Bedrock"
         case .gemini: "Google Gemini"
         }

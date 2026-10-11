@@ -20,8 +20,8 @@ public enum HotkeyTrigger: Codable, Hashable, Sendable {
     public var displayName: String {
         switch self {
         case .fn: "Fn (🌐)"
-        case .rightOption: "右 Option"
-        case .rightCommand: "右 Command"
+        case .rightOption: String(localized: "右 Option")
+        case .rightCommand: String(localized: "右 Command")
         case .shortcut(let keyCode, let modifiers):
             modifiers.symbols + KeyCode.displayName(keyCode)
         }

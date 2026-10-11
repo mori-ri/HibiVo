@@ -3,7 +3,7 @@ import Foundation
 /// Any `/chat/completions` endpoint: OpenAI, Groq, OpenRouter, an in-house gateway, etc.
 public struct OpenAICompatibleCleanupProvider: TextCleanupProvider {
     public let id = "openai-compatible"
-    public let displayName = "OpenAI 互換"
+    public let displayName = String(localized: "OpenAI 互換")
     public let defaultModel = ""
 
     private let baseURL: URL

@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "HibiVo uses the microphone to transcribe what you say. Audio is not saved.";
+"NSAudioCaptureUsageDescription" = "HibiVo uses system audio to record the other participants of online meetings for meeting transcripts. Audio is not saved.";

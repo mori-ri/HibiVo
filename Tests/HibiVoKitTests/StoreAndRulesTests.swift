@@ -29,6 +29,21 @@ import Testing
         #expect(settings.cleanupMode(for: "com.tinyspeck.slackmacgap") == .natural)
     }
 
+    @MainActor @Test func appLanguageSetsAppleLanguagesForTheNextLaunch() {
+        let suite = "AppLanguageTests-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        let settings = SettingsStore(defaults: defaults)
+        #expect(settings.appLanguage == .system)
+
+        settings.appLanguage = .english
+        #expect(defaults.persistentDomain(forName: suite)?["AppleLanguages"] as? [String] == ["en"])
+        #expect(settings.appLanguageAtLaunch == .system)
+        #expect(SettingsStore(defaults: defaults).appLanguage == .english)
+
+        settings.appLanguage = .system
+        #expect(defaults.persistentDomain(forName: suite)?["AppleLanguages"] == nil)
+    }
+
     @MainActor @Test func initialModesAreSeededOnceAndCanBeRemoved() {
         let defaults = UserDefaults(suiteName: "AppModeRulesTests-\(UUID())")!
         let settings = SettingsStore(defaults: defaults)
