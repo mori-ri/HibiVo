@@ -56,6 +56,7 @@ public final class AppEnvironment {
             correctionWatcher: CorrectionWatcher(
                 isEnabled: { settings.learnsFromCorrections },
                 onFinish: { learner.learn(inserted: $0, edited: $1) }),
+            screenReader: ScreenContextReader(),
             history: history,
             historyEnabled: { settings.historyEnabled },
             usage: usage,

@@ -228,3 +228,37 @@ final class MockCorrectionWatcher: CorrectionWatching {
     func watch(inserted: String, target: TargetApplication?) { watched.append((inserted, target)) }
     func stop() { stopCount += 1 }
 }
+
+final class MockScreenReader: ScreenContextReading, @unchecked Sendable {
+    var context: ScreenContext?
+    private(set) var reads: [pid_t] = []
+
+    init(context: ScreenContext? = nil) {
+        self.context = context
+    }
+
+    func read(processID: pid_t) async -> ScreenContext? {
+        reads.append(processID)
+        return context
+    }
+}
+
+/// Keeps the prompts it was sent.
+final class CapturingCleanupProvider: TextCleanupProvider, @unchecked Sendable {
+    let id = "capturing-llm"
+    let displayName = "Capturing LLM"
+    let defaultModel = "m"
+    let output: String
+    private(set) var systems: [String] = []
+    private(set) var users: [String] = []
+
+    init(output: String) {
+        self.output = output
+    }
+
+    func complete(system: String, user: String, model: String) async throws -> CleanupCompletion {
+        systems.append(system)
+        users.append(user)
+        return CleanupCompletion(text: output, usage: nil)
+    }
+}

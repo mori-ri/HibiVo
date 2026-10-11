@@ -38,6 +38,7 @@ public final class DictationController {
     private let activeApp: any ActiveApplicationProviding
     private let inserter: any TextInserting
     private let correctionWatcher: (any CorrectionWatching)?
+    private let screenReader: (any ScreenContextReading)?
     private let cleanup: CleanupCoordinator
     private let history: HistoryStore?
     private let historyEnabled: @MainActor () -> Bool
@@ -64,6 +65,7 @@ public final class DictationController {
         activeApp: any ActiveApplicationProviding,
         inserter: any TextInserting,
         correctionWatcher: (any CorrectionWatching)? = nil,
+        screenReader: (any ScreenContextReading)? = nil,
         cleanup: CleanupCoordinator = CleanupCoordinator(),
         history: HistoryStore? = nil,
         historyEnabled: @escaping @MainActor () -> Bool = { true },
@@ -80,6 +82,7 @@ public final class DictationController {
         self.activeApp = activeApp
         self.inserter = inserter
         self.correctionWatcher = correctionWatcher
+        self.screenReader = screenReader
         self.cleanup = cleanup
         self.history = history
         self.historyEnabled = historyEnabled
@@ -201,7 +204,8 @@ public final class DictationController {
         ducker?.restore()
         state.phase = .processing
         let stoppedAt = clock.now
-        processing = Task { await process(recording, stoppedAt: stoppedAt) }
+        let screen = readScreen(for: recording.context)
+        processing = Task { await process(recording, stoppedAt: stoppedAt, screen: screen) }
     }
 
     /// The text goes where the caret is when recording stops: people often start talking while
@@ -214,6 +218,15 @@ public final class DictationController {
         else { return }
         log.info("Paste target moved to \(app.bundleID ?? app.name, privacy: .public) while recording")
         context.retarget(to: app)
+    }
+
+    /// Starts reading the text around the paste target while STT finishes, when the user opted in
+    /// and cleanup will actually run. Read at stop, when the caret is where the text will go.
+    private func readScreen(for context: DictationContext) -> Task<ScreenContext?, Never>? {
+        guard context.cleanup.readsScreen, context.cleanup.mode != .raw, context.cleanup.provider != nil,
+            let reader = screenReader, let processID = context.target?.processID
+        else { return nil }
+        return Task { await reader.read(processID: processID) }
     }
 
     private func cancel() {
@@ -234,7 +247,9 @@ public final class DictationController {
 
     // MARK: - Processing
 
-    private func process(_ recording: Recording, stoppedAt: ContinuousClock.Instant) async {
+    private func process(
+        _ recording: Recording, stoppedAt: ContinuousClock.Instant, screen: Task<ScreenContext?, Never>?
+    ) async {
         let context = recording.context
         let pumped = await recording.pump.value
         recording.partials.cancel()
@@ -268,7 +283,7 @@ public final class DictationController {
         let (raw, cleaned) = await cleanup.run(
             transcript: transcript, vocabulary: context.vocabulary, mode: context.cleanup.mode,
             appName: context.target?.name, customInstructions: context.cleanup.customInstructions,
-            provider: context.cleanup.provider, model: context.cleanup.model)
+            screenContext: await screen?.value, provider: context.cleanup.provider, model: context.cleanup.model)
         let cleanupDone = clock.now
 
         let outcome = await inserter.insert(cleaned.text, into: context.target)
