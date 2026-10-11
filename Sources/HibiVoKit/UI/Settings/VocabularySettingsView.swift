@@ -11,8 +11,7 @@ struct VocabularySettingsView: View {
         SettingsPage {
             SettingsSection(
                 title: "言葉を追加",
-                footer: "正しい表記と、誤認識されやすい読み方を登録します。STT のヒントと AI 整形の両方に使われます。"
-                    + "よく使う言葉と同じ読みを登録すると、ほかの言葉まで置き換わることがあります。"
+                footer: "正しい表記と、誤認識されやすい読み方を登録します。STT のヒントと AI 整形の両方に使われます。よく使う言葉と同じ読みを登録すると、ほかの言葉まで置き換わることがあります。"
             ) {
                 VocabularyComposer(store: store)
             }
@@ -33,9 +32,8 @@ struct VocabularySettingsView: View {
 
             SettingsSection(
                 title: "自動で追加",
-                footer: "入力した直後に、誤認識された言葉を書き直すと、その言葉を辞書に追加します。追加したときは画面下に表示され、"
-                    + "クリックで取り消せます。入力欄の内容はアクセシビリティ機能で読み取り、保存も送信もしません。"
-                    + "内容を読み取れないアプリ（ターミナルなど）では、履歴の「修正」から追加できます。"
+                footer:
+                    "入力した直後に、誤認識された言葉を書き直すと、その言葉を辞書に追加します。追加したときは画面下に表示され、クリックで取り消せます。入力欄の内容はアクセシビリティ機能で読み取り、保存も送信もしません。内容を読み取れないアプリ（ターミナルなど）では、履歴の「修正」から追加できます。"
             ) {
                 ToggleRow("入力後に直した言葉を辞書に追加する", isOn: $settings.learnsFromCorrections)
             }
@@ -86,12 +84,15 @@ struct VocabularySettingsView: View {
         }
     }
 
-    static let contextualNote =
-        "2 文字以下のひらがな・カタカナの読みは、ほかの言葉と取り違えやすいため自動では置き換えません。"
-        + "AI 整形で文脈に合うと判断されたときだけ、この表記にします。"
+    static var contextualNote: String {
+        String(
+            localized:
+                "2 文字以下のひらがな・カタカナの読みは、ほかの言葉と取り違えやすいため自動では置き換えません。AI 整形で文脈に合うと判断されたときだけ、この表記にします。"
+        )
+    }
 
     static func splitAliases(_ text: String) -> [String] {
-        text.split(whereSeparator: { $0 == "," || $0 == "、" })
+        text.split(whereSeparator: { $0 == "," || $0 == "、" })  // no-l10n
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
     }
@@ -103,7 +104,7 @@ extension VocabularySettingsView {
 
         var id: Self { self }
 
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
             case .all: "すべて"
             case .manual: "手動"
@@ -112,7 +113,7 @@ extension VocabularySettingsView {
             }
         }
 
-        var emptyText: String {
+        var emptyText: LocalizedStringKey {
             switch self {
             case .all: "まだ登録されていません"
             case .manual: "手動で追加した言葉はありません"
@@ -201,7 +202,7 @@ private struct VocabularyRow: View {
             HStack(spacing: 10) {
                 OriginIcon(origin: entry.origin)
                 HStack(spacing: 6) {
-                    Text(entry.preferred.isEmpty ? "（表記なし）" : entry.preferred)
+                    (entry.preferred.isEmpty ? Text("（表記なし）") : Text(verbatim: entry.preferred))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(entry.preferred.isEmpty ? .tertiary : .primary)
                         .layoutPriority(1)
@@ -220,7 +221,8 @@ private struct VocabularyRow: View {
                     RowIconButton(symbol: isEditing ? "checkmark" : "pencil", help: isEditing ? "完了" : "編集") {
                         toggleEditing()
                     }
-                    .accessibilityLabel(isEditing ? "\(entry.preferred) の編集を完了" : "\(entry.preferred) を編集")
+                    .accessibilityLabel(
+                        isEditing ? Text("\(entry.preferred) の編集を完了") : Text("\(entry.preferred) を編集"))
                     RowIconButton(symbol: "trash", help: "辞書から削除", role: .destructive) {
                         withAnimation(.snappy(duration: 0.2)) { store.remove(ids: [entry.id]) }
                     }
@@ -231,7 +233,7 @@ private struct VocabularyRow: View {
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                     .labelsHidden()
-                    .help(entry.isEnabled ? "オフにすると、削除せずに使わないようにできます" : "無効（使われません）")
+                    .help(entry.isEnabled ? Text("オフにすると、削除せずに使わないようにできます") : Text("無効（使われません）"))
                     .accessibilityLabel("\(entry.preferred) を使う")
             }
             .padding(.horizontal, 14)
@@ -301,7 +303,7 @@ struct OriginIcon: View {
             }
         }
         .font(.system(size: 10, weight: .semibold))
-        .help(origin == .manual ? "手動で追加した言葉" : "入力後の修正から自動で追加された言葉")
+        .help(origin == .manual ? Text("手動で追加した言葉") : Text("入力後の修正から自動で追加された言葉"))
     }
 }
 
@@ -321,7 +323,7 @@ private struct FormChip: View {
 
 private struct RowIconButton: View {
     let symbol: String
-    let help: String
+    let help: LocalizedStringKey
     var role: ButtonRole? = nil
     let action: () -> Void
     @State private var isHovered = false
@@ -347,8 +349,8 @@ private struct RowIconButton: View {
 
 /// Caption over a soft, borderless text field.
 private struct VocabularyField: View {
-    let title: String
-    let prompt: String
+    let title: LocalizedStringKey
+    let prompt: LocalizedStringKey
     @Binding var text: String
 
     var body: some View {
@@ -370,7 +372,7 @@ private struct VocabularyField: View {
 }
 
 private struct FilterChip: View {
-    let title: String
+    let title: LocalizedStringKey
     let count: Int
     let isSelected: Bool
     let action: () -> Void
@@ -381,7 +383,7 @@ private struct FilterChip: View {
             HStack(spacing: 5) {
                 Text(title)
                     .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                Text("\(count)")
+                Text(verbatim: "\(count)")
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
                     .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
             }
@@ -437,7 +439,7 @@ private struct SearchField: View {
 
 /// Drawn by SwiftUI: a plain field's own placeholder ignores `foregroundStyle` and reads like typed text.
 private struct Placeholder: View {
-    let text: String
+    let text: LocalizedStringKey
     let isVisible: Bool
 
     var body: some View {

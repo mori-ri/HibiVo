@@ -61,7 +61,7 @@ struct HUDView: View {
             MeetingBadge(startedAt: state.meetingStartedAt ?? Date())
             HUDPillButton(symbol: "note.text", title: "メモ", help: "メモを表示・非表示", action: actions.toggleMeetingNotes)
             if settings.showLiveTranscript || state.meetingReconnecting {
-                Text(meetingLabel ?? "聞き取り中…")
+                Text(meetingLabel ?? String(localized: "聞き取り中…"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(meetingLabel == nil ? 0.45 : 1))
                     .lineLimit(1)
@@ -85,7 +85,7 @@ struct HUDView: View {
     }
 
     private var meetingLabel: String? {
-        if state.meetingReconnecting { return "再接続中…" }
+        if state.meetingReconnecting { return String(localized: "再接続中…") }
         return state.partialTranscript.isEmpty ? nil : state.partialTranscript
     }
 
@@ -207,8 +207,8 @@ private struct LearnedNotice: View {
 /// A labelled button on the dark capsule.
 private struct HUDPillButton: View {
     let symbol: String
-    let title: String
-    let help: String
+    let title: LocalizedStringKey
+    let help: LocalizedStringKey
     let action: @MainActor () -> Void
 
     var body: some View {

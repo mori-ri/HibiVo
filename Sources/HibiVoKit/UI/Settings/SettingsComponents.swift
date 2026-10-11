@@ -22,8 +22,8 @@ struct SettingsPage<Content: View>: View {
 
 /// Titled card of rows with an optional explanatory footer.
 struct SettingsSection<Content: View>: View {
-    var title: String? = nil
-    var footer: String? = nil
+    var title: LocalizedStringKey? = nil
+    var footer: LocalizedStringKey? = nil
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -88,23 +88,27 @@ struct LabeledRow<Label: View, Control: View>: View {
 }
 
 extension LabeledRow where Label == Text {
-    init(_ title: String, @ViewBuilder control: () -> Control) {
-        self.init(label: { Text(title) }, control: control)
+    init(_ title: LocalizedStringKey, @ViewBuilder control: () -> Control) {
+        self.init(Text(title), control: control)
+    }
+
+    init(_ title: Text, @ViewBuilder control: () -> Control) {
+        self.init(label: { title }, control: control)
     }
 }
 
 struct ToggleRow: View {
-    let title: String
+    let title: Text
     @Binding var isOn: Bool
 
-    init(_ title: String, isOn: Binding<Bool>) {
-        self.title = title
+    init(_ title: LocalizedStringKey, isOn: Binding<Bool>) {
+        self.title = Text(title)
         self._isOn = isOn
     }
 
     var body: some View {
         LabeledRow(title) {
-            Toggle(title, isOn: $isOn)
+            Toggle(isOn: $isOn) { title }
                 .labelsHidden()
                 .toggleStyle(.switch)
         }
@@ -112,39 +116,49 @@ struct ToggleRow: View {
 }
 
 struct PickerRow<Selection: Hashable, Options: View>: View {
-    let title: String
+    let title: Text
     @Binding var selection: Selection
     @ViewBuilder var options: Options
 
-    init(_ title: String, selection: Binding<Selection>, @ViewBuilder options: () -> Options) {
-        self.title = title
+    init(_ title: LocalizedStringKey, selection: Binding<Selection>, @ViewBuilder options: () -> Options) {
+        self.title = Text(title)
         self._selection = selection
         self.options = options()
     }
 
     var body: some View {
         LabeledRow(title) {
-            Picker(title, selection: $selection) { options }
-                .labelsHidden()
-                .fixedSize()
+            Picker(selection: $selection) {
+                options
+            } label: {
+                title
+            }
+            .labelsHidden()
+            .fixedSize()
         }
     }
 }
 
 struct TextFieldRow: View {
-    let title: String
+    let title: Text
     @Binding var text: String
-    var prompt: String? = nil
+    var prompt: Text? = nil
 
-    init(_ title: String, text: Binding<String>, prompt: String? = nil) {
-        self.title = title
+    init(_ title: LocalizedStringKey, text: Binding<String>, prompt: LocalizedStringKey? = nil) {
+        self.title = Text(title)
         self._text = text
-        self.prompt = prompt
+        self.prompt = prompt.map { Text($0) }
+    }
+
+    /// For a prompt that is a value (a default model or region), not text to translate.
+    init(_ title: LocalizedStringKey, text: Binding<String>, prompt verbatim: String) {
+        self.init(title, text: text)
+        self.prompt = Text(verbatim: verbatim)
     }
 
     var body: some View {
         LabeledRow(title) {
-            TextField(title, text: $text, prompt: prompt.map { Text($0) })
+            TextField(text: $text, prompt: prompt) { title }
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 340)
@@ -154,17 +168,24 @@ struct TextFieldRow: View {
 
 /// Small secondary text inside a card.
 struct NoteRow: View {
-    let text: String
+    let text: Text
     var color: Color? = nil
 
+    init(_ text: LocalizedStringKey, color: Color? = nil) {
+        self.text = Text(text)
+        self.color = color
+    }
+
+    /// For text that is already localized, such as an error message.
+    @_disfavoredOverload
     init(_ text: String, color: Color? = nil) {
-        self.text = text
+        self.text = Text(verbatim: text)
         self.color = color
     }
 
     var body: some View {
         SettingsRow {
-            Text(text)
+            text
                 .font(.caption)
                 .foregroundStyle(color.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.secondary))
                 .fixedSize(horizontal: false, vertical: true)
@@ -174,16 +195,16 @@ struct NoteRow: View {
 
 /// A long prompt: a one-line preview in the card, edited in a sheet so it doesn't take over the page.
 struct PromptEditorRow: View {
-    let title: String
+    let title: LocalizedStringKey
     /// The saved text.
     let text: String
     let limit: Int
     /// Shown in the row when `text` is empty.
-    var placeholder = "未設定"
+    var placeholder: LocalizedStringKey = "未設定"
     /// Offered as "デフォルトに戻す" in the sheet when set.
     var defaultText: String? = nil
     /// What the prompt is for, shown above the editor.
-    var explanation: String? = nil
+    var explanation: LocalizedStringKey? = nil
     let onSave: (String) -> Void
     @State private var isEditing = false
 
@@ -191,7 +212,7 @@ struct PromptEditorRow: View {
         LabeledRow {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                Text(preview ?? placeholder)
+                (preview.map { Text(verbatim: $0) } ?? Text(placeholder))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -216,16 +237,17 @@ struct PromptEditorRow: View {
 
 /// Edits a draft; nothing is stored until "保存".
 struct PromptEditorSheet: View {
-    let title: String
+    let title: LocalizedStringKey
     let limit: Int
     let defaultText: String?
-    let explanation: String?
+    let explanation: LocalizedStringKey?
     let onSave: (String) -> Void
     @State private var draft: String
     @Environment(\.dismiss) private var dismiss
 
     init(
-        title: String, initialText: String, limit: Int, defaultText: String?, explanation: String?,
+        title: LocalizedStringKey, initialText: String, limit: Int, defaultText: String?,
+        explanation: LocalizedStringKey?,
         onSave: @escaping (String) -> Void
     ) {
         self.title = title

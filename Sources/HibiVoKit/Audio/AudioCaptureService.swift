@@ -187,7 +187,7 @@ private final class AVMicrophoneEngine: MicrophoneEngine {
         guard hardwareFormat.sampleRate > 0, hardwareFormat.channelCount > 0,
             let converter = PCMConverter(inputFormat: hardwareFormat, sampleRate: sampleRate)
         else {
-            throw AudioCaptureError.engineFailed("入力デバイスのフォーマットを取得できません")
+            throw AudioCaptureError.engineFailed("入力デバイスのフォーマットを取得できません")  // no-l10n
         }
         input.installTap(
             onBus: 0, bufferSize: 1024, format: hardwareFormat,

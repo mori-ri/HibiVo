@@ -7,6 +7,19 @@ public final class SettingsStore {
     @ObservationIgnored private let defaults: UserDefaults
 
     public var hotkey: HotkeyTrigger { didSet { save(hotkey, "hotkey") } }
+    /// The UI language. macOS reads `AppleLanguages` from the app's domain only at launch.
+    public var appLanguage: AppLanguage {
+        didSet {
+            save(appLanguage, "appLanguage")
+            if let code = appLanguage.code {
+                defaults.set([code], forKey: "AppleLanguages")
+            } else {
+                defaults.removeObject(forKey: "AppleLanguages")
+            }
+        }
+    }
+    /// What `appLanguage` was when the app started, i.e. the language the UI is showing.
+    @ObservationIgnored public let appLanguageAtLaunch: AppLanguage
     /// CoreAudio device UID; nil means the system default input.
     public var microphoneUID: String? { didSet { defaults.set(microphoneUID, forKey: "microphoneUID") } }
 
@@ -87,6 +100,9 @@ public final class SettingsStore {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         hotkey = Self.load("hotkey", from: defaults) ?? .default
+        let appLanguage: AppLanguage = Self.load("appLanguage", from: defaults) ?? .system
+        self.appLanguage = appLanguage
+        appLanguageAtLaunch = appLanguage
         microphoneUID = defaults.string(forKey: "microphoneUID")
         transcriptionProviderID =
             defaults.string(forKey: "transcriptionProviderID") ?? Self.defaultTranscriptionProviderID
@@ -198,8 +214,27 @@ public enum BedrockAuthMethod: String, Codable, CaseIterable, Identifiable, Send
 
     public var displayName: String {
         switch self {
-        case .apiKey: "Bedrock API キー"
-        case .iam: "IAM アクセスキー"
+        case .apiKey: String(localized: "Bedrock API キー")
+        case .iam: String(localized: "IAM アクセスキー")
+        }
+    }
+}
+
+/// The UI language chosen in Settings.
+public enum AppLanguage: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Follows macOS (System Settings › General › Language & Region).
+    case system
+    case japanese
+    case english
+
+    public var id: String { rawValue }
+
+    /// The localization to put in `AppleLanguages`; nil leaves it to macOS.
+    var code: String? {
+        switch self {
+        case .system: nil
+        case .japanese: "ja"
+        case .english: "en"
         }
     }
 }

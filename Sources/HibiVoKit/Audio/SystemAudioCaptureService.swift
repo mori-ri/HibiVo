@@ -28,7 +28,7 @@ public final class SystemAudioCaptureService: AudioCapturing {
     public func start(sampleRate: Double, deviceUID _: String?) throws -> AsyncStream<AudioChunk> {
         stop()
         guard #available(macOS 14.2, *) else {
-            throw AudioCaptureError.engineFailed("システム音声の取得には macOS 14.2 以降が必要です")
+            throw AudioCaptureError.engineFailed("システム音声の取得には macOS 14.2 以降が必要です")  // no-l10n
         }
         do {
             return try startTap(sampleRate: sampleRate)
@@ -86,7 +86,7 @@ public final class SystemAudioCaptureService: AudioCapturing {
         guard let format = AVAudioFormat(streamDescription: &streamDescription),
             let converter = PCMConverter(inputFormat: format, sampleRate: sampleRate)
         else {
-            throw AudioCaptureError.engineFailed("システム音声のフォーマットを取得できません")
+            throw AudioCaptureError.engineFailed("システム音声のフォーマットを取得できません")  // no-l10n
         }
 
         let (stream, continuation) = AsyncStream<AudioChunk>.makeStream(bufferingPolicy: .unbounded)
@@ -123,7 +123,7 @@ public final class SystemAudioCaptureService: AudioCapturing {
 
     private static func check(_ status: OSStatus, _ step: String) throws {
         guard status == noErr else {
-            throw AudioCaptureError.engineFailed("システム音声を取得できません(\(step): \(status))")
+            throw AudioCaptureError.engineFailed("システム音声を取得できません(\(step): \(status))")  // no-l10n
         }
     }
 
@@ -141,7 +141,7 @@ public final class SystemAudioCaptureService: AudioCapturing {
         size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         address.mSelector = kAudioDevicePropertyDeviceUID
         try check(AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &uid), "output UID")
-        guard let uid else { throw AudioCaptureError.engineFailed("出力デバイスを取得できません") }
+        guard let uid else { throw AudioCaptureError.engineFailed("出力デバイスを取得できません") }  // no-l10n
         return uid.takeRetainedValue() as String
     }
 

@@ -12,6 +12,11 @@
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>io.github.mori-ri.hibivo</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ja</string>
+		<string>en</string>
+	</array>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

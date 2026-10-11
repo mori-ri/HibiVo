@@ -111,6 +111,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 - 画面・HUD・アイコンの色、形、文字、動きは `DESIGN.md` に従う。ブランドの色は `Theme` のトークン(`brandGradient` など)を使い、値を直接書かない。
 - ユーザー向けテキストは日本語で、ステータスコードではなくユーザーに伝わる言い回しにする。エラーは `UserFacingError` を経由させる。コードコメントは英語。
+- UI は日本語と英語に対応する。コードに書いた日本語がそのままキーになり(開発言語 `ja`)、英訳は `Resources/en.lproj/Localizable.strings` に書く(`build-app.sh` がバンドルにコピーする)。SwiftUI のリテラル(`Text("…")` など)と、`LocalizedStringKey` を受け取る設定画面の部品は自動で翻訳される。`String` で持つ文言は `String(localized:)` を使う。補間はキーでは `%@`(String)・`%lld`(Int)などになる。モデルに送るプロンプト、議事録などの保存する文書、照合用の文字列は翻訳しない(行末に `// no-l10n`)。`scripts/check-localization.swift`(`lint.sh` から実行)が訳の抜けと使われていない訳を検出する。テストはバンドル外で動くため日本語のまま。表示言語は設定 › 一般で選べる(`SettingsStore.appLanguage`)。アプリのドメインの `AppleLanguages` に書くだけなので、再起動で反映される。
 - テストは Swift Testing(`@Test`、`#expect`)を使う。モックは `Tests/HibiVoKitTests/Mocks.swift` にある。`#require` の中に `#require` をネストしない(マクロ再帰エラーになる)。
 - 自明でない設計判断はローカル専用の `notes/DECISIONS.md`(番号付きの表)に記録する。詳しい設計と macOS 関連のメモは `notes/ARCHITECTURE.md` にある。どちらもクローンには含まれない。
 - `notes/` はローカル専用(`.git/info/exclude` で除外)。その内容を追跡対象のファイルに移さないこと。
