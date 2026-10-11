@@ -1,3 +1,5 @@
+[English](README.en.md) | 日本語
+
 # HibiVo
 
 押す → 話す → もう一度押す(または押している間だけ話す)→ 文章が入る。macOS 向けの日本語音声入力アプリです。
@@ -8,6 +10,7 @@
 - 元のアプリのカーソル位置へ貼り付け、クリップボードは元に戻します
 - ユーザー辞書（表記と聞き取り例を登録。聞き取り例は平仮名・片仮名、全角・半角を区別せずに置き換え、STT のヒントにも使います）、履歴（コピー / もう一度入力 / 整形やり直し）
 - ミーティングモード: ホットキー + M で録音を続け、マイクとシステム音声（オンライン参加者の声）を文字起こしして Markdown に保存（既定は macOS 標準。Soniox なら話者識別付き）
+- 画面は日本語と英語に対応しています。既定では macOS の言語に合わせて切り替わり、設定 › 一般 の「表示言語」で選ぶこともできます
 - 音声は保存しません（ミーティングを「終了後にまとめて」で文字起こしする場合だけ、文字起こしが終わるまで一時的に保存します）。API Key は Keychain に保存します
 
 ## 必要なもの
@@ -105,6 +108,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 - **議事録**: [Claude Code](https://claude.com/claude-code) がインストールされ、claude.ai のアカウントでログインしていれば、終了後に Claude が文字起こしから議事録（概要・決定事項・ToDo・議論の内容・未解決の事項）を作り、`<開始日時>_<会議の内容を表すタイトル>.md`（例: `2026-09-27_14-00-05_新機能リリース計画.md`）として隣に保存します。タイトルは Claude が内容から付けます。ユーザー辞書も Claude に渡すので、登録した表記が議事録でも使われます。
   - Claude のサブスクリプションの利用枠で処理するので、API の料金はかかりません。
   - モデル（Opus / Sonnet / Haiku、既定は Sonnet）と Claude Code の場所は 設定 › ミーティング で変えられます。オフにもできます。
+  - 設定 › ミーティング の「作成方法」で、AI 整形のプロバイダ（Anthropic、OpenAI 互換、Amazon Bedrock、Google Gemini）を選ぶこともできます。認証情報は AI 整形と共通です。API の料金がかかり、利用状況に計上されます。
   - Claude Code は、ツール・MCP・設定ファイルをすべて無効にし、空の一時フォルダで動かします。文字起こしを読んで議事録を返す以外のことはしません。
 
 ## プライバシー
@@ -113,7 +117,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 - **テキスト**: Soniox / Google Gemini を選んだ場合、音声はその STT Provider へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
 - **履歴**: 文字起こし原文と整形結果を `~/Library/Application Support/HibiVo/history.json` に平文で最大 200 件保存します。履歴画面の右上の「履歴を保存」で無効にでき、同じ画面から全件削除できます。
 - **辞書**: `~/Library/Application Support/HibiVo/vocabulary.json` に保存します。
-- **ミーティング**: 文字起こしと議事録を `~/Library/Application Support/HibiVo/Meetings/` に Markdown で平文保存します。音声は保存しません。議事録を作る場合、文字起こしは Claude Code 経由で Anthropic に送信されます。
+- **ミーティング**: 文字起こしと議事録を `~/Library/Application Support/HibiVo/Meetings/` に Markdown で平文保存します。音声は保存しません。議事録を作る場合、文字起こしは Claude Code 経由で Anthropic に、または「作成方法」で選んだプロバイダに送信されます。
 - **API Key / AWS 認証情報**: macOS の Keychain に保存します。設定ファイルには書き込みません。
   - Soniox・Gemini・Anthropic・OpenAI 互換・Bedrock の API キーは、HibiVo 用の 1 つの項目にまとめて保存します。この項目へのアクセス許可は、保存した API キー全体に適用されます。
   - 取得した API キーはアプリ内のメモリに保持し、通常の利用でキーごとの再取得・再承認を行いません。キーチェーンアクセスなどで外部からキーを変更した場合は、HibiVo を再起動してください。
