@@ -599,7 +599,7 @@ private struct MinutesInstructionsRows: View {
             limit: MeetingMinutesPrompt.instructionsLimit,
             defaultText: defaultText,
             explanation:
-                "議事録に書く内容と書き方を指定します。1 行目のタイトル(ファイル名に使います)、辞書の扱い、出力の形式についての指示は自動で加わります。空欄のときはデフォルトのプロンプトを使います。",
+                "議事録に書く内容と書き方を指定します。1 行目のタイトル(ファイル名に使います)、辞書の扱い、出力の形式についての指示は自動で加わります。空欄のときはデフォルトのプロンプトを使います。デフォルトのプロンプトは、文字起こしの言語が English のときは英語版になります。",
             onSave: settings.setMeetingMinutesInstructions)
     }
 }
