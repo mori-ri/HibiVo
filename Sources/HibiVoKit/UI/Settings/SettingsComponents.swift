@@ -151,6 +151,8 @@ struct TextFieldRow: View {
     }
 
     /// For a prompt that is a value (a default model or region), not text to translate.
+    /// Disfavored so a string literal prompt still takes the localized initializer above.
+    @_disfavoredOverload
     init(_ title: LocalizedStringKey, text: Binding<String>, prompt verbatim: String) {
         self.init(title, text: text)
         self.prompt = Text(verbatim: verbatim)

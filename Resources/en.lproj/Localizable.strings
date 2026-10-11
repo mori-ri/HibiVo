@@ -1,4 +1,4 @@
-/* English UI strings. Keys are the Japanese text in code (development region ja). */
+/* English UI strings. Keys are the Japanese text in code. */
 /* Checked by scripts/check-localization.swift. */
 
 "%@ 2 回" = "%@ twice";

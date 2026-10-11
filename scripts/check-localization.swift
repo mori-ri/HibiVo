@@ -1,7 +1,7 @@
 // Checks that every Japanese UI string in HibiVoKit has an English translation, and that every
 // translation is still used. Run with `swift scripts/check-localization.swift` (also run by lint.sh).
 //
-// The Japanese text is the localization key (development region `ja`), so a missing entry in
+// The Japanese text is the localization key, so a missing entry in
 // Resources/en.lproj/Localizable.strings silently shows Japanese to English users.
 //
 // Skipped: comments, multi-line literals (prompts), files listed in `excludedFiles` (text sent to

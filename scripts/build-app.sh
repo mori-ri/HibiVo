@@ -23,7 +23,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/HibiVo"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns Resources/Logo.png Resources/Logo@2x.png Resources/MenuBarIcon.png Resources/MenuBarIcon@2x.png "$APP/Contents/Resources/"
-# Localized strings. The Japanese text in code is the key, so ja.lproj only holds InfoPlist.strings.
+# Localized strings. The Japanese text in code is the key, so ja.lproj/Localizable.strings is empty.
 cp -R Resources/ja.lproj Resources/en.lproj "$APP/Contents/Resources/"
 
 # Prefer an explicit identity, then the certificate from create-signing-cert.sh, then ad-hoc.
