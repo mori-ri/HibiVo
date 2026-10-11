@@ -106,6 +106,34 @@ struct MockCleanupProvider: TextCleanupProvider {
         #expect(!natural.contains("1 文ごとに改行"))
     }
 
+    @Test func englishTranscriptionGetsTheEnglishPrompt() {
+        #expect(PromptLanguage(transcriptionLanguage: "en") == .english)
+        #expect(PromptLanguage(transcriptionLanguage: "ja") == .japanese)
+        let prompt = CleanupPromptBuilder.systemPrompt(
+            mode: .business,
+            vocabulary: [
+                .init(preferred: "AppSync", spokenForms: ["アップシンク"]),
+                .init(preferred: "AI", contextualForms: ["あい"]),
+            ],
+            appName: "Gmail", language: .english)
+        #expect(prompt.contains("Mode: Business"))
+        #expect(prompt.contains("Write in the language the user spoke"))
+        #expect(prompt.contains("- AppSync (sounds like: アップシンク)"))
+        #expect(prompt.contains("- AI (reading: あい. Everyday words share this reading"))
+        #expect(prompt.contains("The text will be entered into Gmail"))
+        #expect(!prompt.contains("謙譲語"))
+        #expect(!prompt.contains("整形した文章だけを返す"))
+    }
+
+    @Test(arguments: CleanupMode.allCases)
+    func everyEnglishModeForbidsAddingMeaning(mode: CleanupMode) {
+        let prompt = CleanupPromptBuilder.systemPrompt(
+            mode: mode, customInstructions: "Translate into French", vocabulary: [], appName: nil, language: .english)
+        #expect(prompt.contains("Return only the cleaned-up text"))
+        #expect(prompt.contains("Do not add anything they did not say"))
+        #expect(prompt.contains("<instructions>") == (mode == .custom))
+    }
+
     @Test func userMessageWrapsTranscript() {
         #expect(CleanupPromptBuilder.userMessage(transcript: "送って") == "<transcript>\n送って\n</transcript>")
     }

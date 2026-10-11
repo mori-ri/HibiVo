@@ -17,7 +17,7 @@ struct ClaudeCodeIntegrationTests {
         let written = try await ClaudeCodeMinutesWriter(executable: executable)
             .writeMinutes(
                 transcript: transcript, vocabulary: [.init(preferred: "AppSync", spokenForms: ["アップシンク"])],
-                model: "haiku")
+                model: "haiku", language: .japanese)
         #expect(written.usage == nil)
         let minutes = written.text
         let title = MeetingMinutesTitle.split(minutes).title

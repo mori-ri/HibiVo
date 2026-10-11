@@ -13,10 +13,17 @@ public enum CleanupPromptBuilder {
         }
     }
 
-    /// - Parameter customInstructions: The user's own instructions, used only by `.custom`.
+    /// - Parameters:
+    ///   - customInstructions: The user's own instructions, used only by `.custom`.
+    ///   - language: Which prompt to use; see `English` for the English one.
     public static func systemPrompt(
-        mode: CleanupMode, customInstructions: String = "", vocabulary: [Term], appName: String?
+        mode: CleanupMode, customInstructions: String = "", vocabulary: [Term], appName: String?,
+        language: PromptLanguage = .japanese
     ) -> String {
+        if language == .english {
+            return English.systemPrompt(
+                mode: mode, customInstructions: customInstructions, vocabulary: vocabulary, appName: appName)
+        }
         var sections = [base, modeRules(mode)]
         if mode == .custom, let instructions = normalizedCustomInstructions(customInstructions) {
             sections.append(customInstructionsSection(instructions))
@@ -113,8 +120,9 @@ public enum CleanupPromptBuilder {
     }
 
     /// One `- 表記（聞き取り例: …）` line per term. Shared with the meeting minutes prompt.
-    static func vocabularyLines(_ terms: [Term]) -> String {
-        terms.prefix(200).map { term in
+    static func vocabularyLines(_ terms: [Term], language: PromptLanguage = .japanese) -> String {
+        if language == .english { return English.vocabularyLines(terms) }
+        return terms.prefix(200).map { term in
             var notes: [String] = []
             if !term.spokenForms.isEmpty { notes.append("聞き取り例: \(term.spokenForms.joined(separator: "、"))") }
             if !term.contextualForms.isEmpty {

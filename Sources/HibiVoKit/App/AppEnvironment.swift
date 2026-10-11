@@ -263,7 +263,8 @@ public final class AppEnvironment {
             .init(
                 raw: record.rawTranscript, mode: mode,
                 vocabulary: vocabulary.activeEntries.map(\.promptTerm), appName: record.appName,
-                customInstructions: cleanup.customInstructions),
+                customInstructions: cleanup.customInstructions,
+                language: PromptLanguage(transcriptionLanguage: settings.language)),
             provider: cleanup.provider, model: cleanup.model)
         if let tokens = outcome.usage, let provider = cleanup.provider {
             usage.record(UsageEvent(cleanup: CleanupUsage(provider, model: cleanup.model, tokens: tokens)))

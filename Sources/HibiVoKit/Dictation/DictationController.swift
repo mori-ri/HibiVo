@@ -268,6 +268,7 @@ public final class DictationController {
         let (raw, cleaned) = await cleanup.run(
             transcript: transcript, vocabulary: context.vocabulary, mode: context.cleanup.mode,
             appName: context.target?.name, customInstructions: context.cleanup.customInstructions,
+            language: PromptLanguage(transcriptionLanguage: context.transcriptionConfig.language),
             provider: context.cleanup.provider, model: context.cleanup.model)
         let cleanupDone = clock.now
 

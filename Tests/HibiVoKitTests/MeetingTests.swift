@@ -87,6 +87,9 @@ import Testing
         let md = MeetingDocument.minutes(title: "予算", body: "## 概要\n予算の件。", transcriptFileName: "a.md")
         #expect(md == "# 予算\n\n## 概要\n予算の件。\n\n---\n\n*Claude が文字起こし「a.md」から作成しました。*\n")
         #expect(MeetingDocument.minutes(title: nil, body: "本文", transcriptFileName: "a.md").hasPrefix("# 議事録\n\n本文"))
+        #expect(
+            MeetingDocument.minutes(title: nil, body: "Body", transcriptFileName: "a.md", language: .english)
+                == "# Minutes\n\nBody\n\n---\n\n*Written by Claude from the transcript \"a.md\".*\n")
     }
 
     @Test func markdownWhileRecordingSaysSo() {
@@ -860,6 +863,8 @@ import Testing
     @Test func savedMeetingIsTurnedIntoMinutes() async throws {
         settings.meetingMinutesEnabled = true
         settings.meetingMinutesModel = .opus
+        // The minutes prompt follows the language the meeting was transcribed in.
+        settings.language = "en"
         let writer = MockMinutesWriter(.success("# リリース日程の確認\n\n## 概要\nリリース日を決めた。"))
         var shown: [URL] = []
         let sut = MeetingController(
@@ -871,6 +876,7 @@ import Testing
 
         let call = try #require(await writer.calls.first)
         #expect(call.model == "opus")
+        #expect(call.language == .english)
         #expect(call.vocabulary == [CleanupPromptBuilder.Term(preferred: "AppSync", spokenForms: ["アップシンク"])])
         #expect(call.transcript.contains("**話者1** 来週リリースします"))
         // Finder is pointed at the minutes only, not at the transcript first.
@@ -1325,6 +1331,20 @@ import Testing
         #expect(args.last == MeetingMinutesPrompt.system(instructions: "## 要点"))
     }
 
+    @Test func englishMeetingsGetTheEnglishMinutesPrompt() {
+        let english = MeetingMinutesPrompt.system(instructions: "", language: .english)
+        #expect(english.contains("write the minutes in English"))
+        #expect(english.contains("## To-dos"))
+        #expect(english.contains("\"## メモ\" section, those are notes the participants wrote"))
+        #expect(english.contains("This title is used as the file name"))
+        #expect(!english.contains("議事録を Markdown で作成"))
+        // Edited instructions are used as written, whichever language the fixed parts are in.
+        #expect(MeetingMinutesPrompt.system(instructions: "## 要点", language: .english).contains("\n## 要点\n"))
+        #expect(
+            ClaudeCodeMinutesWriter.arguments(model: "sonnet", language: .english).last
+                == MeetingMinutesPrompt.system(instructions: "", language: .english))
+    }
+
     @Test func minutesSitNextToTheTranscript() {
         let transcript = URL(fileURLWithPath: "/m/2026-09-27_14-00-05.md")
         #expect(
@@ -1508,8 +1528,8 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
         let sut = ProviderMinutesWriter(provider: provider, instructions: "## 要点")
         let minutes = try await sut.writeMinutes(
             transcript: "**話者1** 来週です",
-            vocabulary: [CleanupPromptBuilder.Term(preferred: "AppSync", spokenForms: [])],
-            model: "claude-haiku-5-5")
+            vocabulary: [CleanupPromptBuilder.Term(preferred: "AppSync", spokenForms: ["アップシンク"])],
+            model: "claude-haiku-5-5", language: .english)
         #expect(minutes.text == "# 日程の確認\n\n## 概要\n決めた。")
         #expect(
             minutes.usage
@@ -1518,15 +1538,15 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
                     tokens: TokenUsage(input: 1_200, output: 300)))
         let call = try #require(await provider.calls.first)
         #expect(call.model == "claude-haiku-5-5")
-        #expect(call.system == MeetingMinutesPrompt.system(instructions: "## 要点"))
-        #expect(call.user.contains("<vocabulary>"))
+        #expect(call.system == MeetingMinutesPrompt.system(instructions: "## 要点", language: .english))
+        #expect(call.user.contains("<vocabulary>\n- AppSync (sounds like: アップシンク)\n</vocabulary>"))
         #expect(call.user.contains("<transcript>\n**話者1** 来週です\n</transcript>"))
     }
 
     @Test func providerErrorsBecomeMinutesFailures() async {
         let sut = ProviderMinutesWriter(provider: RecordingProvider(.failure(.unauthorized)))
         await #expect(throws: MeetingMinutesError.failed("Recording: unauthorized")) {
-            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m", language: .japanese)
         }
     }
 
@@ -1548,7 +1568,7 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
     @Test func busyServersAreRetried() async throws {
         let provider = SequenceProvider([.failure(.http(529)), .failure(.http(429)), .success(.init(text: "# 題\n本文"))])
         let sut = ProviderMinutesWriter(provider: provider, retryDelays: [.zero, .zero])
-        let minutes = try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+        let minutes = try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m", language: .japanese)
         #expect(minutes.text == "# 題\n本文")
         #expect(await provider.calls == 3)
     }
@@ -1557,7 +1577,7 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
         let provider = SequenceProvider([.failure(.http(400)), .success(.init(text: "x"))])
         let sut = ProviderMinutesWriter(provider: provider, retryDelays: [.zero])
         await #expect(throws: MeetingMinutesError.failed("Sequence: http(400)")) {
-            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m", language: .japanese)
         }
         #expect(await provider.calls == 1)
     }
@@ -1570,7 +1590,7 @@ final class SonioxStubProtocol: URLProtocol, @unchecked Sendable {
             throws: MeetingMinutesError.outputLimitReached(
                 usage: CleanupUsage(provider: "sequence", model: "m", requests: 1, tokens: tokens))
         ) {
-            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m")
+            try await sut.writeMinutes(transcript: "t", vocabulary: [], model: "m", language: .japanese)
         }
     }
 

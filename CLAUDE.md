@@ -76,6 +76,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - `TextCleanupProvider.complete(system:user:model:)`。Bedrock はキーペアが必要なため、各プロバイダは自身の認証情報を持って生成される。
 - `CleanupCoordinator` は発話を決して失わない: raw モード、プロバイダなし(nil = 認証情報なし)、エラー、タイムアウト(5 秒 + 50 文字ごとに 1 秒、最大 30 秒。出力が入力とほぼ同じ長さになるため)、`CleanupOutputGuard` による棄却のいずれでも、生の文字起こしと `failure` を返す。
 - プロンプトは純粋関数的な `CleanupPromptBuilder` が生成する。文字起こしは `<transcript>` で囲まれ、モデルが内容に回答せず書き直すようにしている。
+- プロンプトは文字起こしの言語(`PromptLanguage`)で日本語版と英語版(`CleanupPromptBuilder.English`)を切り替える。英語で書いたプロンプトは日本語の整形が忠実でなくなったため(評価で確認)、日本語版は日本語のまま保つ。議事録のプロンプト(`MeetingMinutesPrompt`)も同じで、ミーティング開始時の言語で選ぶ。評価ケースは `language` で言語を指定する(省略時は `ja`)。
 - Custom モードは、設定の「カスタム指示」(`SettingsStore.customCleanupInstructions`、`CleanupMode.customInstructionsLimit` 文字まで)を `<instructions>` として基本の整形ルールに加える。指示は録音開始時に `DictationContext.Cleanup` に固定する。
 - プロバイダ:
   - Anthropic Messages(`output_config.effort: low`、Opus 5 以降・Fable 5 系・Sonnet 5.5 向けにサーバー側 `fallbacks`)。

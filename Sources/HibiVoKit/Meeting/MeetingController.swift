@@ -497,7 +497,8 @@ public final class MeetingController {
             if meeting.transcript.isEmpty {
                 onSaved(meeting.fileURL)
             } else {
-                didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary)
+                didSave(
+                    document, to: meeting.fileURL, vocabulary: meeting.vocabulary, language: meeting.config.language)
             }
         }
     }
@@ -618,7 +619,8 @@ public final class MeetingController {
             if meeting.transcript.isEmpty {
                 onSaved(meeting.fileURL)
             } else {
-                didSave(document, to: meeting.fileURL, vocabulary: meeting.vocabulary)
+                didSave(
+                    document, to: meeting.fileURL, vocabulary: meeting.vocabulary, language: meeting.config.language)
             }
         } else {
             // With the recording on disk, the next resume fetches the result again and retries the save.
@@ -768,7 +770,7 @@ public final class MeetingController {
     /// With minutes, Finder shows the minutes once they exist (or the transcript if they fail), so the
     /// user isn't pulled to Finder twice.
     /// The user's notes reach the minutes through the transcript document, where Claude reads them.
-    private func didSave(_ document: String, to url: URL, vocabulary: [VocabularyEntry]) {
+    private func didSave(_ document: String, to url: URL, vocabulary: [VocabularyEntry], language: String) {
         guard settings.meetingMinutesEnabled else {
             onSaved(url)
             return
@@ -787,13 +789,13 @@ public final class MeetingController {
             Task {
                 await writeMinutes(
                     from: document, transcriptURL: url, vocabulary: vocabulary.map(\.promptTerm), model: model,
-                    with: writer)
+                    language: PromptLanguage(transcriptionLanguage: language), with: writer)
             })
     }
 
     private func writeMinutes(
         from document: String, transcriptURL: URL, vocabulary: [CleanupPromptBuilder.Term], model: String,
-        with minutesWriter: any MeetingMinutesWriting
+        language: PromptLanguage, with minutesWriter: any MeetingMinutesWriting
     ) async {
         defer { state.meetingMinutesInProgress -= 1 }
         var minutes: WrittenMinutes?
@@ -804,7 +806,7 @@ public final class MeetingController {
             let sleeps = sleepCount
             do {
                 minutes = try await minutesWriter.writeMinutes(
-                    transcript: document, vocabulary: vocabulary, model: model)
+                    transcript: document, vocabulary: vocabulary, model: model, language: language)
             } catch {
                 failure = error
                 // A cut-off answer was still billed.
@@ -832,7 +834,7 @@ public final class MeetingController {
         let (title, body) = MeetingMinutesTitle.split(minutes.text)
         let url = Self.minutesURL(for: transcriptURL, title: title)
         let text = MeetingDocument.minutes(
-            title: title, body: body, transcriptFileName: transcriptURL.lastPathComponent)
+            title: title, body: body, transcriptFileName: transcriptURL.lastPathComponent, language: language)
         if await writer.write(text, to: url) {
             log.info("Minutes saved")
             onSaved(url)

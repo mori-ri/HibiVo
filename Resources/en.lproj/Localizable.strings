@@ -311,7 +311,7 @@
 "議事録" = "Minutes";
 "議事録あり" = "Minutes";
 "議事録に使うモデルを入力してください。" = "Enter the model to use for minutes.";
-"議事録に書く内容と書き方を指定します。1 行目のタイトル(ファイル名に使います)、辞書の扱い、出力の形式についての指示は自動で加わります。空欄のときはデフォルトのプロンプトを使います。" = "Describes what the minutes cover and how they're written. Instructions for the title on the first line (used as the file name), dictionary terms, and output format are added automatically. Leave empty to use the default prompt.";
+"議事録に書く内容と書き方を指定します。1 行目のタイトル(ファイル名に使います)、辞書の扱い、出力の形式についての指示は自動で加わります。空欄のときはデフォルトのプロンプトを使います。デフォルトのプロンプトは、文字起こしの言語が English のときは英語版になります。" = "Describes what the minutes cover and how they're written. Instructions for the title on the first line (used as the file name), dictionary terms, and output format are added automatically. Leave empty to use the default prompt. When the transcription language is English, the default prompt is the English one.";
 "議事録のプロンプト" = "Minutes Prompt";
 "議事録のモデル" = "Minutes Model";
 "議事録を作成できませんでした。文字起こしは保存済みです" = "Couldn't write minutes. The transcript is saved";

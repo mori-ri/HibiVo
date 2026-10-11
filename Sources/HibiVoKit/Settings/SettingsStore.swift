@@ -170,13 +170,13 @@ public final class SettingsStore {
     }
 
     /// Stores the minutes prompt's editable part, cut to `MeetingMinutesPrompt.instructionsLimit` characters.
-    /// nil, blank or the default text goes back to following the default.
+    /// nil, blank or a default text (in either prompt language) goes back to following the default.
     public func setMeetingMinutesInstructions(_ text: String?) {
         let text = text.map { String($0.prefix(MeetingMinutesPrompt.instructionsLimit)) }
         let isDefault =
-            text.map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    || $0 == MeetingMinutesPrompt.defaultInstructions
+            text.map { text in
+                text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || PromptLanguage.allCases.contains { MeetingMinutesPrompt.defaultInstructions(for: $0) == text }
             } ?? true
         meetingMinutesInstructions = isDefault ? nil : text
     }

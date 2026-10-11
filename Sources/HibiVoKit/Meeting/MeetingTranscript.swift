@@ -173,9 +173,21 @@ public enum MeetingDocument {
 
     /// The minutes file: Claude's title and minutes, and where they came from. The user's notes are
     /// not copied here; Claude takes what matters from them in the transcript.
-    static func minutes(title: String?, body: String, transcriptFileName: String) -> String {
-        ["# \(title ?? "議事録")", body, "---", "*Claude が文字起こし「\(transcriptFileName)」から作成しました。*\n"]
-            .joined(separator: "\n\n")
+    /// - Parameter language: The meeting's prompt language, so English minutes get an English heading and footer.
+    static func minutes(
+        title: String?, body: String, transcriptFileName: String, language: PromptLanguage = .japanese
+    ) -> String {
+        let heading: String
+        let source: String
+        switch language {
+        case .japanese:
+            heading = title ?? "議事録"
+            source = "*Claude が文字起こし「\(transcriptFileName)」から作成しました。*"
+        case .english:
+            heading = title ?? "Minutes"
+            source = "*Written by Claude from the transcript \"\(transcriptFileName)\".*"
+        }
+        return ["# \(heading)", body, "---", source + "\n"].joined(separator: "\n\n")
     }
 
     struct SpeakerKey: Hashable {

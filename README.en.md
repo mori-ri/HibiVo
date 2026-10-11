@@ -6,8 +6,7 @@ Press → speak → press again (or hold while you speak) → your text appears.
 
 > **About languages**: HibiVo is designed for Japanese first.
 > - The UI is available in Japanese and English and follows your macOS language by default. You can also choose it in Settings › General › App Language.
-> - Transcription can recognize English: set Settings… › Transcription › Language to English.
-> - AI Cleanup prompts and meeting minutes are written for Japanese. The cleanup rules (fillers, polite Japanese for Business, and so on) assume Japanese speech, and minutes are always written in Japanese. With English speech, use Raw or Custom (with your own instructions) for the best results.
+> - To dictate in English, set Settings… › Transcription › Language to English. AI Cleanup and meeting minutes then use English prompts too, so text is cleaned up and minutes are written in English.
 
 - Push-to-Talk (right Option by default; Fn / right Command / ⌃Space are also available)
 - Transcribes while you speak, so your text is entered right after you stop recording. The default is macOS's built-in transcription (macOS 26 or later; runs on your Mac, no API key, free). Soniox or Google Gemini can also be chosen
