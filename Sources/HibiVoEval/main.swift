@@ -101,6 +101,10 @@ struct EvalCase: Decodable, Sendable {
     var customInstructions: String
     var checks: Checks
     var notes: String
+    /// The transcription language the case was spoken in ("ja" when absent); picks the prompt.
+    var language: String?
+
+    var promptLanguage: PromptLanguage { PromptLanguage(transcriptionLanguage: language ?? "ja") }
 
     var entries: [VocabularyEntry] {
         vocabulary.map { VocabularyEntry(preferred: $0.preferred, spoken: $0.spoken, aliases: $0.aliases) }
@@ -618,7 +622,8 @@ func runCase(
         let started = ContinuousClock.now
         cleanup = await coordinator.run(
             transcript: evalCase.raw, vocabulary: evalCase.entries, mode: evalCase.mode, appName: evalCase.app,
-            customInstructions: evalCase.customInstructions, provider: provider, model: options.model)
+            customInstructions: evalCase.customInstructions, language: evalCase.promptLanguage, provider: provider,
+            model: options.model)
         let elapsed = ContinuousClock.now - started
         latency = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
         switch cleanup.outcome.failure {
@@ -636,7 +641,7 @@ func runCase(
     let (raw, outcome) = cleanup
     let instructions = CleanupPromptBuilder.systemPrompt(
         mode: evalCase.mode, customInstructions: evalCase.customInstructions,
-        vocabulary: evalCase.entries.map(\.promptTerm), appName: evalCase.app)
+        vocabulary: evalCase.entries.map(\.promptTerm), appName: evalCase.app, language: evalCase.promptLanguage)
 
     var verdict: Judge.Verdict?
     var judgeRetries = 0

@@ -23,11 +23,11 @@ struct MockCleanupProvider: TextCleanupProvider {
             mode: .business,
             vocabulary: [.init(preferred: "AppSync", spokenForms: ["アップシンク"]), .init(preferred: "Bedrock")],
             appName: "Gmail")
-        #expect(prompt.contains("Mode: Business"))
-        #expect(prompt.contains("- AppSync (sounds like: アップシンク)"))
+        #expect(prompt.contains("モード: Business"))
+        #expect(prompt.contains("- AppSync（聞き取り例: アップシンク）"))
         #expect(prompt.contains("- Bedrock"))
         #expect(prompt.contains("Gmail"))
-        #expect(prompt.contains("Do not add anything they did not say"))
+        #expect(prompt.contains("言っていない情報を足さない"))
     }
 
     @Test func contextualFormsAskForContext() {
@@ -38,37 +38,31 @@ struct MockCleanupProvider: TextCleanupProvider {
                 .init(preferred: "Siri", spokenForms: ["シリちゃん"], contextualForms: ["シリ"]),
             ],
             appName: nil)
-        #expect(
-            prompt.contains(
-                "- AI (reading: あい. Everyday words share this reading, so use this spelling only where the context "
-                    + "means this term, and leave other uses unchanged)"))
-        #expect(prompt.contains("- Siri (sounds like: シリちゃん; reading: シリ. "))
+        #expect(prompt.contains("- AI（読み: あい。同じ読みの一般的な言葉もあるため、文脈上この語を指すときだけこの表記にし、それ以外は変えない）"))
+        #expect(prompt.contains("- Siri（聞き取り例: シリちゃん。読み: シリ。"))
     }
 
     @Test(arguments: CleanupMode.allCases)
     func everyModeForbidsAddingMeaning(mode: CleanupMode) {
         let prompt = CleanupPromptBuilder.systemPrompt(mode: mode, vocabulary: [], appName: nil)
-        #expect(prompt.contains("Return only the cleaned-up text"))
-        #expect(prompt.contains("Write in the language the user spoke"))
-        #expect(!prompt.contains("User dictionary"))
+        #expect(prompt.contains("整形した文章だけを返す"))
+        #expect(!prompt.contains("ユーザー辞書"))
     }
 
     @Test func promptModeForbidsInventedRequirements() {
         let prompt = CleanupPromptBuilder.systemPrompt(mode: .prompt, vocabulary: [], appName: nil)
-        #expect(prompt.contains("Do not add requirements, constraints, or steps the user did not mention"))
-        #expect(prompt.contains("Do not change sentence endings or tone"))
-        #expect(prompt.contains("\n- Remove fillers"))
+        #expect(prompt.contains("ユーザーが言っていない要件"))
+        #expect(prompt.contains("語尾・口調は変えない"))
+        #expect(prompt.contains("\n- 「えー」"))
     }
 
     @Test func customModeAddsTheUserInstructions() {
         let prompt = CleanupPromptBuilder.systemPrompt(
             mode: .custom, customInstructions: "  英語に翻訳する  \n", vocabulary: [], appName: nil)
-        #expect(prompt.contains("Mode: Custom"))
+        #expect(prompt.contains("モード: Custom"))
         #expect(prompt.contains("<instructions>\n英語に翻訳する\n</instructions>"))
-        #expect(prompt.contains("\n- Remove fillers"))
-        #expect(prompt.contains("Do not add anything they did not say"))
-        // Translating is allowed when the user's instructions ask for it.
-        #expect(prompt.contains("Do not translate it unless the user's instructions below ask you to"))
+        #expect(prompt.contains("\n- 「えー」"))
+        #expect(prompt.contains("言っていない情報を足さない"))
     }
 
     @Test func customInstructionsAreOnlyUsedByCustomModeAndCapped() {
@@ -104,12 +98,40 @@ struct MockCleanupProvider: TextCleanupProvider {
 
     @Test func businessKeepsWordingAndBreaksLines() {
         let business = CleanupPromptBuilder.systemPrompt(mode: .business, vocabulary: [], appName: nil)
-        #expect(business.contains("keep the speaker's phrasing, word order, and sentence endings"))
-        #expect(business.contains("put each sentence of the body on its own line"))
+        #expect(business.contains("言い回し・語順・語尾は話者のまま残し"))
+        #expect(business.contains("本文は 1 文ごとに改行"))
         #expect(business.contains("「聞いた」→「伺った」"))
-        #expect(business.contains("\n- Remove fillers"))
+        #expect(business.contains("\n- 「えー」"))
         let natural = CleanupPromptBuilder.systemPrompt(mode: .natural, vocabulary: [], appName: nil)
-        #expect(!natural.contains("each sentence of the body"))
+        #expect(!natural.contains("1 文ごとに改行"))
+    }
+
+    @Test func englishTranscriptionGetsTheEnglishPrompt() {
+        #expect(PromptLanguage(transcriptionLanguage: "en") == .english)
+        #expect(PromptLanguage(transcriptionLanguage: "ja") == .japanese)
+        let prompt = CleanupPromptBuilder.systemPrompt(
+            mode: .business,
+            vocabulary: [
+                .init(preferred: "AppSync", spokenForms: ["アップシンク"]),
+                .init(preferred: "AI", contextualForms: ["あい"]),
+            ],
+            appName: "Gmail", language: .english)
+        #expect(prompt.contains("Mode: Business"))
+        #expect(prompt.contains("Write in the language the user spoke"))
+        #expect(prompt.contains("- AppSync (sounds like: アップシンク)"))
+        #expect(prompt.contains("- AI (reading: あい. Everyday words share this reading"))
+        #expect(prompt.contains("The text will be entered into Gmail"))
+        #expect(!prompt.contains("謙譲語"))
+        #expect(!prompt.contains("整形した文章だけを返す"))
+    }
+
+    @Test(arguments: CleanupMode.allCases)
+    func everyEnglishModeForbidsAddingMeaning(mode: CleanupMode) {
+        let prompt = CleanupPromptBuilder.systemPrompt(
+            mode: mode, customInstructions: "Translate into French", vocabulary: [], appName: nil, language: .english)
+        #expect(prompt.contains("Return only the cleaned-up text"))
+        #expect(prompt.contains("Do not add anything they did not say"))
+        #expect(prompt.contains("<instructions>") == (mode == .custom))
     }
 
     @Test func userMessageWrapsTranscript() {

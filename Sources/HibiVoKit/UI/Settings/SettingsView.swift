@@ -590,11 +590,14 @@ private struct MinutesInstructionsRows: View {
     let settings: SettingsStore
 
     var body: some View {
+        // The default follows the transcription language, like the rest of the minutes prompt.
+        let defaultText = MeetingMinutesPrompt.defaultInstructions(
+            for: PromptLanguage(transcriptionLanguage: settings.language))
         PromptEditorRow(
             title: "議事録のプロンプト",
-            text: settings.meetingMinutesInstructions ?? MeetingMinutesPrompt.defaultInstructions,
+            text: settings.meetingMinutesInstructions ?? defaultText,
             limit: MeetingMinutesPrompt.instructionsLimit,
-            defaultText: MeetingMinutesPrompt.defaultInstructions,
+            defaultText: defaultText,
             explanation:
                 "議事録に書く内容と書き方を指定します。1 行目のタイトル(ファイル名に使います)、辞書の扱い、出力の形式についての指示は自動で加わります。空欄のときはデフォルトのプロンプトを使います。",
             onSave: settings.setMeetingMinutesInstructions)

@@ -205,17 +205,18 @@ actor MockFileTranscriber: MeetingFileTranscriber {
 actor MockMinutesWriter: MeetingMinutesWriting {
     private let result: Result<String, MeetingMinutesError>
     private let usage: CleanupUsage?
-    private(set) var calls: [(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String)] = []
+    private(set) var calls:
+        [(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String, language: PromptLanguage)] = []
 
     init(_ result: Result<String, MeetingMinutesError>, usage: CleanupUsage? = nil) {
         self.result = result
         self.usage = usage
     }
 
-    func writeMinutes(transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String) async throws
-        -> WrittenMinutes
-    {
-        calls.append((transcript, vocabulary, model))
+    func writeMinutes(
+        transcript: String, vocabulary: [CleanupPromptBuilder.Term], model: String, language: PromptLanguage
+    ) async throws -> WrittenMinutes {
+        calls.append((transcript, vocabulary, model, language))
         return WrittenMinutes(text: try result.get(), usage: usage)
     }
 }

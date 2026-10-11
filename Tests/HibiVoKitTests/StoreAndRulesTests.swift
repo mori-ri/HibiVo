@@ -128,7 +128,9 @@ import Testing
         settings.setMeetingMinutesInstructions(
             String(repeating: "あ", count: MeetingMinutesPrompt.instructionsLimit + 1))
         #expect(settings.meetingMinutesInstructions?.count == MeetingMinutesPrompt.instructionsLimit)
-        for reset in [nil, " \n", MeetingMinutesPrompt.defaultInstructions] {
+        for reset in [
+            nil, " \n", MeetingMinutesPrompt.defaultInstructions, MeetingMinutesPrompt.englishDefaultInstructions,
+        ] {
             settings.setMeetingMinutesInstructions("## 要点")
             settings.setMeetingMinutesInstructions(reset)
             #expect(settings.meetingMinutesInstructions == nil)
