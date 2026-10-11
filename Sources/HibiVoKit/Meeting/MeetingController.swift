@@ -834,7 +834,7 @@ public final class MeetingController {
         let (title, body) = MeetingMinutesTitle.split(minutes.text)
         let url = Self.minutesURL(for: transcriptURL, title: title)
         let text = MeetingDocument.minutes(
-            title: title, body: body, transcriptFileName: transcriptURL.lastPathComponent)
+            title: title, body: body, transcriptFileName: transcriptURL.lastPathComponent, language: language)
         if await writer.write(text, to: url) {
             log.info("Minutes saved")
             onSaved(url)

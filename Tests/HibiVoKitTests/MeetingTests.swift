@@ -87,6 +87,9 @@ import Testing
         let md = MeetingDocument.minutes(title: "予算", body: "## 概要\n予算の件。", transcriptFileName: "a.md")
         #expect(md == "# 予算\n\n## 概要\n予算の件。\n\n---\n\n*Claude が文字起こし「a.md」から作成しました。*\n")
         #expect(MeetingDocument.minutes(title: nil, body: "本文", transcriptFileName: "a.md").hasPrefix("# 議事録\n\n本文"))
+        #expect(
+            MeetingDocument.minutes(title: nil, body: "Body", transcriptFileName: "a.md", language: .english)
+                == "# Minutes\n\nBody\n\n---\n\n*Written by Claude from the transcript \"a.md\".*\n")
     }
 
     @Test func markdownWhileRecordingSaysSo() {
