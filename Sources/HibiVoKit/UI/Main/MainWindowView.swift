@@ -88,7 +88,7 @@ public struct MainWindowView: View {
         VStack(alignment: .leading, spacing: 0) {
             PageHeader(section: section) {
                 switch section {
-                case .history: HistoryHeaderActions(history: env.history, settings: env.settings)
+                case .history: HistoryHeaderActions(env: env)
                 case .usage: UsageHeaderActions(usage: env.usage)
                 default: EmptyView()
                 }

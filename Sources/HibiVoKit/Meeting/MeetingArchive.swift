@@ -19,23 +19,37 @@ public struct MeetingRecord: Identifiable, Hashable, Sendable {
     public var primaryURL: URL? { minutesURL ?? transcriptURL }
 }
 
-/// The meetings saved in the Meetings folder, newest first. The files are the source of truth, so
-/// a file the user deletes or renames in Finder simply drops out on the next refresh.
+/// The meetings saved in the chosen folder and the built-in one, newest first. The files are the
+/// source of truth, so a file the user deletes or renames in Finder simply drops out on the next refresh.
 @MainActor
 @Observable
 public final class MeetingArchive {
     public private(set) var records: [MeetingRecord] = []
-    @ObservationIgnored private let directory: URL
+    /// The chosen folder first; the built-in one also holds meetings saved before the user chose one.
+    @ObservationIgnored private let directories: @MainActor () -> [URL]
 
-    public init(directory: URL = MeetingController.defaultDirectory) {
-        self.directory = directory
+    public init(directories: @escaping @MainActor () -> [URL] = { [MeetingController.defaultDirectory] }) {
+        self.directories = directories
         refresh()
     }
 
     public func refresh() {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        let records = Self.records(fileNames: names, in: directory)
+        var seen: Set<URL> = []
+        let listings = directories().filter { seen.insert($0.standardizedFileURL).inserted }.map {
+            (directory: $0, names: (try? FileManager.default.contentsOfDirectory(atPath: $0.path)) ?? [])
+        }
+        let records = Self.records(listings)
         if records != self.records { self.records = records }
+    }
+
+    /// Merges several folders; a meeting found in more than one keeps the first folder's files.
+    nonisolated static func records(_ listings: [(directory: URL, names: [String])], timeZone: TimeZone = .current)
+        -> [MeetingRecord]
+    {
+        var ids: Set<String> = []
+        return listings.flatMap { records(fileNames: $0.names, in: $0.directory, timeZone: timeZone) }
+            .filter { ids.insert($0.id).inserted }
+            .sorted { $0.startedAt > $1.startedAt }
     }
 
     /// Pairs `<stamp>.md` with `<stamp>_<title>.md`. Files that don't start with a stamp are ignored.

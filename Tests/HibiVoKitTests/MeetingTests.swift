@@ -184,15 +184,18 @@ import Testing
 
     private func makeController(
         secrets: MockSecrets = MockSecrets(), fileTranscriber: MockFileTranscriber? = nil,
-        minutesWriter: MockMinutesWriter? = nil, usage: UsageStore? = nil,
+        minutesWriter: MockMinutesWriter? = nil, usage: UsageStore? = nil, saveDirectory: URL? = nil,
         onSaved: @escaping @MainActor (URL) -> Void = { _ in }
     ) -> MeetingController {
-        MeetingController(
+        var chosen: (@MainActor () -> URL)?
+        if let saveDirectory { chosen = { saveDirectory } }
+        return MeetingController(
             state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: secrets,
             transcriber: { [provider] in MeetingTranscriber(provider: provider, fileTranscriber: fileTranscriber) },
             minutesWriter: { minutesWriter },
             vocabulary: { [VocabularyEntry(preferred: "AppSync", spoken: "あっぷしんく")] },
-            usage: usage, directory: directory, saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved
+            usage: usage, directory: directory, saveDirectory: chosen,
+            saveInterval: .seconds(3600), reconnectDelays: [.zero], onSaved: onSaved
         )
     }
 
@@ -245,6 +248,54 @@ import Testing
         let text = try String(contentsOf: url, encoding: .utf8)
         #expect(text.contains("**話者1** 始めます"))
         #expect(text.contains("- 終了: "))
+    }
+
+    @Test func savesInTheChosenFolderButKeepsRecordingsInTheBuiltInOne() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let chosen = directory.appending(path: "Chosen/Meetings")
+        let transcriber = MockFileTranscriber([
+            .success([MeetingToken(text: "始めます", isFinal: true, speaker: "1", startMs: 0, endMs: 800)])
+        ])
+        var saved: URL?
+        let sut = makeController(fileTranscriber: transcriber, saveDirectory: chosen, onSaved: { saved = $0 })
+        sut.start()
+        audio.speak(bytes: 320)
+        await settle {
+            let names = try? FileManager.default.contentsOfDirectory(
+                atPath: directory.appending(path: ".recordings").path)
+            return names?.contains { $0.hasSuffix(".pcm") } == true
+        }
+        // The audio never goes to the chosen folder, which may sync with a cloud service.
+        #expect(!FileManager.default.fileExists(atPath: chosen.appending(path: ".recordings").path))
+        #expect(
+            (try FileManager.default.contentsOfDirectory(atPath: directory.appending(path: ".recordings").path))
+                .contains { $0.hasSuffix(".pcm") })
+        sut.stop()
+        await sut.waitUntilIdle()
+
+        let url = try #require(saved)
+        #expect(url.deletingLastPathComponent().standardizedFileURL == chosen.standardizedFileURL)
+        #expect(savedFiles().allSatisfy { $0.lastPathComponent == "Chosen" })
+    }
+
+    @Test func unavailableChosenFolderFallsBackToTheBuiltInOne() async throws {
+        // A folder can't be created inside a file, as with an unplugged drive.
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appending(path: "file")
+        try Data().write(to: file)
+        var saved: URL?
+        let sut = makeController(saveDirectory: file.appending(path: "Meetings"), onSaved: { saved = $0 })
+        sut.start()
+        audio.speak()
+        let session = try #require(provider.sessions.first)
+        await session.emit(.tokens([MeetingToken(text: "始めます", isFinal: true, speaker: "1", startMs: 0, endMs: 800)]))
+        await settle { state.partialTranscript == "始めます" }
+        sut.stop()
+        await sut.waitUntilIdle()
+
+        #expect(state.phase == .idle)
+        let url = try #require(saved)
+        #expect(url.deletingLastPathComponent().standardizedFileURL == directory.standardizedFileURL)
     }
 
     private func makeUsage() -> UsageStore {
@@ -1391,6 +1442,19 @@ import Testing
         #expect(records[1].transcriptURL?.path == "/m/2026-09-27_14-00-05.md")
         #expect(records[1].primaryURL?.path == "/m/2026-09-27_14-00-05_リリース日程.md")
         #expect(records[1].startedAt == Date(timeIntervalSince1970: 1_790_517_605))
+    }
+
+    @Test func listsSeveralFoldersPreferringTheFirst() {
+        let chosen = URL(fileURLWithPath: "/chosen")
+        let records = MeetingArchive.records(
+            [
+                (directory: chosen, names: ["2026-09-28_09-30-00.md", "2026-09-27_14-00-05_リリース日程.md"]),
+                (directory: directory, names: ["2026-09-27_14-00-05.md", "2026-09-26_10-00-00.md"]),
+            ], timeZone: utc)
+        #expect(records.map(\.id) == ["2026-09-28_09-30-00", "2026-09-27_14-00-05", "2026-09-26_10-00-00"])
+        #expect(records[1].minutesURL?.path == "/chosen/2026-09-27_14-00-05_リリース日程.md")
+        #expect(records[1].transcriptURL == nil)
+        #expect(records[2].primaryURL?.path == "/m/2026-09-26_10-00-00.md")
     }
 
     @Test func fallbackMinutesHaveNoTitleAndMinutesSurviveADeletedTranscript() {

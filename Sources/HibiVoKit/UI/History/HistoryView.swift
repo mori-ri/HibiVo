@@ -105,11 +105,16 @@ struct HistoryView: View {
 
 /// Shown in the page header next to the title.
 struct HistoryHeaderActions: View {
-    let history: HistoryStore
-    @Bindable var settings: SettingsStore
+    let env: AppEnvironment
     @State private var confirming = false
 
     var body: some View {
+        @Bindable var settings = env.settings
+        let history = env.history
+        Button("ミーティングの保存先を開く", systemImage: "folder") { env.openMeetingsFolder() }
+            .labelStyle(.iconOnly)
+            .controlSize(.small)
+            .help("ミーティングの文字起こしと議事録を保存しているフォルダを Finder で開きます。")
         Toggle("履歴を保存", isOn: $settings.historyEnabled)
             .toggleStyle(.switch)
             .controlSize(.small)

@@ -122,7 +122,10 @@ public final class MeetingController {
     private let minutesWriter: @MainActor () -> (any MeetingMinutesWriting)?
     private let vocabulary: @MainActor () -> [VocabularyEntry]
     private let usage: UsageStore?
+    /// The built-in folder: the fallback for transcripts and home of the after-meeting recordings.
     private let directory: URL
+    /// The folder the user chose for transcripts and minutes, read when a meeting starts.
+    private let saveDirectory: @MainActor () -> URL
     private let saveInterval: Duration
     private let reconnectDelays: [Duration]
     /// How long after waking to wait for the network before using it.
@@ -152,6 +155,7 @@ public final class MeetingController {
     /// - Parameter systemAudio: Captures the remote side of an online meeting; nil where unsupported.
     ///   Used only while `settings.meetingCapturesSystemAudio` is on.
     /// - Parameter transcribers: Every provider; defaults to the one `transcriber` returns.
+    /// - Parameter saveDirectory: Where transcripts and minutes go; defaults to `directory`.
     public init(
         state: AppState,
         audio: any AudioCapturing,
@@ -164,6 +168,7 @@ public final class MeetingController {
         vocabulary: @escaping @MainActor () -> [VocabularyEntry] = { [] },
         usage: UsageStore? = nil,
         directory: URL = MeetingController.defaultDirectory,
+        saveDirectory: (@MainActor () -> URL)? = nil,
         saveInterval: Duration = .seconds(5),
         reconnectDelays: [Duration] = MeetingController.defaultReconnectDelays,
         wakeDelay: Duration = .seconds(10),
@@ -180,11 +185,13 @@ public final class MeetingController {
         self.vocabulary = vocabulary
         self.usage = usage
         self.directory = directory
+        self.saveDirectory = saveDirectory ?? { directory }
         self.saveInterval = saveInterval
         self.reconnectDelays = reconnectDelays.isEmpty ? [.zero] : reconnectDelays
         self.wakeDelay = wakeDelay
         self.onSaved = onSaved
-        // Hidden inside the Meetings folder, which the archive lists, so it never shows up there.
+        // Hidden inside the built-in folder, whatever folder the user chose: the audio stays local
+        // rather than syncing with a cloud folder, and never shows up in the archive.
         recordings = MeetingRecordingStore(directory: directory.appending(path: ".recordings"))
     }
 
@@ -273,7 +280,7 @@ public final class MeetingController {
         let startedAt = Date()
         let meeting = Meeting(
             provider: provider, fileTranscriber: fileTranscriber, config: config, startedAt: startedAt,
-            fileURL: directory.appending(path: MeetingDocument.fileName(startedAt: startedAt)),
+            fileURL: outputDirectory().appending(path: MeetingDocument.fileName(startedAt: startedAt)),
             vocabulary: entries, session: afterMeeting ? nil : provider.makeMeetingSession(config))
         meeting.systemAudioUnavailable = systemAudioUnavailable
         meeting.includesSystemAudio = system != nil
@@ -732,7 +739,8 @@ public final class MeetingController {
                     apiKey: apiKey, model: info.model, language: info.language,
                     vocabulary: info.vocabulary.map(\.preferred), readings: info.vocabulary.flatMap(\.readings),
                     speakerDiarization: true),
-                startedAt: info.startedAt, fileURL: directory.appending(path: "\(id).md"), vocabulary: info.vocabulary,
+                startedAt: info.startedAt, fileURL: outputDirectory().appending(path: "\(id).md"),
+                vocabulary: info.vocabulary,
                 session: nil)
             // A recording the app never got to stop ends where its audio does.
             meeting.endedAt = info.endedAt ?? pending.lastWrittenAt ?? info.startedAt
@@ -858,6 +866,20 @@ public final class MeetingController {
             return
         }
         show(error)
+    }
+
+    /// The chosen folder, or the built-in one when it can't be created (an unplugged drive, a lost
+    /// permission), so the transcript is still saved somewhere.
+    private func outputDirectory() -> URL {
+        let chosen = saveDirectory()
+        guard chosen.standardizedFileURL != directory.standardizedFileURL else { return directory }
+        do {
+            try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
+            return chosen
+        } catch {
+            log.error("Meeting folder unavailable: \(error.localizedDescription, privacy: .public)")
+            return directory
+        }
     }
 
     private func saveIfDirty() async {

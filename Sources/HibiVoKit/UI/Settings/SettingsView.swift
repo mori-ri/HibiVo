@@ -350,8 +350,20 @@ struct MeetingSettingsView: View {
                         "会議中は録音だけを行い、終了後に音声全体から文字起こしするため、話者を正確に区別できます。結果は 1 時間の会議で数分ほどで届きます。音声は終了までメモリに置くだけで保存しないため、途中でアプリが終了するとその会議は記録されません。"
                     )
                 }
-                LabeledRow("保存先") {
-                    Button("開く…") { env.openMeetingsFolder() }
+            }
+            SettingsSection(
+                title: "保存先",
+                footer: "文字起こしと議事録を保存します。変更しても、これまでのファイルは移動しません。"
+            ) {
+                let path = abbreviatedPath(env.settings.meetingsDirectory)
+                LabeledRow {
+                    Text(verbatim: path).lineLimit(1).truncationMode(.middle).help(path)
+                } control: {
+                    if !env.settings.meetingsDirectoryPath.isEmpty {
+                        Button("既定に戻す") { env.resetMeetingsFolder() }
+                    }
+                    Button("変更…") { env.chooseMeetingsFolder() }
+                    Button("開く") { env.openMeetingsFolder() }
                 }
             }
             SettingsSection(title: "音声") {
@@ -410,6 +422,11 @@ struct MeetingSettingsView: View {
             }
         }
     }
+}
+
+/// `~/…` for a path in the home folder, which is how Finder users know it.
+private func abbreviatedPath(_ url: URL) -> String {
+    NSString(string: url.path).abbreviatingWithTildeInPath
 }
 
 /// Reads and writes an API key straight to the Keychain. Nothing touches UserDefaults.
