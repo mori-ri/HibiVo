@@ -60,6 +60,10 @@ struct HomeView: View {
         guard settings.meetingMinutesEnabled else { return nil }
         let engine = settings.meetingMinutesEngine
         guard let kind = engine.providerKind else {
+            // Without the executable every meeting ends with `claudeCodeNotFound`, so don't present it as in use.
+            guard ClaudeCodeMinutesWriter.locate(configuredPath: settings.claudeCodePath) != nil else {
+                return ("Claude Code", String(localized: "見つかりません"))
+            }
             return ("Claude Code", settings.meetingMinutesModel.rawValue.capitalized)
         }
         guard kind.makeProvider(settings: settings, secrets: env.secrets) != nil else {
