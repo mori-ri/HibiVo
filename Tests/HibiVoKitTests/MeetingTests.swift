@@ -796,6 +796,31 @@ import Testing
         #expect(savedRecordings().isEmpty)
     }
 
+    @Test func resumedRecordingIsSavedInTheFolderChosenWhenItStarted() async throws {
+        let startedAt = Date(timeIntervalSinceNow: -600)
+        let id = MeetingDocument.fileName(startedAt: startedAt).replacingOccurrences(of: ".md", with: "")
+        let original = directory.appending(path: "Original")
+        let store = MeetingRecordingStore(directory: recordingsDirectory)
+        let info = MeetingRecordingInfo(
+            startedAt: startedAt, endedAt: nil, providerID: provider.id, model: "m1", language: "ja",
+            vocabulary: [], includesSystemAudio: false, notices: [], notes: "", job: nil, directory: original.path)
+        #expect(await store.save(info, id: id))
+        #expect(await store.append(Data(count: 960), id: id))
+        await store.closeAudio(id: id)
+
+        let transcriber = MockFileTranscriber([
+            .success([MeetingToken(text: "残っていた", isFinal: true, speaker: "1", startMs: 0, endMs: 500)])
+        ])
+        // The user has since chosen another folder.
+        let sut = makeController(fileTranscriber: transcriber, saveDirectory: directory.appending(path: "Changed"))
+        sut.resumeSavedRecordings()
+        await sut.waitUntilIdle()
+
+        let text = try String(contentsOf: original.appending(path: "\(id).md"), encoding: .utf8)
+        #expect(text.contains("残っていた"))
+        #expect(!FileManager.default.fileExists(atPath: directory.appending(path: "Changed").path))
+    }
+
     @Test func goneJobIsSubmittedAgain() async throws {
         settings.meetingTranscriptionTiming = .afterMeeting
         let transcriber = MockFileTranscriber(

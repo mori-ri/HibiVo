@@ -41,7 +41,8 @@ public final class MeetingController {
         let fileTranscriber: (any MeetingFileTranscriber)?
         let config: TranscriptionConfig
         let startedAt: Date
-        let fileURL: URL
+        /// Moves to the built-in folder if the chosen one can't be written to.
+        var fileURL: URL
         let vocabulary: [VocabularyEntry]
         var transcript = MeetingTranscript()
         /// nil in after-meeting mode.
@@ -280,7 +281,7 @@ public final class MeetingController {
         let startedAt = Date()
         let meeting = Meeting(
             provider: provider, fileTranscriber: fileTranscriber, config: config, startedAt: startedAt,
-            fileURL: outputDirectory().appending(path: MeetingDocument.fileName(startedAt: startedAt)),
+            fileURL: saveDirectory().appending(path: MeetingDocument.fileName(startedAt: startedAt)),
             vocabulary: entries, session: afterMeeting ? nil : provider.makeMeetingSession(config))
         meeting.systemAudioUnavailable = systemAudioUnavailable
         meeting.includesSystemAudio = system != nil
@@ -482,7 +483,7 @@ public final class MeetingController {
         if meeting.transcript.isEmpty && !meeting.keepsDocument {
             await writer.remove(meeting.fileURL)
         } else {
-            saved = await writer.write(document, to: meeting.fileURL)
+            saved = await write(document, for: meeting)
         }
         self.meeting = nil
         state.meetingStartedAt = nil
@@ -523,7 +524,7 @@ public final class MeetingController {
                 let document = markdown(meeting, ended: true)
                 transcriptions.append(
                     Task {
-                        if await writer.write(document, to: meeting.fileURL) {
+                        if await write(document, for: meeting) {
                             onSaved(meeting.fileURL)
                         } else {
                             showUnlessBusy(.meetingSaveFailed)
@@ -544,7 +545,7 @@ public final class MeetingController {
                 // Preserve the capture failure and the notes even if the later API request cannot
                 // transcribe the audio.
                 if meeting.keepsDocument {
-                    if !(await writer.write(markdown(meeting, ended: true), to: meeting.fileURL)) {
+                    if !(await write(markdown(meeting, ended: true), for: meeting)) {
                         showUnlessBusy(.meetingSaveFailed)
                     }
                 } else {
@@ -620,7 +621,7 @@ public final class MeetingController {
             return
         }
         let document = markdown(meeting, ended: true)
-        if await writer.write(document, to: meeting.fileURL) {
+        if await write(document, for: meeting) {
             await discardRecording(meeting, with: transcriber)
             log.info("Meeting transcribed (\(meeting.transcript.segments.count) segments)")
             if meeting.transcript.isEmpty {
@@ -658,7 +659,7 @@ public final class MeetingController {
             startedAt: meeting.startedAt, endedAt: meeting.endedAt, providerID: meeting.provider.id,
             model: meeting.config.model, language: meeting.config.language, vocabulary: meeting.vocabulary,
             includesSystemAudio: meeting.includesSystemAudio, notices: notices(meeting, ended: meeting.endedAt != nil),
-            notes: meeting.notes, job: meeting.job)
+            notes: meeting.notes, job: meeting.job, directory: meeting.fileURL.deletingLastPathComponent().path)
     }
 
     // MARK: - Sleep, shutdown and saved recordings
@@ -733,14 +734,15 @@ public final class MeetingController {
                 continue
             }
 
+            // The folder chosen when the meeting started, where an autosave may already have written its notes.
+            let folder = info.directory.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? saveDirectory()
             let meeting = Meeting(
                 provider: stt.provider, fileTranscriber: fileTranscriber,
                 config: TranscriptionConfig(
                     apiKey: apiKey, model: info.model, language: info.language,
                     vocabulary: info.vocabulary.map(\.preferred), readings: info.vocabulary.flatMap(\.readings),
                     speakerDiarization: true),
-                startedAt: info.startedAt, fileURL: outputDirectory().appending(path: "\(id).md"),
-                vocabulary: info.vocabulary,
+                startedAt: info.startedAt, fileURL: folder.appending(path: "\(id).md"), vocabulary: info.vocabulary,
                 session: nil)
             // A recording the app never got to stop ends where its audio does.
             meeting.endedAt = info.endedAt ?? pending.lastWrittenAt ?? info.startedAt
@@ -754,7 +756,7 @@ public final class MeetingController {
             let audio = await recordings.audio(id: id) ?? Data()
             guard !audio.isEmpty || meeting.job != nil else {
                 // Nothing was recorded; only the notes, if any, are left to keep.
-                if meeting.keepsDocument, await writer.write(markdown(meeting, ended: true), to: meeting.fileURL) {
+                if meeting.keepsDocument, await write(markdown(meeting, ended: true), for: meeting) {
                     onSaved(meeting.fileURL)
                 }
                 await recordings.remove(id: id)
@@ -868,18 +870,20 @@ public final class MeetingController {
         show(error)
     }
 
-    /// The chosen folder, or the built-in one when it can't be created (an unplugged drive, a lost
-    /// permission), so the transcript is still saved somewhere.
-    private func outputDirectory() -> URL {
-        let chosen = saveDirectory()
-        guard chosen.standardizedFileURL != directory.standardizedFileURL else { return directory }
-        do {
-            try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
-            return chosen
-        } catch {
-            log.error("Meeting folder unavailable: \(error.localizedDescription, privacy: .public)")
-            return directory
-        }
+    /// Writes the meeting's document, moving it to the built-in folder when the chosen one can't be
+    /// written to (an unplugged drive, a lost permission), so the transcript is still saved somewhere.
+    private func write(_ document: String, for meeting: Meeting) async -> Bool {
+        if await writer.write(document, to: meeting.fileURL) { return true }
+        let fallback = directory.appending(path: meeting.fileURL.lastPathComponent)
+        guard fallback.standardizedFileURL != meeting.fileURL.standardizedFileURL,
+            await writer.write(document, to: fallback)
+        else { return false }
+        log.error("Meeting folder unavailable; saved in the built-in one")
+        // An earlier autosave there would otherwise hide this copy in the archive once the folder is back.
+        await writer.remove(meeting.fileURL)
+        meeting.fileURL = fallback
+        await saveRecordingInfo(meeting)
+        return true
     }
 
     private func saveIfDirty() async {
@@ -891,7 +895,7 @@ public final class MeetingController {
         }
         guard meeting.isDirty, !meeting.transcript.isEmpty || meeting.hasNotes else { return }
         meeting.isDirty = false
-        if !(await writer.write(markdown(meeting, ended: false), to: meeting.fileURL)) {
+        if !(await write(markdown(meeting, ended: false), for: meeting)) {
             meeting.isDirty = true
         }
     }
