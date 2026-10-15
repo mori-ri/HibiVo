@@ -1346,6 +1346,14 @@ import Testing
 }
 
 @Suite struct ClaudeCodeMinutesWriterTests {
+    @Test func locateAcceptsOnlyExecutableFiles() {
+        // A directory has its search bit set but can't be launched.
+        #expect(ClaudeCodeMinutesWriter.locate(configuredPath: "/bin") == nil)
+        #expect(ClaudeCodeMinutesWriter.locate(configuredPath: "/bin/sh")?.path == "/bin/sh")
+        #expect(ClaudeCodeMinutesWriter.locate(configuredPath: " /bin/sh\n")?.path == "/bin/sh")
+        #expect(ClaudeCodeMinutesWriter.locate(configuredPath: "/nonexistent/claude") == nil)
+    }
+
     @Test func runsHeadlessWithoutToolsOrSettings() {
         let args = ClaudeCodeMinutesWriter.arguments(model: "sonnet")
         #expect(args.starts(with: ["-p", "--output-format", "json", "--model", "sonnet"]))
