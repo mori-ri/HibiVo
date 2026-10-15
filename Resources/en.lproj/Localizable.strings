@@ -136,7 +136,10 @@
 "ミーティング" = "Meeting";
 "ミーティングのメモ" = "Meeting Notes";
 "ミーティングのメモを表示" = "Show Meeting Notes";
+"ミーティングの保存先を開く" = "Open Meeting Folder";
 "ミーティングの文字起こし" = "Meeting Transcription";
+"ミーティングの文字起こしと議事録を保存しているフォルダを Finder で開きます。" = "Opens the folder with your meeting transcripts and minutes in Finder.";
+"ミーティングの文字起こしと議事録を保存するフォルダを選んでください。" = "Choose a folder for meeting transcripts and minutes.";
 "ミーティングの文字起こしには %@ の API Key が必要です" = "Meeting transcription needs a %@ API key";
 "ミーティングの文字起こしに失敗しました" = "Meeting transcription failed";
 "ミーティングの文字起こしに失敗しました。ネットワークの回復後に自動でやり直します" = "Meeting transcription failed. It will try again automatically when the network is back";
@@ -206,6 +209,7 @@
 "回数" = "Dictations";
 "固有名詞や専門用語の表記" = "Spellings of names and technical terms";
 "変更" = "Change";
+"変更…" = "Change…";
 "太字" = "Bold";
 "失敗" = "Failed";
 "完了" = "Done";
@@ -239,6 +243,7 @@
 "文字数" = "Characters";
 "文字起こし" = "Transcription";
 "文字起こしがタイムアウトしました" = "Transcription timed out";
+"文字起こしと議事録を保存します。変更しても、これまでのファイルは移動しません。" = "Meeting transcripts and minutes are saved here. Changing the folder doesn't move files you already have.";
 "文字起こしに失敗しました" = "Transcription failed";
 "文字起こしのタイミング" = "When to Transcribe";
 "文字起こしを %@ に送って議事録を作成します。API の料金がかかります。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。" = "Sends the transcript to %@ to write minutes. API charges apply. Minutes are given a title that describes the meeting and saved next to the transcript.";
@@ -248,6 +253,7 @@
 "料金が登録されていないモデルは合計に含めていません。トークン数を各サービスの料金表と照らし合わせてください。" = "Models without a known price are not included in the total. Compare the token counts with each service's pricing.";
 "料金不明" = "Unknown cost";
 "既定: %@" = "Default: %@";
+"既定に戻す" = "Use Default";
 "既定のモード" = "Default Mode";
 "既定（%@）" = "Default (%@)";
 "日付" = "Date";
@@ -326,10 +332,12 @@
 "辞書を開く" = "Open Dictionary";
 "追加" = "Add";
 "追加しました" = "Added";
+"選択" = "Choose";
 "選択…" = "Choose…";
 "録音をやめる" = "Cancel recording";
 "録音中はスピーカーの音量を下げる" = "Lower Speaker Volume While Recording";
 "録音終了から入力まで" = "Time from Stop to Paste";
+"開く" = "Open";
 "開く…" = "Open…";
 "音声" = "Audio";
 "音声をテキストにするサービス" = "The service that turns speech into text";

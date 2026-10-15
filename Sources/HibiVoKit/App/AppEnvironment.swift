@@ -19,7 +19,7 @@ public final class AppEnvironment {
     public let vocabulary = VocabularyStore()
     public let history = HistoryStore()
     public let usage = UsageStore()
-    public let meetings = MeetingArchive()
+    public let meetings: MeetingArchive
     private let inserter = TextInsertionService()
     private let learner: CorrectionLearner
     private let contextBuilder: DictationContextBuilder
@@ -41,7 +41,8 @@ public final class AppEnvironment {
         settings.keepSonioxForExistingUsers { secrets.secret(for: SonioxProvider().id)?.isEmpty == false }
         let meetingTranscribers = meetingTranscribers
         let vocabulary = vocabulary
-        let meetings = meetings
+        let meetings = MeetingArchive { [settings.meetingsDirectory, MeetingController.defaultDirectory] }
+        self.meetings = meetings
         let learner = CorrectionLearner(vocabulary: vocabulary, state: state)
         self.learner = learner
         contextBuilder = DictationContextBuilder(
@@ -86,6 +87,7 @@ public final class AppEnvironment {
             },
             vocabulary: { vocabulary.activeEntries },
             usage: usage,
+            saveDirectory: { settings.meetingsDirectory },
             onSaved: {
                 meetings.refresh()
                 NSWorkspace.shared.activateFileViewerSelecting([$0])
@@ -202,9 +204,31 @@ public final class AppEnvironment {
 
     /// Shows the saved meeting transcripts in Finder.
     public func openMeetingsFolder() {
-        let url = MeetingController.defaultDirectory
+        let url = settings.meetingsDirectory
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         NSWorkspace.shared.open(url)
+    }
+
+    /// Asks for a new folder for meeting transcripts and minutes. Files already saved stay where they are.
+    public func chooseMeetingsFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = String(localized: "選択")
+        panel.message = String(localized: "ミーティングの文字起こしと議事録を保存するフォルダを選んでください。")
+        panel.directoryURL = settings.meetingsDirectory
+        NSApp.activate()
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let isDefault = url.standardizedFileURL == MeetingController.defaultDirectory.standardizedFileURL
+        settings.meetingsDirectoryPath = isDefault ? "" : url.path
+        meetings.refresh()
+    }
+
+    public func resetMeetingsFolder() {
+        settings.meetingsDirectoryPath = ""
+        meetings.refresh()
     }
 
     // MARK: - History actions

@@ -93,6 +93,14 @@ public final class SettingsStore {
     }
     /// Path to the `claude` executable; empty means look in the standard install locations.
     public var claudeCodePath: String { didSet { defaults.set(claudeCodePath, forKey: "claudeCodePath") } }
+    /// Folder for meeting transcripts and minutes; empty means `MeetingController.defaultDirectory`.
+    public var meetingsDirectoryPath: String {
+        didSet { defaults.set(meetingsDirectoryPath, forKey: "meetingsDirectoryPath") }
+    }
+    public var meetingsDirectory: URL {
+        meetingsDirectoryPath.isEmpty
+            ? MeetingController.defaultDirectory : URL(fileURLWithPath: meetingsDirectoryPath, isDirectory: true)
+    }
     public var appModeOverrides: [AppModeOverride] { didSet { save(appModeOverrides, "appModeOverrides") } }
     /// Yen per US dollar, for showing estimated API cost in yen.
     public var usdJPYRate: Double { didSet { defaults.set(usdJPYRate, forKey: "usdJPYRate") } }
@@ -135,6 +143,7 @@ public final class SettingsStore {
         meetingMinutesInstructions = defaults.string(forKey: "meetingMinutesInstructions")
             .map { String($0.prefix(MeetingMinutesPrompt.instructionsLimit)) }
         claudeCodePath = defaults.string(forKey: "claudeCodePath") ?? ""
+        meetingsDirectoryPath = defaults.string(forKey: "meetingsDirectoryPath") ?? ""
         appModeOverrides = Self.load("appModeOverrides", from: defaults) ?? []
         usdJPYRate = defaults.object(forKey: "usdJPYRate") as? Double ?? UsagePricing.defaultUSDJPYRate
         seedAppModeOverrides()
