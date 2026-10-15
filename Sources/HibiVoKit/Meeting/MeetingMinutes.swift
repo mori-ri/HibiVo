@@ -259,11 +259,19 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
 
     /// The configured path if set and executable, otherwise the first standard location that exists.
     public static func locate(configuredPath: String) -> URL? {
-        let paths = configuredPath.isEmpty ? candidatePaths : [configuredPath]
+        let configured = configuredPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let paths = configured.isEmpty ? candidatePaths : [configured]
         return
             paths
             .map { URL(fileURLWithPath: NSString(string: $0).expandingTildeInPath) }
-            .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+            .first(where: isExecutable)
+    }
+
+    /// Directories pass `isExecutableFile` (their search bit), but can't be launched.
+    private static func isExecutable(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && !isDirectory.boolValue
+            && FileManager.default.isExecutableFile(atPath: url.path)
     }
 
     static func arguments(model: String, instructions: String = "", language: PromptLanguage = .japanese) -> [String] {
