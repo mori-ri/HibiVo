@@ -43,8 +43,7 @@ struct HomeView: View {
 
     /// What each step currently uses, resolved the same way a dictation or meeting would at start.
     private var models: some View {
-        let settings = env.settings
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             HomeSectionHeader(title: "使用中のモデル") { EmptyView() }
             SettingsSection {
                 ModelRow("音声入力の文字起こし", model: dictationModel) { show(.transcription) }
