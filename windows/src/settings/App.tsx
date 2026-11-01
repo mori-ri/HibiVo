@@ -102,6 +102,7 @@ export function App({ runtime }: { runtime: AppRuntime }) {
           </select>
         </Row>
         <SecretRow
+          key={provider}
           runtime={runtime}
           account={secretAccount(provider)}
           label={`${cleanupProviderInfo[provider].name} の API Key`}

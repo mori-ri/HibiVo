@@ -73,7 +73,9 @@ export const rustInserter: TextInserter = {
       return await invoke<InsertOutcome>("paste_text", { text, targetHwnd: target?.hwnd ?? null });
     } catch (error) {
       console.error("Paste failed", error);
-      return { kind: "copiedOnly", reason: String(error) };
+      // Keep the promise the message makes: the text really is on the clipboard.
+      await navigator.clipboard.writeText(text);
+      return { kind: "copiedOnly", reason: "貼り付けできませんでした" };
     }
   },
 };

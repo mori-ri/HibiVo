@@ -186,7 +186,9 @@ impl Clipboard {
             if format == 0 {
                 break;
             }
-            if SKIPPED_FORMATS.contains(&format) && (has_unicode || format != 1) {
+            // Private (0x200–0x2FF) and GDI-object (0x300–0x3FF) formats aren't necessarily global memory.
+            let handle_range = (0x200..=0x3FF).contains(&format);
+            if handle_range || SKIPPED_FORMATS.contains(&format) && (has_unicode || format != 1) {
                 continue;
             }
             if let Some(bytes) = unsafe { read_global(GetClipboardData(format)) } {
