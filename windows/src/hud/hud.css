@@ -1,0 +1,115 @@
+/* The window itself is transparent; only the capsule is drawn. */
+
+:root {
+  /* Theme.glowBlue / glowMagenta / glowOrange from the macOS app (Sources/HibiVoKit/UI/Main/Theme.swift). */
+  --glow-blue: rgb(31, 115, 255);
+  --glow-magenta: rgb(217, 64, 242);
+  --glow-orange: rgb(255, 140, 26);
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif;
+  font-size: 12px;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+
+#root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.capsule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 8px);
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #ffffff;
+}
+
+.text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.level {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+}
+
+.level i {
+  display: block;
+  width: 3px;
+  border-radius: 2px;
+  background: #ffffff;
+  transition: height 80ms linear;
+}
+
+.level.colored i:nth-child(1) {
+  background: var(--glow-blue);
+}
+.level.colored i:nth-child(2) {
+  background: color-mix(in srgb, var(--glow-blue), var(--glow-magenta));
+}
+.level.colored i:nth-child(3) {
+  background: var(--glow-magenta);
+}
+.level.colored i:nth-child(4) {
+  background: color-mix(in srgb, var(--glow-magenta), var(--glow-orange));
+}
+.level.colored i:nth-child(5) {
+  background: var(--glow-orange);
+}
+
+.dots {
+  display: flex;
+  gap: 4px;
+}
+
+.dots i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots i {
+    animation: none;
+  }
+  .level i {
+    transition: none;
+  }
+}

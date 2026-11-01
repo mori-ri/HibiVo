@@ -1,0 +1,7 @@
+node_modules/
+dist/
+src-tauri/target/
+# Generated from ../Resources/AppIconSource.png by `npm run icons` (not MIT licensed; see README).
+src-tauri/icons/
+# Written by tauri-build on every build.
+src-tauri/gen/

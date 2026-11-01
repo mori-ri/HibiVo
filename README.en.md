@@ -166,6 +166,10 @@ With only the Command Line Tools installed, the build automatically uses the mac
 
 UI strings are written in Japanese in the code and translated in `Resources/en.lproj/Localizable.strings`. `swift scripts/check-localization.swift` checks that every Japanese UI string has a translation.
 
+### Windows version (in progress)
+
+`windows/` holds a Windows version built with Tauri 2. For now it covers only basic dictation. See [windows/README.md](windows/README.md) (in Japanese).
+
 ## License
 
 The source code is under the [MIT License](LICENSE).

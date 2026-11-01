@@ -100,6 +100,21 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - `UsageStore` は日別の利用集計(回数・文字数・送信音声秒数・モデル別トークン)を `usage.json` に保存する。議事録のトークンは AI 整形とは別の `minutes` に入れ、ミーティング側の利用として数える。Claude Code はサブスクリプションの枠を使うため記録しない(`WrittenMinutes.usage` が nil)。Haiku 5.5 のように入力 10 万トークン超で単価が上がるモデルがあるため、そうしたリクエストは `longPrompt` で分けて集計する。テキストは持たず、履歴の設定とは独立。料金の概算は `UsagePricing` の公開価格表から計算する。
 - 音声はディスクに書き込まない。例外は「終了後にまとめて」のミーティングの一時保存(`MeetingRecordingStore`)だけで、文字起こしが済んだら削除する。
 
+## Windows 版(`windows/`)
+
+Tauri 2(Rust + React / TypeScript)製。いまは音声入力の最小構成(ホットキー → Soniox → AI 整形 → Ctrl+V)だけ。詳細は `windows/README.md`。
+
+```sh
+cd windows && npm ci && npm test && npm run typecheck     # TypeScript (Vitest)。Linux でも動く
+cd windows/src-tauri && cargo test -p hibivo-core         # Rust の OS 非依存部分。Linux でも動く
+cd windows && npm run icons && npm run tauri build -- --bundles nsis   # Windows 上のみ
+```
+
+- `windows/src/core` は `Sources/HibiVoKit` の移植(整形のプロンプト・出力チェック・コーディネーター・プロバイダ、Soniox、`DictationController`)。テストも Swift のテストから移植している。**整形のプロンプトの文言は macOS 版と同じに保つ**(評価結果をそのまま使うため)。片方を変えたらもう片方も合わせる。
+- 音声入力の処理は隠れたメインウィンドウの TypeScript で動く。Rust(`windows/src-tauri/src`)は OS が持つものだけ: 低レベルキーボードフック、cpal でのマイク、クリップボード + `SendInput`、資格情報マネージャー、フォーカスを奪わない HUD。キーを横取りするかはフック内で即決する必要があるので、ホットキーの判定(`hibivo-core::hotkey`)は Rust にある。
+- `windows/src-tauri` は Windows 以外では `compile_error!` で止まる。Linux から型チェックするときは `rustup target add x86_64-pc-windows-msvc` のうえで `cargo check --target x86_64-pc-windows-msvc`(TLS は Schannel なので C コンパイラは不要)。
+- UI はまだ日本語のみ。CI は `.github/workflows/windows.yml`(Linux でテスト、`windows-latest` でインストーラーを作って成果物に置く)。
+
 ## 過去に問題になった並行性ルール
 
 - AVAudioEngine のタップブロックは `nonisolated` なコンテキストで作ること(`AudioCaptureService.makeTapBlock`)。`@MainActor` メソッド内で作ったクロージャは、Swift 6 ではリアルタイム音声スレッド上でトラップする。

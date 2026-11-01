@@ -162,6 +162,10 @@ scripts/test.sh       # テスト
 Xcode プロジェクトはありません。SwiftPM でビルドし、`scripts/build-app.sh` が `.app` を組み立てて署名します。
 Command Line Tools だけの環境では、自動的に macOS 26 SDK でビルドします（macOS 27 SDK では SwiftUI の `@State` がマクロになり、そのプラグインが Xcode にしか含まれていないため）。
 
+### Windows 版（開発中）
+
+`windows/` に Tauri 2 で作っている Windows 版があります。いまは音声入力の最小構成だけです。詳しくは [windows/README.md](windows/README.md) を参照してください。
+
 ## ライセンス
 
 ソースコードは [MIT License](LICENSE) です。
