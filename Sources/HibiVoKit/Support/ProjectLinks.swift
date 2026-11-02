@@ -6,9 +6,13 @@ public enum ProjectLinks {
     public static let repository = URL(string: "https://github.com/mori-ri/HibiVo")!
     public static let discussions = URL(string: "https://github.com/mori-ri/HibiVo/discussions")!
     public static let newFeedback = URL(string: "https://github.com/mori-ri/HibiVo/discussions/new?category=feedback")!
-    public static let latestRelease = URL(string: "https://github.com/mori-ri/HibiVo/releases/latest")!
+    public static let releases = URL(string: "https://github.com/mori-ri/HibiVo/releases")!
+    /// The latest release's app, attached under this unversioned name by `release.sh upload`.
+    /// Opening it in the browser downloads the zip without showing the release page.
+    public static let latestDownload = URL(
+        string: "https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip")!
     public static let sponsors = URL(string: "https://github.com/sponsors/mori-ri")!
-    static let latestReleaseAPI = URL(string: "https://api.github.com/repos/mori-ri/HibiVo/releases/latest")!
+    static let releasesAPI = URL(string: "https://api.github.com/repos/mori-ri/HibiVo/releases?per_page=10")!
     /// The license copied into the app bundle by `build-app.sh`; absent under `swift run`.
     public static var license: URL? { Bundle.main.url(forResource: "LICENSE", withExtension: "txt") }
 

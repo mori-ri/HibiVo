@@ -70,6 +70,10 @@ public final class SettingsStore {
     }
     /// Whether the app asks GitHub for the latest release, once a day.
     public var checksForUpdates: Bool { didSet { defaults.set(checksForUpdates, forKey: "checksForUpdates") } }
+    /// The newest release whose notes the News page has shown; nil until it is first opened.
+    public var lastSeenReleaseNotes: String? {
+        didSet { defaults.set(lastSeenReleaseNotes, forKey: "lastSeenReleaseNotes") }
+    }
     /// Whether minutes are written from each saved meeting.
     public var meetingMinutesEnabled: Bool {
         didSet { defaults.set(meetingMinutesEnabled, forKey: "meetingMinutesEnabled") }
@@ -140,6 +144,7 @@ public final class SettingsStore {
         meetingCapturesSystemAudio = defaults.object(forKey: "meetingCapturesSystemAudio") as? Bool ?? true
         meetingTranscriptionTiming = Self.load("meetingTranscriptionTiming", from: defaults) ?? .realtime
         checksForUpdates = defaults.object(forKey: "checksForUpdates") as? Bool ?? true
+        lastSeenReleaseNotes = defaults.string(forKey: "lastSeenReleaseNotes")
         // Opt-in: minutes send the transcript to a provider the user chooses.
         meetingMinutesEnabled = defaults.object(forKey: "meetingMinutesEnabled") as? Bool ?? false
         meetingMinutesEngine = Self.load("meetingMinutesEngine", from: defaults) ?? .anthropic
