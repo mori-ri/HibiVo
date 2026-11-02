@@ -40,6 +40,11 @@ function setUpDemo() {
         return element;
     };
 
+    function isOnScreen() {
+        const box = stage.getBoundingClientRect();
+        return box.bottom >= 0 && box.top <= innerHeight;
+    }
+
     function setPhase(next, step) {
         phase = next;
         stage.dataset.phase = next;
@@ -92,16 +97,23 @@ function setUpDemo() {
             showSpoken(rawText.length);
             animateBars(0);
             setPhase("recording", "3");
+            timer = setTimeout(stop, waitForStopMs);
             return;
         }
 
         const started = performance.now();
         let finished = false;
+        let shown = -1;
         const tick = (now) => {
             animateBars(now);
             if (!finished) {
-                const count = Math.min(rawText.length, Math.floor((now - started) / perCharacter));
-                showSpoken(count);
+                // A frame's timestamp can be earlier than `started`.
+                const elapsed = Math.max(0, now - started);
+                const count = Math.min(rawText.length, Math.floor(elapsed / perCharacter));
+                if (count !== shown) {
+                    shown = count;
+                    showSpoken(count);
+                }
                 if (count === rawText.length) {
                     finished = true;
                     setPhase("recording", "3");
@@ -118,6 +130,8 @@ function setUpDemo() {
         cancelAnimationFrame(frame);
         // Stopping early keeps the demo's point: the rest of the sentence still comes through.
         showSpoken(rawText.length);
+        // The spans above are new: without a style flush they start in the processing styles and never fade.
+        void text.offsetWidth;
         isAutoplay = false;
         setPhase("processing", "");
         timer = setTimeout(
@@ -148,9 +162,7 @@ function setUpDemo() {
     // A Mac's right Option is the app's default hotkey, so it works here too. Leaves the event alone:
     // the browser keeps its own shortcuts, and the key only counts while the demo is on screen.
     addEventListener("keydown", (event) => {
-        if (event.code !== "AltRight" || event.repeat) return;
-        const box = stage.getBoundingClientRect();
-        if (box.bottom < 0 || box.top > innerHeight) return;
+        if (event.code !== "AltRight" || event.repeat || !isOnScreen()) return;
         isAutoplay = false;
         press();
     });
@@ -163,7 +175,16 @@ function setUpDemo() {
         text.replaceChildren(caret());
         stage.dataset.step = "1";
         isAutoplay = true;
-        timer = setTimeout(press, 1100);
+        timer = setTimeout(() => {
+            if (isOnScreen()) {
+                press();
+                return;
+            }
+            // The viewer has scrolled on, and a HUD over what they're reading would only get in the way.
+            isAutoplay = false;
+            showFinal();
+            setPhase("done", "");
+        }, 1100);
     }
 }
 

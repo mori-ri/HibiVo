@@ -139,4 +139,4 @@ let siteLogo = render(pixels: NSSize(width: siteLogoWidth, height: siteLogoHeigh
 writePNG(siteLogo, to: siteAssets.appending(path: "logo.png"))
 writePNG(appIcon(pixels: 512), to: siteAssets.appending(path: "icon.png"))
 
-print("Wrote AppIcon.icns, Logo.png and MenuBarIcon.png (\(Int(menuBarWidth))x\(Int(menuBarHeight)) pt)")
+print("Wrote AppIcon.icns, Logo.png, site/assets and MenuBarIcon.png (\(Int(menuBarWidth))x\(Int(menuBarHeight)) pt)")

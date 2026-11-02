@@ -127,15 +127,6 @@ kbd {
     top: 12px;
 }
 
-.visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-}
-
 /* Buttons: the same black capsule as the HUD. The brand colours are not used as an accent. */
 
 .button {
@@ -434,10 +425,21 @@ h1 span {
     animation: blink 1.1s steps(1) infinite;
 }
 
+/* Only the level bars keep moving (DESIGN.md), so the caret rests once the text is in. */
+.stage[data-phase="done"] .caret {
+    animation: none;
+}
+
 @keyframes blink {
     50% {
         opacity: 0;
     }
+}
+
+/* Without JavaScript nothing answers the key, so the page shows only the finished text. */
+html:not(.js) .keypad,
+html:not(.js) .demo-note {
+    display: none;
 }
 
 .demo-note {
@@ -1016,7 +1018,7 @@ h3 {
         animation: none;
     }
 
-    .streak,
+    .stage[data-phase] .streak,
     .hud,
     .key,
     .demo-text .drop,
