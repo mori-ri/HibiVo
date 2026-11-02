@@ -6,7 +6,7 @@ English | [日本語](README.md)
 
 # HibiVo
 
-Press → speak → press again (or hold while you speak) → your text appears. A voice input app for macOS, built Japanese-first.
+Press → speak → press again (or hold while you speak) → your text appears. A voice input app for macOS, built Japanese-first. Try how it works on the [website](https://mori-ri.github.io/HibiVo/en/).
 
 > **About languages**: HibiVo is designed for Japanese first.
 > - The UI is available in Japanese and English and follows your macOS language by default. You can also choose it in Settings › General › App Language.
@@ -146,5 +146,5 @@ For building and working on HibiVo, see [Build from source](docs/en/building.md)
 
 The source code is under the [MIT License](LICENSE).
 
-The app icon and logo (`Resources/AppIconSource.png`, `Resources/AppIcon.icns`, `Resources/MenuBarIcon.png`, `Resources/MenuBarIcon@2x.png`) are not covered by the MIT License; their copyright belongs to the author.
+The app icon and logo (`Resources/AppIconSource.png`, `Resources/AppIcon.icns`, `Resources/MenuBarIcon.png`, `Resources/MenuBarIcon@2x.png`, `Resources/Logo.png`, `Resources/Logo@2x.png`, `site/assets/`) are not covered by the MIT License; their copyright belongs to the author.
 You may use them to build or introduce HibiVo, but please replace them with a different icon when distributing forks or derivative works.
