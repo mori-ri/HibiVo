@@ -182,7 +182,12 @@ upload() {
   # Chained with &&: publish calls this inside `||`, where set -e doesn't apply, and a failed build must
   # not attach an older zip. NOTARIZE is pinned for the same reason: 0 in the environment would skip the
   # build of the zip attached below.
-  NOTARIZE=1 scripts/package.sh && gh release upload "$tag" "build/HibiVo-$version-$(uname -m).zip" --clobber
+  # The asset name carries no version so https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip
+  # always fetches the newest app: the landing page (site/) links straight to it.
+  local asset="build/HibiVo-$(uname -m).zip"
+  NOTARIZE=1 scripts/package.sh \
+    && cp "build/HibiVo-$version-$(uname -m).zip" "$asset" \
+    && gh release upload "$tag" "$asset" --clobber
 }
 
 case "${1:-}" in

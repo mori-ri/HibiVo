@@ -16,8 +16,14 @@
 <meta property="og:title" content="HibiVo | Speak, and it’s written. Voice input for Mac">
 <meta property="og:description" content="Press a key and speak. Clean text appears at the cursor in whatever app you’re using. A free, open-source voice input app for Mac, built Japanese-first.">
 <meta property="og:url" content="https://mori-ri.github.io/HibiVo/en/">
-<meta property="og:image" content="https://mori-ri.github.io/HibiVo/assets/icon.png">
-<meta name="twitter:card" content="summary">
+<meta property="og:site_name" content="HibiVo">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:image" content="https://mori-ri.github.io/HibiVo/assets/og-en.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="HibiVo: Just speak. It’s written. Voice input for Mac, plus meeting transcripts">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="../style.css">
 <script src="../main.js" defer></script>
 </head>
@@ -28,7 +34,7 @@
   <a class="brand" href="./"><img src="../assets/logo.png" width="49" height="32" alt="">HibiVo</a>
   <a class="lang" href="../" hreflang="ja" lang="ja">日本語</a>
   <a href="https://github.com/mori-ri/HibiVo">GitHub</a>
-  <a class="button button-small" href="https://github.com/mori-ri/HibiVo/releases/latest">Download</a>
+  <a class="button button-small" href="https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip">Download</a>
 </header>
 
 <main id="main">
@@ -38,7 +44,7 @@
     <div class="hero-lead">
       <p class="lead">HibiVo is a voice input app for Mac. Press a key and speak, and clean text appears at the cursor in whatever app you’re using. It’s built Japanese-first, and handles English too.</p>
       <div class="actions">
-        <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest">Download for Mac</a>
+        <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip">Download for Mac</a>
         <p class="fine">Free and open source. Runs on Apple Silicon Macs with macOS 14 or later.</p>
       </div>
     </div>
@@ -61,6 +67,16 @@ Let me know if you can get it done by Friday.</p>
     </div>
     <p class="demo-note">Press the key to try it<span class="desktop-only"> (on a Mac, the right Option key works too)</span>. This is a replay on this page. It doesn’t use your microphone.</p>
   </div>
+</section>
+
+<section class="wrap section" aria-label="The app">
+  <figure class="shot">
+    <picture>
+      <source srcset="../assets/screens/home-en-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="../assets/screens/home-en.png" width="880" height="652" loading="lazy" alt="The HibiVo Home page, showing uses, speaking time and estimated API cost for the last 7 days with a chart, a list of hotkeys, and recently learned words">
+    </picture>
+    <figcaption>The Home page shows your usage and hotkeys. The data here is sample data.</figcaption>
+  </figure>
 </section>
 
 <section class="wrap section" aria-labelledby="modes">
@@ -116,7 +132,8 @@ Let me know if you can get it done by Friday.</p>
   </div>
 </section>
 
-<section class="wrap section split" aria-labelledby="dictionary">
+<section class="wrap section" aria-labelledby="dictionary">
+  <div class="split">
   <div>
     <h2 id="dictionary">Fix a word once, and the dictionary learns it</h2>
     <p class="section-lead">When you correct a word right after dictating, HibiVo notices and adds it to your dictionary, so company names, product names and technical terms come out right more often. Click the notice to undo. In apps whose text can’t be read, such as Terminal, you can add words from History.</p>
@@ -129,6 +146,14 @@ Let me know if you can get it done by Friday.</p>
       <span class="notice-undo">Undo</span>
     </div>
   </div>
+  </div>
+  <figure class="shot">
+    <picture>
+      <source srcset="../assets/screens/vocabulary-en-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="../assets/screens/vocabulary-en.png" width="880" height="600" loading="lazy" alt="The HibiVo Dictionary page, with fields for adding a word and a list of entries: AppSync, Kubernetes and HibiVo">
+    </picture>
+    <figcaption>The Dictionary page. Words added automatically get their own icon.</figcaption>
+  </figure>
 </section>
 
 <section class="wrap section split" aria-labelledby="meetings">
@@ -141,6 +166,11 @@ Let me know if you can get it done by Friday.</p>
       <li>Where recording or transcription requires consent, tell participants first.</li>
     </ul>
   </div>
+  <div>
+  <figure class="shot-hud">
+    <img src="../assets/screens/hud-meeting-en.png" width="236" height="39" loading="lazy" alt="The recording HUD, with a red dot and elapsed time, a Notes button, level bars and a stop button">
+    <figcaption>During a meeting, elapsed time and microphone activity appear at the bottom of the screen.</figcaption>
+  </figure>
   <div class="file">
     <p class="file-name">2026-11-02_14-00-05.md</p>
     <pre># ミーティング 2026-11-02 14:00
@@ -157,6 +187,7 @@ Let me know if you can get it done by Friday.</p>
 [00:00:20] **話者2** Testing should be done by Thursday.
 
 [00:00:31] **話者1** Great. Let's ship Friday morning.</pre>
+  </div>
   </div>
 </section>
 
@@ -179,7 +210,7 @@ Let me know if you can get it done by Friday.</p>
         <li><h3>Allow two permissions</h3><p>Accessibility, for the hotkey and pasting, and the microphone.</p></li>
         <li><h3>Press right Option and speak</h3><p>Press again when you’re done, or hold while you speak. You can also use Fn, right Command, or ⌃Space.</p></li>
       </ol>
-      <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest">Download for Mac</a>
+      <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip">Download for Mac</a>
     </div>
     <div>
       <h3>What you need</h3>

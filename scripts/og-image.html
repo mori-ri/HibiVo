@@ -1,0 +1,203 @@
+<!doctype html>
+<!--
+  Source of the link preview cards (site/assets/og.png and og-en.png, 1200×630).
+  Regenerate with: node scripts/make-og-image.mjs
+  Opened directly in a browser it shows the Japanese card; add #en for the English one.
+  Colours follow DESIGN.md and site/style.css: the brand gradient is only a thin streak, left to right.
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<style>
+    :root {
+        --paper: #fff;
+        --surface: #f2f4f8;
+        --ink: #11141b;
+        --ink-soft: #566070;
+        --spoken: #667082;
+        --line: #dfe4ec;
+        --brand-gradient: linear-gradient(90deg, #006aec, #c8b5f5, #ff9a3c);
+        --sans:
+            -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+            "Segoe UI", sans-serif;
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+    }
+
+    html,
+    body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+    }
+
+    body {
+        display: grid;
+        grid-template-columns: 1fr 470px;
+        grid-template-rows: auto 1fr auto;
+        column-gap: 56px;
+        padding: 56px 72px 60px;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-feature-settings: "palt";
+        -webkit-font-smoothing: antialiased;
+    }
+
+    html[lang="ja"] body > [lang="en"],
+    html[lang="en"] body > [lang="ja"] {
+        display: none;
+    }
+
+    .brand {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+
+    .brand img {
+        width: 60px;
+        height: 40px;
+    }
+
+    h1 {
+        align-self: center;
+        font-size: 96px;
+        letter-spacing: -0.035em;
+        line-height: 1.14;
+    }
+
+    html:lang(en) h1 {
+        font-size: 92px;
+        line-height: 1.08;
+    }
+
+    h1 span {
+        display: block;
+    }
+
+    .said {
+        font-weight: 200;
+    }
+
+    .written {
+        font-weight: 800;
+    }
+
+    /* The before/after the app does, shown as a page: thin is what was said, heavy is what got written. */
+    .page {
+        position: relative;
+        align-self: center;
+        padding: 34px 36px 36px;
+        border-radius: 22px;
+        background: var(--surface);
+    }
+
+    .page::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 36px;
+        right: 36px;
+        height: 3px;
+        background: var(--brand-gradient);
+    }
+
+    .label {
+        color: var(--ink-soft);
+        font-size: 17px;
+        font-weight: 700;
+    }
+
+    .spoken {
+        margin-top: 8px;
+        color: var(--spoken);
+        font-size: 24px;
+        font-weight: 200;
+        line-height: 1.6;
+    }
+
+    .spoken s {
+        opacity: 0.55;
+    }
+
+    .written-text {
+        margin-top: 8px;
+        font-size: 30px;
+        font-weight: 750;
+        letter-spacing: -0.01em;
+        line-height: 1.5;
+    }
+
+    html[lang="en"] .written-text {
+        font-size: 27px;
+    }
+
+    .divider {
+        height: 1px;
+        margin: 22px 0 20px;
+        background: var(--line);
+    }
+
+    .features {
+        grid-column: 1 / -1;
+        display: flex;
+        padding: 0;
+        gap: 12px;
+        color: var(--ink-soft);
+        font-size: 22px;
+        font-weight: 700;
+    }
+
+    .features li {
+        list-style: none;
+        padding: 6px 18px;
+        border: 1.5px solid var(--line);
+        border-radius: 999px;
+    }
+</style>
+</head>
+<body>
+<p class="brand"><img src="../site/assets/logo.png" alt="">HibiVo</p>
+
+<h1 lang="ja"><span class="said">話すだけで、</span><span class="written">文章になる。</span></h1>
+<h1 lang="en"><span class="said">Just speak.</span><span class="written">It’s written.</span></h1>
+
+<div class="page" lang="ja">
+    <p class="label">話した言葉</p>
+    <p class="spoken"><s>えーと</s>昨日のデザイン案、<s>ボタンの色を、あ、いや、</s>見出しの色をもうちょっと明るくして</p>
+    <div class="divider"></div>
+    <p class="label">入る文章</p>
+    <p class="written-text">昨日のデザイン案、<br>見出しの色をもう少し<br>明るくしてください。</p>
+</div>
+<div class="page" lang="en">
+    <p class="label">What you said</p>
+    <p class="spoken"><s>Um, so</s> the design draft, <s>the button color, uh, no,</s> the heading color, make it a bit brighter</p>
+    <div class="divider"></div>
+    <p class="label">What gets typed</p>
+    <p class="written-text">In the design draft, could you make the heading color a bit brighter?</p>
+</div>
+
+<ul class="features" lang="ja">
+    <li>Mac の音声入力</li>
+    <li>会議の文字起こし</li>
+    <li>無料・オープンソース</li>
+</ul>
+<ul class="features" lang="en">
+    <li>Voice input for Mac</li>
+    <li>Meeting transcripts</li>
+    <li>Free &amp; open source</li>
+</ul>
+
+<script>
+    if (location.hash === "#en") document.documentElement.lang = "en";
+</script>
+</body>
+</html>

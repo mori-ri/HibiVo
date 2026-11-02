@@ -22,6 +22,11 @@ let package = Package(
             name: "HibiVoEval",
             dependencies: ["HibiVoKit"]
         ),
+        // Landing page images (scripts/make-screenshots.sh). Debug only: it reaches into HibiVoKit's internals.
+        .executableTarget(
+            name: "HibiVoScreenshots",
+            dependencies: ["HibiVoKit"]
+        ),
         .testTarget(
             name: "HibiVoKitTests",
             dependencies: ["HibiVoKit"]

@@ -8,7 +8,7 @@ public final class AppEnvironment {
     public let state = AppState()
     public let settings: SettingsStore
     public let hotkey: HotkeyMonitor
-    public let secrets: any SecretStore = KeychainService()
+    public let secrets: any SecretStore
     public let transcriptionProviders: [any TranscriptionProvider] =
         (AppleSpeechProvider.isSupported ? [AppleSpeechProvider()] : []) + [SonioxProvider(), GeminiLiveProvider()]
     /// The providers that can transcribe a meeting, each with its after-meeting transcriber if it has one.
@@ -34,11 +34,11 @@ public final class AppEnvironment {
     private var wasOnline: Bool?
     private let log = Logger(subsystem: "io.github.mori-ri.hibivo", category: "app")
 
-    public init() {
+    public init(secrets: any SecretStore = KeychainService()) {
+        self.secrets = secrets
         settings = SettingsStore()
         hotkey = HotkeyMonitor(trigger: settings.hotkey)
         let settings = settings
-        let secrets = secrets
         settings.keepClaudeCodeMinutesForExistingUsers {
             ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil
         }

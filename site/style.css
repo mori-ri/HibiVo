@@ -594,6 +594,48 @@ h3 {
     align-items: start;
 }
 
+/* Screenshots */
+
+.shot {
+    max-width: 880px;
+    margin: 0 auto;
+}
+
+.split + .shot {
+    margin-top: clamp(40px, 6vw, 72px);
+}
+
+.shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.18));
+}
+
+.shot figcaption,
+.shot-hud figcaption {
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+}
+
+.shot figcaption {
+    margin-top: 20px;
+}
+
+.shot-hud {
+    margin: 0 0 28px;
+}
+
+.shot-hud img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+.shot-hud figcaption {
+    margin-top: 10px;
+}
+
 /* Modes */
 
 .mode-compare {

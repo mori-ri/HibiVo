@@ -24,6 +24,8 @@ scripts/release.sh publish              # マージ後の main (か release/*) �
 scripts/release.sh upload               # タグの位置で公証済みアプリを作り直して添付する (publish の最後の手順のやり直し)
 scripts/create-signing-cert.sh          # 初回のみ: ログインキーチェーンに自己署名証明書 "HibiVo Self-Signed" を作成
 npx http-server site -p 8000 -c-1       # LP をローカルで確認 (http://localhost:8000)
+node scripts/make-og-image.mjs          # LP のシェア用カード site/assets/og.png・og-en.png を scripts/og-image.html から再生成 (Playwright が必要)
+scripts/make-screenshots.sh             # LP の画面画像 site/assets/screens/ をサンプルデータで再生成 (Retina ディスプレイが必要)
 swift scripts/make-icons.swift          # Resources/AppIconSource.png から AppIcon.icns、Logo*.png、MenuBarIcon*.png、site/assets/ を再生成
 scripts/format.sh                       # swift-format で整形 (その場で書き換え)
 scripts/lint.sh                         # swift-format lint --strict (CI でも実行)
@@ -120,7 +122,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - 画面・HUD・アイコンの色、形、文字、動きは `DESIGN.md` に従う。ブランドの色は `Theme` のトークン(`brandGradient` など)を使い、値を直接書かない。
 - ユーザー向けテキストは日本語で、ステータスコードではなくユーザーに伝わる言い回しにする。エラーは `UserFacingError` を経由させる。コードコメントは英語。
 - UI は日本語と英語に対応する。コードに書いた日本語がそのままキーになり、英訳は `Resources/en.lproj/Localizable.strings` に書く(`build-app.sh` がバンドルにコピーする)。日本語と英語のどちらでもない言語の Mac では英語を出すため、`CFBundleDevelopmentRegion` は `en`。そのままだと日本語でも英訳にフォールバックするので、空の `ja.lproj/Localizable.strings` を置いている(消さないこと)。SwiftUI のリテラル(`Text("…")` など)と、`LocalizedStringKey` を受け取る設定画面の部品は自動で翻訳される。`String` で持つ文言は `String(localized:)` を使う。補間はキーでは `%@`(String)・`%lld`(Int)などになる。モデルに送るプロンプト、議事録などの保存する文書、照合用の文字列は翻訳しない(行末に `// no-l10n`)。`scripts/check-localization.swift`(`lint.sh` から実行)が訳の抜けと使われていない訳を検出する。テストはバンドル外で動くため日本語のまま。表示言語は設定 › 一般で選べる(`SettingsStore.appLanguage`)。アプリのドメインの `AppleLanguages` に書くだけなので、再起動で反映される。
-- LP は `site/` の素の HTML / CSS / JS で、ビルドはない。`main` への push で `.github/workflows/pages.yml` が GitHub Pages に公開する。`index.html`(日本語)と `en/index.html`(英語)は同じ構造に保つ。外部のフォント、スクリプト、解析は入れない(CSP で禁止している)。整形の出力例は `docs/cleanup-modes.md` に合わせ、機能の説明は README と食い違わせない。
+- LP は `site/` の素の HTML / CSS / JS で、ビルドはない。`main` への push で `.github/workflows/pages.yml` が GitHub Pages に公開する。`index.html`(日本語)と `en/index.html`(英語)は同じ構造に保つ。外部のフォント、スクリプト、解析は入れない(CSP で禁止している)。整形の出力例は `docs/cleanup-modes.md` に合わせ、機能の説明は README と食い違わせない。ダウンロードボタンは最新リリースの `HibiVo-arm64.zip` に直接リンクしている(`release.sh upload` がバージョンなしのこの名前で添付する)。ヒーローやカードの文言を変えたら、シェア用カードも作り直す。画面が変わったら `scripts/make-screenshots.sh` で画面画像も作り直す。画像は実際の SwiftUI の画面を別プロセスで描いたもので、アプリのデータを空の一時ホームに向け、Keychain はダミーに差し替えるので、実行した人のデータは写らない(画面収録の権限も不要)。
 - テストは Swift Testing(`@Test`、`#expect`)を使う。モックは `Tests/HibiVoKitTests/Mocks.swift` にある。`#require` の中に `#require` をネストしない(マクロ再帰エラーになる)。
 - 自明でない設計判断はローカル専用の `notes/DECISIONS.md`(番号付きの表)に記録する。詳しい設計と macOS 関連のメモは `notes/ARCHITECTURE.md` にある。どちらもクローンには含まれない。
 - リポジトリは公開している。利用者のローカルデータ(辞書、履歴、会議)や本名、チーム ID を、コード、テスト、コミット、PR に書かないこと。

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <title>HibiVo | 話すだけで文章になる Mac の音声入力</title>
-<meta name="description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。日本語を第一に作った、無料でオープンソースの Mac 用音声入力アプリです。">
+<meta name="description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。日本語を第一に作った無料でオープンソースの Mac 用音声入力アプリです。">
 <link rel="canonical" href="https://mori-ri.github.io/HibiVo/">
 <link rel="alternate" hreflang="ja" href="https://mori-ri.github.io/HibiVo/">
 <link rel="alternate" hreflang="en" href="https://mori-ri.github.io/HibiVo/en/">
@@ -14,10 +14,16 @@
 <link rel="apple-touch-icon" href="assets/icon.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="HibiVo | 話すだけで文章になる Mac の音声入力">
-<meta property="og:description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。日本語を第一に作った、無料でオープンソースの Mac 用音声入力アプリです。">
+<meta property="og:description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。日本語を第一に作った無料でオープンソースの Mac 用音声入力アプリです。">
 <meta property="og:url" content="https://mori-ri.github.io/HibiVo/">
-<meta property="og:image" content="https://mori-ri.github.io/HibiVo/assets/icon.png">
-<meta name="twitter:card" content="summary">
+<meta property="og:site_name" content="HibiVo">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:image" content="https://mori-ri.github.io/HibiVo/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="HibiVo: 話すだけで、文章になる。Mac の音声入力、会議の文字起こし">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="style.css">
 <script src="main.js" defer></script>
 </head>
@@ -28,7 +34,7 @@
   <a class="brand" href="./"><img src="assets/logo.png" width="49" height="32" alt="">HibiVo</a>
   <a class="lang" href="en/" hreflang="en" lang="en">English</a>
   <a href="https://github.com/mori-ri/HibiVo">GitHub</a>
-  <a class="button button-small" href="https://github.com/mori-ri/HibiVo/releases/latest">ダウンロード</a>
+  <a class="button button-small" href="https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip">ダウンロード</a>
 </header>
 
 <main id="main">
@@ -38,7 +44,7 @@
     <div class="hero-lead">
       <p class="lead">HibiVo は Mac の音声入力アプリです。キーを押して話すと、いま使っているアプリのカーソル位置に、整った文章が入ります。</p>
       <div class="actions">
-        <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest">Mac 版をダウンロード</a>
+        <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip">Mac 版をダウンロード</a>
         <p class="fine">無料のオープンソースです。macOS 14 以降の Apple Silicon Mac で動きます。</p>
       </div>
     </div>
@@ -61,6 +67,16 @@
     </div>
     <p class="demo-note">キーを押すと試せます<span class="desktop-only">(Mac なら右 Option キーでも動きます)</span>。これはページ上の再現で、マイクは使いません。</p>
   </div>
+</section>
+
+<section class="wrap section" aria-label="アプリの画面">
+  <figure class="shot">
+    <picture>
+      <source srcset="assets/screens/home-ja-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="assets/screens/home-ja.png" width="880" height="652" loading="lazy" alt="HibiVo のホーム画面。直近 7 日の利用回数、話した時間、API 料金の概算とグラフ、ホットキーの一覧、最近覚えた言葉が並んでいる">
+    </picture>
+    <figcaption>ホーム画面。利用状況とホットキーの一覧を確認できます。画面のデータはサンプルです。</figcaption>
+  </figure>
 </section>
 
 <section class="wrap section" aria-labelledby="modes">
@@ -116,7 +132,8 @@
   </div>
 </section>
 
-<section class="wrap section split" aria-labelledby="dictionary">
+<section class="wrap section" aria-labelledby="dictionary">
+  <div class="split">
   <div>
     <h2 id="dictionary">一度直せば、<wbr>辞書が覚える</h2>
     <p class="section-lead">入力された言葉を直すと、HibiVo が気づいて辞書に登録します。社名や製品名、専門用語が、次から正しく入りやすくなります。登録はクリックで取り消せます。ターミナルなど内容を読み取れないアプリでは、履歴の「修正」から登録できます。</p>
@@ -129,6 +146,14 @@
       <span class="notice-undo">取り消す</span>
     </div>
   </div>
+  </div>
+  <figure class="shot">
+    <picture>
+      <source srcset="assets/screens/vocabulary-ja-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="assets/screens/vocabulary-ja.png" width="880" height="600" loading="lazy" alt="HibiVo の辞書画面。言葉を追加する欄と、登録した AppSync、Kubernetes、HibiVo の一覧が並んでいる">
+    </picture>
+    <figcaption>辞書画面。自動で追加した言葉には専用のアイコンが付きます。</figcaption>
+  </figure>
 </section>
 
 <section class="wrap section split" aria-labelledby="meetings">
@@ -141,6 +166,11 @@
       <li>録音や文字起こしに同意が必要な場面では、参加者に伝えてから使ってください。</li>
     </ul>
   </div>
+  <div>
+  <figure class="shot-hud">
+    <img src="assets/screens/hud-meeting-ja.png" width="225" height="39" loading="lazy" alt="録音中の HUD。赤い丸と経過時間、メモのボタン、レベルバー、終了のボタンが並んでいる">
+    <figcaption>ミーティング中は、経過時間とマイクの反応を画面下に表示します。</figcaption>
+  </figure>
   <div class="file">
     <p class="file-name">2026-11-02_14-00-05.md</p>
     <pre># ミーティング 2026-11-02 14:00
@@ -157,6 +187,7 @@
 [00:00:20] **話者2** テストは木曜までに終わる見込みです。
 
 [00:00:31] **話者1** わかりました。金曜の朝に公開しましょう。</pre>
+  </div>
   </div>
 </section>
 
@@ -179,7 +210,7 @@
         <li><h3>2 つの権限を許可する</h3><p>ホットキーと貼り付けのためのアクセシビリティと、マイクを許可します。</p></li>
         <li><h3>右 Option を押して話す</h3><p>終わったらもう一度押します。押している間だけ話すこともできます。キーは Fn、右 Command、⌃Space からも選べます。</p></li>
       </ol>
-      <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest">Mac 版をダウンロード</a>
+      <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip">Mac 版をダウンロード</a>
     </div>
     <div>
       <h3>必要なもの</h3>
