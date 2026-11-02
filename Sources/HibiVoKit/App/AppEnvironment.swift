@@ -20,6 +20,7 @@ public final class AppEnvironment {
     public let history = HistoryStore()
     public let usage = UsageStore()
     public let meetings: MeetingArchive
+    public let updates: UpdateChecker
     private let inserter = TextInsertionService()
     private let learner: CorrectionLearner
     private let contextBuilder: DictationContextBuilder
@@ -38,7 +39,13 @@ public final class AppEnvironment {
         hotkey = HotkeyMonitor(trigger: settings.hotkey)
         let settings = settings
         let secrets = secrets
+        settings.keepClaudeCodeMinutesForExistingUsers {
+            ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil
+        }
         settings.keepSonioxForExistingUsers { secrets.secret(for: SonioxProvider().id)?.isEmpty == false }
+        updates = UpdateChecker(
+            currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            isEnabled: { settings.checksForUpdates })
         let meetingTranscribers = meetingTranscribers
         let vocabulary = vocabulary
         let meetings = MeetingArchive { [settings.meetingsDirectory, MeetingController.defaultDirectory] }
@@ -147,6 +154,7 @@ public final class AppEnvironment {
         if !state.hasAccessibilityPermission { Permissions.promptForAccessibility() }
         startHotkeyWhenTrusted()
         observeSleepAndNetwork()
+        updates.start()
         meeting.resumeSavedRecordings()
     }
 

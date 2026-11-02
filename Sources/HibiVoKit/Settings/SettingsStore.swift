@@ -65,6 +65,8 @@ public final class SettingsStore {
     public var meetingTranscriptionTiming: MeetingTranscriptionTiming {
         didSet { save(meetingTranscriptionTiming, "meetingTranscriptionTiming") }
     }
+    /// Whether the app asks GitHub for the latest release, once a day.
+    public var checksForUpdates: Bool { didSet { defaults.set(checksForUpdates, forKey: "checksForUpdates") } }
     /// Whether minutes are written from each saved meeting.
     public var meetingMinutesEnabled: Bool {
         didSet { defaults.set(meetingMinutesEnabled, forKey: "meetingMinutesEnabled") }
@@ -133,11 +135,10 @@ public final class SettingsStore {
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
         meetingCapturesSystemAudio = defaults.object(forKey: "meetingCapturesSystemAudio") as? Bool ?? true
         meetingTranscriptionTiming = Self.load("meetingTranscriptionTiming", from: defaults) ?? .realtime
-        // On by default only where Claude Code is installed, so nobody else gets an error per meeting.
-        meetingMinutesEnabled =
-            defaults.object(forKey: "meetingMinutesEnabled") as? Bool
-            ?? (ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil)
-        meetingMinutesEngine = Self.load("meetingMinutesEngine", from: defaults) ?? .claudeCode
+        checksForUpdates = defaults.object(forKey: "checksForUpdates") as? Bool ?? true
+        // Opt-in: minutes send the transcript to a provider the user chooses.
+        meetingMinutesEnabled = defaults.object(forKey: "meetingMinutesEnabled") as? Bool ?? false
+        meetingMinutesEngine = Self.load("meetingMinutesEngine", from: defaults) ?? .anthropic
         meetingMinutesModel = Self.load("meetingMinutesModel", from: defaults) ?? .sonnet
         meetingMinutesAPIModel = defaults.string(forKey: "meetingMinutesAPIModel") ?? ""
         meetingMinutesInstructions = defaults.string(forKey: "meetingMinutesInstructions")
@@ -166,6 +167,17 @@ public final class SettingsStore {
         let soniox = SonioxProvider().id
         if unset.contains("transcriptionProviderID") { transcriptionProviderID = soniox }
         if unset.contains("meetingTranscriptionProviderID") { meetingTranscriptionProviderID = soniox }
+    }
+
+    /// Claude Code used to be the default for minutes, on wherever it was installed. Someone upgrading keeps
+    /// what they had; new installs choose for themselves. Runs once, before `keepSonioxForExistingUsers` sets the
+    /// flag that identifies an earlier launch.
+    public func keepClaudeCodeMinutesForExistingUsers(claudeCodeInstalled: () -> Bool) {
+        guard !defaults.bool(forKey: "minutesDefaultsMigrated") else { return }
+        defaults.set(true, forKey: "minutesDefaultsMigrated")
+        guard defaults.bool(forKey: "transcriptionDefaultsMigrated") else { return }
+        if defaults.data(forKey: "meetingMinutesEngine") == nil { meetingMinutesEngine = .claudeCode }
+        if defaults.object(forKey: "meetingMinutesEnabled") == nil { meetingMinutesEnabled = claudeCodeInstalled() }
     }
 
     /// Cleanup mode for the app that will receive the text.

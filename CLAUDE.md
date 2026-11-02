@@ -18,9 +18,10 @@ scripts/eval.sh --variant baseline --provider bedrock --model <id>    # 整形�
 
 scripts/run.sh                          # debug ビルド → build/HibiVo.app → 起動 (起動中のアプリは終了させる)
 CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署名
-scripts/package.sh                      # release ビルド → build/HibiVo-<ver>-<arch>.zip (ditto で署名を保持)
+scripts/package.sh                      # 配布用 zip: コミット済みのソースから Developer ID で署名、公証、staple する。満たせなければエラー (NOTARIZE=0 は試用: 署名不問、-local.zip)
 scripts/release.sh prepare 0.3.0        # リリース準備: Info.plist のバージョンと build 番号を上げて PR を作る (release/* 上では直接コミット)
-scripts/release.sh publish              # マージ後の main (か release/*) でタグを push し、ノート自動生成付きのリリース下書きを作る
+scripts/release.sh publish              # マージ後の main (か release/*) でタグを push し、ノート自動生成付きのリリース下書きを作って公証済みアプリを添付する
+scripts/release.sh upload               # タグの位置で公証済みアプリを作り直して添付する (publish の最後の手順のやり直し)
 scripts/create-signing-cert.sh          # 初回のみ: ログインキーチェーンに自己署名証明書 "HibiVo Self-Signed" を作成
 swift scripts/make-icons.swift          # Resources/AppIconSource.png から AppIcon.icns、Logo*.png、MenuBarIcon*.png を再生成
 scripts/format.sh                       # swift-format で整形 (その場で書き換え)
@@ -33,7 +34,8 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 - **CLT のみの環境では macOS 26 SDK が必要。** macOS 27 SDK では SwiftUI の `@State` がマクロになっており、そのプラグインは Xcode にしか同梱されていない。`xcode-select -p` が CommandLineTools を指している場合、`scripts/env.sh` が `SDKROOT` を 26 SDK に設定する。素の `swift build` は "plugin for module 'SwiftUIMacros' not found" で失敗する。コードでは通常どおり `@State` を使い続けること。
 - **Swift Testing マクロの不安定な失敗。** CLT のみの環境では、テストファイル変更後の初回コンパイルが "plugin for module 'TestingMacros' not found" で失敗することがある。再ビルドすれば成功するため、`scripts/test.sh` はビルドを最大 3 回リトライする。
-- **アクセシビリティ権限 (TCC) はアドホック署名で再ビルドするたびにリセットされる。** cdhash が変わるため。自己署名証明書がない場合、ユーザーは `build-app.sh` のたびに権限を再付与する必要がある。復旧方法は `tccutil reset Accessibility io.github.mori-ri.hibivo`。`build-app.sh` は "HibiVo Self-Signed" 証明書(または `HIBIVO_SIGN_IDENTITY`)があれば自動的に使用する。
+- **アクセシビリティ権限 (TCC) はアドホック署名で再ビルドするたびにリセットされる。** cdhash が変わるため。自己署名証明書がない場合、ユーザーは `build-app.sh` のたびに権限を再付与する必要がある。復旧方法は `tccutil reset Accessibility io.github.mori-ri.hibivo`。`build-app.sh` は `HIBIVO_SIGN_IDENTITY`、"Developer ID Application" 証明書、"HibiVo Self-Signed" 証明書の順に、あるものを自動的に使用する。
+- **Developer ID の署名は Hardened Runtime を有効にする。** 公証に必須で、`Resources/HibiVo.entitlements` のマイクの entitlement がないとマイクが使えなくなる。TCC と Keychain のアクセス許可は署名の要件に結び付くため、自己署名から切り替えると一度だけ許可し直しになる。以後はチーム ID で判定されるので、再ビルドや証明書の更新では保たれる。公証には notarytool のキーチェーンプロファイル(既定は `hibivo-notary`、作り方は `scripts/package.sh` の先頭)が必要。
 - バンドル ID `io.github.mori-ri.hibivo` は Keychain のサービス名プレフィックス(`…api-keys`)および `Logger` の subsystem も兼ねている。変更するとユーザーが保存したキーや権限が参照できなくなる。
 - リソース(アイコン)は SwiftPM リソースではない。`build-app.sh` が `Contents/Resources` にコピーし、コードは `NSImage(named:)` で読み込む。`swift run` 実行時には存在しないため、コードは SF Symbols にフォールバックする。
 
@@ -57,7 +59,8 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - セッションが切れたら再接続する(不正なキーの場合を除く)。新しいセッションの時刻は、それまでに送った音声の長さだけずらす。話者番号はセッションごとに振り直される。
 - 「終了後にまとめて」モード(`MeetingTranscriptionTiming.afterMeeting`)では STT セッションを開かず、ミックスした PCM をメモリに溜める。終了後に `MeetingFileTranscriber` で処理する。手順は `submit`(アップロード → 作成)→ `result`(ポーリング → 取得)→ `discard`(ファイルと文字起こしの削除)。Soniox の実装は `SonioxFileTranscriber`(非同期 API `stt-async-v5`)。WAV はメモリ上で組み立てる。バックグラウンドで実行し、録音が終わった時点でホットキーは解放する。一時的な失敗は 3 回まで再試行し、送信済みのジョブは送り直さず結果だけを取り直す。404 や `error` の状態(`MeetingFileJobError.gone`)のときだけ送り直す。
 - 同じ音声とメタデータ(`MeetingRecordingInfo`: 開始・終了時刻、プロバイダ、辞書、メモ、注記、送信済みジョブ、保存先)は `MeetingRecordingStore` が `Meetings/.recordings/<開始日時>.pcm` / `.json` にも書く(0600、バックアップ対象外)。保存先を変えてもこの場所は既定のフォルダのまま(クラウド同期のフォルダに音声を置かないため)。文字起こしを保存できたら、Soniox 側とあわせて削除する。シャットダウン・スリープ・ネットワーク断で残った分は、`resumeSavedRecordings` が起動時、スリープ復帰時、ネットワーク回復時(`NWPathMonitor`)に引き継ぐ。終了時刻がなければ音声ファイルの更新時刻を使う。7 日を過ぎたものは削除する。
-- 保存後、設定で有効なら `ClaudeCodeMinutesWriter` が Claude Code CLI を `claude -p --output-format json --tools "" --strict-mcp-config --setting-sources "" --no-session-persistence --system-prompt …` で実行し、議事録を書く。ファイル名は `<開始日時>_<タイトル>.md` で、タイトルは議事録の 1 行目(`# …`)として Claude に書かせたものを `MeetingMinutesTitle` がファイル名に使える形に整える。取れなかった場合は `_議事録`。プロンプトのうち議事録の内容と書き方の部分(`MeetingMinutesPrompt.defaultInstructions`)は設定で編集でき(`instructionsLimit` 文字まで、nil・空欄・既定と同じ文はデフォルト扱い)、タイトル行・辞書・インジェクション対策・出力形式の指示は固定。ユーザー辞書は通常の整形と同じ形式(`CleanupPromptBuilder.vocabularyLines`)で、`<vocabulary>` として文字起こしの前に渡す。サブスクリプションの枠を使うため、子プロセスの環境から `ANTHROPIC_API_KEY` を取り除き、`--bare`(OAuth を読まない)は使わない。GUI アプリは PATH を引き継がないので、実行ファイルは標準のインストール先から探す。作成方法(`MeetingMinutesEngine`)で AI 整形のプロバイダ(Anthropic、OpenAI 互換、Bedrock、Gemini)を選ぶと、`ProviderMinutesWriter` が同じプロンプトをそのプロバイダに送る。モデルは `meetingMinutesAPIModel`(空なら各エンジンの既定。Anthropic と Bedrock は Haiku 5.5)。認証情報は AI 整形と共通(`CleanupProviderKind.makeProvider`)。議事録用には `CleanupLimits.minutes` で出力上限とタイムアウトを広げ、effort や thinking はモデルの既定のままにする。Finder は議事録ができてから 1 回だけ開く。
+- 議事録は既定でオフ、作成方法の既定は Anthropic。Claude Code は利用者が選んだときだけ使う(一覧の最後)。以前の版から更新した人は `keepClaudeCodeMinutesForExistingUsers` が一度だけそれまでの設定を保つ。
+- 保存後、設定で有効なら `ClaudeCodeMinutesWriter` が Claude Code CLI を `claude -p --output-format json --tools "" --strict-mcp-config --setting-sources "" --no-session-persistence --system-prompt …` で実行し、議事録を書く。ファイル名は `<開始日時>_<タイトル>.md` で、タイトルは議事録の 1 行目(`# …`)として Claude に書かせたものを `MeetingMinutesTitle` がファイル名に使える形に整える。取れなかった場合は `_議事録`。プロンプトのうち議事録の内容と書き方の部分(`MeetingMinutesPrompt.defaultInstructions`)は設定で編集でき(`instructionsLimit` 文字まで、nil・空欄・既定と同じ文はデフォルト扱い)、タイトル行・辞書・インジェクション対策・出力形式の指示は固定。ユーザー辞書は通常の整形と同じ形式(`CleanupPromptBuilder.vocabularyLines`)で、`<vocabulary>` として文字起こしの前に渡す。認証は Claude Code 自身の設定に任せる: 環境の API キーは取り除かず(第三者アプリが利用者のサブスクリプションを経由させる形を避ける)、`--bare`(OAuth を読まない)も使わず、宣伝もしない。GUI アプリは PATH を引き継がないので、実行ファイルは標準のインストール先から探す。作成方法(`MeetingMinutesEngine`)で AI 整形のプロバイダ(Anthropic、OpenAI 互換、Bedrock、Gemini)を選ぶと、`ProviderMinutesWriter` が同じプロンプトをそのプロバイダに送る。モデルは `meetingMinutesAPIModel`(空なら各エンジンの既定。Anthropic と Bedrock は Haiku 5.5)。認証情報は AI 整形と共通(`CleanupProviderKind.makeProvider`)。議事録用には `CleanupLimits.minutes` で出力上限とタイムアウトを広げ、effort や thinking はモデルの既定のままにする。Finder は議事録ができてから 1 回だけ開く。
 - HUD にはマイクのレベルバー、メモと終了のボタンを出す(このときだけ HUD はクリックを SwiftUI に渡す)。終了は押し間違い防止のため 2 回押し(`HUDModel.confirmStop`)。
 - メモ(`AppState.meetingNotes`、Markdown)は開始時に開く非アクティブ化パネル(`MeetingNotesPanelController`)で書く。書式のボタン、Return でのリストの継続、Tab / Shift-Tab の字下げは純粋関数的な `MarkdownEditing`。メモは文字起こしの「## メモ」として先頭に入り(議事録のプロンプトにもそう伝える)、議事録には原文を貼らず、Claude が必要な分だけ取り込む。終了時に固定して欄は空にする。発言がなくてもメモがあればファイルを残す。終了後モードでも数秒ごとの保存でメモを書き出す。
 - 貼り付け・整形・ダッキングは行わない。アイドルスリープは抑止し、4 時間で自動終了する。
@@ -92,12 +95,14 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - 350 ms 後、`changeCount` が変わっていない場合のみ復元する。
 - Secure Input、アクセシビリティ権限なし、対象アプリ終了済みの場合は、説明付きでコピーのみにする。
 
+**更新の確認**(`Support/UpdateChecker.swift`): 起動時と 1 日 1 回、GitHub の最新リリースを問い合わせ、新しければサイドバーとメニューに出す(失敗時は 1 時間後に再試行)。通知だけで、ダウンロードもインストールもしない。リンク先は固定の URL で、タグは `AppVersion` の形に合うものだけを使う。設定 › 一般 でオフにできる(`checksForUpdates`)。
+
 **状態と永続化**:
 - `AppState` は UI 状態のみを保持する。
 - `SettingsStore` は秘密情報以外の設定を UserDefaults に保存する。
 - 秘密情報は `SecretStore` / `KeychainService` 経由で Keychain にのみ保存する。
 - `VocabularyStore` / `HistoryStore` は `@MainActor @Observable` なインメモリストアで、`JSONFileStore`(`~/Library/Application Support/HibiVo/`)経由で保存する。書き込み用 actor は古い世代を破棄するため、並行保存でファイルが巻き戻らない。
-- `UsageStore` は日別の利用集計(回数・文字数・送信音声秒数・モデル別トークン)を `usage.json` に保存する。議事録のトークンは AI 整形とは別の `minutes` に入れ、ミーティング側の利用として数える。Claude Code はサブスクリプションの枠を使うため記録しない(`WrittenMinutes.usage` が nil)。Haiku 5.5 のように入力 10 万トークン超で単価が上がるモデルがあるため、そうしたリクエストは `longPrompt` で分けて集計する。テキストは持たず、履歴の設定とは独立。料金の概算は `UsagePricing` の公開価格表から計算する。
+- `UsageStore` は日別の利用集計(回数・文字数・送信音声秒数・モデル別トークン)を `usage.json` に保存する。議事録のトークンは AI 整形とは別の `minutes` に入れ、ミーティング側の利用として数える。Claude Code は利用量を返さないため記録しない(`WrittenMinutes.usage` が nil)。Haiku 5.5 のように入力 10 万トークン超で単価が上がるモデルがあるため、そうしたリクエストは `longPrompt` で分けて集計する。テキストは持たず、履歴の設定とは独立。料金の概算は `UsagePricing` の公開価格表から計算する。
 - 音声はディスクに書き込まない。例外は「終了後にまとめて」のミーティングの一時保存(`MeetingRecordingStore`)だけで、文字起こしが済んだら削除する。
 
 ## 過去に問題になった並行性ルール
@@ -115,5 +120,6 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - UI は日本語と英語に対応する。コードに書いた日本語がそのままキーになり、英訳は `Resources/en.lproj/Localizable.strings` に書く(`build-app.sh` がバンドルにコピーする)。日本語と英語のどちらでもない言語の Mac では英語を出すため、`CFBundleDevelopmentRegion` は `en`。そのままだと日本語でも英訳にフォールバックするので、空の `ja.lproj/Localizable.strings` を置いている(消さないこと)。SwiftUI のリテラル(`Text("…")` など)と、`LocalizedStringKey` を受け取る設定画面の部品は自動で翻訳される。`String` で持つ文言は `String(localized:)` を使う。補間はキーでは `%@`(String)・`%lld`(Int)などになる。モデルに送るプロンプト、議事録などの保存する文書、照合用の文字列は翻訳しない(行末に `// no-l10n`)。`scripts/check-localization.swift`(`lint.sh` から実行)が訳の抜けと使われていない訳を検出する。テストはバンドル外で動くため日本語のまま。表示言語は設定 › 一般で選べる(`SettingsStore.appLanguage`)。アプリのドメインの `AppleLanguages` に書くだけなので、再起動で反映される。
 - テストは Swift Testing(`@Test`、`#expect`)を使う。モックは `Tests/HibiVoKitTests/Mocks.swift` にある。`#require` の中に `#require` をネストしない(マクロ再帰エラーになる)。
 - 自明でない設計判断はローカル専用の `notes/DECISIONS.md`(番号付きの表)に記録する。詳しい設計と macOS 関連のメモは `notes/ARCHITECTURE.md` にある。どちらもクローンには含まれない。
+- リポジトリは公開している。利用者のローカルデータ(辞書、履歴、会議)や本名、チーム ID を、コード、テスト、コミット、PR に書かないこと。
 - `notes/` はローカル専用(`.git/info/exclude` で除外)。その内容を追跡対象のファイルに移さないこと。
 - アプリアイコンとロゴのファイルは MIT ライセンスの対象外(README 参照)。出力ファイルを直接編集せず、`make-icons.swift` で再生成すること。

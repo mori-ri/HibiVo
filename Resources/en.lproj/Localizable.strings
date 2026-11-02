@@ -43,11 +43,11 @@
 "Bedrock API キー" = "Bedrock API Key";
 "Business（丁寧な文章）" = "Business (Polite Text)";
 "Claude Code が見つからないため、議事録を作成できませんでした" = "Couldn't write minutes because Claude Code wasn't found";
-"Claude Code が見つかりません。インストールして claude.ai のアカウントでログインするか、実行ファイルの場所を入力してください。" = "Claude Code was not found. Install it and sign in with your claude.ai account, or enter the location of the executable.";
-"Claude Code で作成した議事録は Claude のサブスクリプションの利用枠を使うため、ここには含まれません。" = "Minutes written with Claude Code use your Claude subscription, so they are not included here.";
+"Claude Code が見つかりません。インストールしてログインするか、実行ファイルの場所を入力してください。" = "Claude Code was not found. Install it and sign in, or enter the location of the executable.";
+"Claude Code で作成した議事録の利用量は、ここには含まれません。" = "Usage from minutes written with Claude Code is not included here.";
 "Claude Code の場所" = "Claude Code Location";
-"Claude Code(%@)を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。" = "Minutes are written with Claude Code (%@) using your Claude subscription, with no API charges. They are given a title that describes the meeting and saved next to the transcript.";
-"Claude Code(サブスクリプション)" = "Claude Code (Subscription)";
+"インストール済みの Claude Code(%@)を実行して議事録を作成します。ログイン方法と利用条件は Claude Code の設定に従い、文字起こしは Anthropic に送られます。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。" = "Minutes are written by running your installed Claude Code (%@). Sign-in and terms follow your Claude Code setup, and the transcript is sent to Anthropic. Minutes are given a title that describes the meeting and saved next to the transcript.";
+"Claude Code(別途インストール)" = "Claude Code (Installed Separately)";
 "Custom モードの指示" = "Custom Mode Instructions";
 "Custom（カスタム指示）" = "Custom (Your Instructions)";
 "Finder で表示" = "Show in Finder";
@@ -352,3 +352,9 @@
 "項目を選択してください" = "Select an item";
 "（空）" = "(Empty)";
 "（表記なし）" = "(No spelling)";
+"新しいバージョン %@ があります" = "Version %@ Is Available";
+"新しいバージョン %@ があります…" = "Version %@ Is Available…";
+"新しいバージョンを確認する" = "Check for New Versions";
+"起動時と 1 日に 1 回、GitHub に最新のバージョンを問い合わせます。自動でインストールはしません。" = "Asks GitHub for the latest version at launch and once a day. Nothing is installed automatically.";
+"ライセンス" = "License";
+"録音や文字起こしに参加者の同意が必要な国や地域、組織があります。参加者に伝えたうえで、法令や所属先のルールに従って使ってください。" = "Some countries, regions, and organizations require participants' consent to record or transcribe. Tell participants, and follow the applicable laws and your organization's rules.";

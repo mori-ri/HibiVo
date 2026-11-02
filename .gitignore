@@ -4,7 +4,18 @@
 build/
 *.xcodeproj/xcuserdata/
 .env
+.env.*
 *.secret
+
+# Signing material
+*.p12
+*.pem
+*.key
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.keychain
+*.keychain-db
 
 # Editor
 .vscode/

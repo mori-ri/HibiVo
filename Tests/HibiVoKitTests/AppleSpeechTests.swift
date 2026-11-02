@@ -62,6 +62,40 @@ import Testing
         #expect(fresh.transcriptionProviderID == SettingsStore.defaultTranscriptionProviderID)
     }
 
+    @Test func newInstallsLeaveMinutesOffAndNotOnClaudeCode() {
+        let defaults = makeDefaults()
+        let settings = SettingsStore(defaults: defaults)
+        settings.keepClaudeCodeMinutesForExistingUsers { true }
+        settings.keepSonioxForExistingUsers { false }
+        #expect(settings.meetingMinutesEnabled == false)
+        #expect(settings.meetingMinutesEngine == .anthropic)
+        #expect(settings.checksForUpdates)
+    }
+
+    @Test func existingUsersKeepTheirClaudeCodeMinutes() {
+        let defaults = makeDefaults()
+        defaults.set(true, forKey: "transcriptionDefaultsMigrated")
+        let settings = SettingsStore(defaults: defaults)
+        settings.keepClaudeCodeMinutesForExistingUsers { true }
+        #expect(settings.meetingMinutesEnabled)
+        #expect(settings.meetingMinutesEngine == .claudeCode)
+
+        let reopened = SettingsStore(defaults: defaults)
+        #expect(reopened.meetingMinutesEnabled)
+        #expect(reopened.meetingMinutesEngine == .claudeCode)
+    }
+
+    @Test func minutesMigrationLeavesChoicesAlone() {
+        let defaults = makeDefaults()
+        defaults.set(true, forKey: "transcriptionDefaultsMigrated")
+        let settings = SettingsStore(defaults: defaults)
+        settings.meetingMinutesEnabled = false
+        settings.meetingMinutesEngine = .gemini
+        settings.keepClaudeCodeMinutesForExistingUsers { true }
+        #expect(settings.meetingMinutesEnabled == false)
+        #expect(settings.meetingMinutesEngine == .gemini)
+    }
+
     @Test func keylessProviderNeedsNoAPIKey() throws {
         let settings = SettingsStore(defaults: makeDefaults())
         settings.transcriptionProviderID = "mock"

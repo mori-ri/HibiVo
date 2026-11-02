@@ -35,13 +35,14 @@ public protocol MeetingMinutesWriting: Sendable {
 
 /// What writes the minutes: Claude Code, or one of the AI cleanup providers with its saved credentials.
 public enum MeetingMinutesEngine: String, Codable, CaseIterable, Identifiable, Sendable {
-    /// Claude Code CLI, on the user's Claude subscription.
-    case claudeCode
     // Billed per token, like AI cleanup. Raw values match `CleanupProviderKind`.
     case anthropic
     case openAICompatible = "openai-compatible"
     case bedrock
     case gemini
+    /// The Claude Code CLI the user installed, signed in however they set it up. Listed last and never the
+    /// default: the user opts in, and HibiVo doesn't touch their credentials.
+    case claudeCode
 
     public var id: String { rawValue }
 
@@ -49,7 +50,7 @@ public enum MeetingMinutesEngine: String, Codable, CaseIterable, Identifiable, S
     public var providerKind: CleanupProviderKind? { CleanupProviderKind(rawValue: rawValue) }
 
     public var displayName: String {
-        providerKind?.displayName ?? String(localized: "Claude Code(サブスクリプション)")
+        providerKind?.displayName ?? String(localized: "Claude Code(別途インストール)")
     }
 
     /// The model used when none is entered. Empty for OpenAI-compatible endpoints, which have no common model.
@@ -238,8 +239,7 @@ enum MeetingMinutesTitle {
 ///
 /// Claude Code runs with no tools, no MCP servers and no settings files, in an empty temporary
 /// directory, and keeps no session: it only reads the prompt and prints the minutes.
-/// `ANTHROPIC_API_KEY` is removed from its environment, because Claude Code prefers an API key over
-/// the subscription login when one is set.
+/// Authentication stays Claude Code's own: its credentials are neither read nor overridden here.
 public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
     /// Where Claude Code's installers put the executable. A GUI app doesn't inherit the shell's PATH.
     static let candidatePaths = [
@@ -284,7 +284,8 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
 
     static func environment(_ base: [String: String]) -> [String: String] {
         var environment = base
-        for key in ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"] {
+        // Set when HibiVo was started from inside Claude Code; the child is a separate session.
+        for key in ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"] {
             environment.removeValue(forKey: key)
         }
         return environment
@@ -328,7 +329,7 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
                 throw MeetingMinutesError.timedOut
             }
             defer { group.cancelAll() }
-            // Runs on the user's subscription, so there's no per-token cost to record.
+            // Claude Code doesn't report usage to HibiVo, so there's nothing to record.
             return WrittenMinutes(text: try await group.next() ?? "")
         }
     }

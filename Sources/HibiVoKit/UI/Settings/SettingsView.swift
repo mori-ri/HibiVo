@@ -26,6 +26,9 @@ struct GeneralSettingsView: View {
                         Button("今すぐ再起動") { AppRelauncher.relaunch() }
                     }
                 }
+                ToggleRow("新しいバージョンを確認する", isOn: $settings.checksForUpdates)
+                    .onChange(of: settings.checksForUpdates) { Task { await env.updates.check() } }
+                NoteRow("起動時と 1 日に 1 回、GitHub に最新のバージョンを問い合わせます。自動でインストールはしません。")
             }
             SettingsSection(title: "操作") {
                 PickerRow("ホットキー（押すと録音開始、もう一度押すと終了）", selection: hotkeyBinding) {
@@ -367,6 +370,7 @@ struct MeetingSettingsView: View {
                 }
             }
             SettingsSection(title: "音声") {
+                NoteRow("録音や文字起こしに参加者の同意が必要な国や地域、組織があります。参加者に伝えたうえで、法令や所属先のルールに従って使ってください。")
                 ToggleRow("オンライン参加者の声(システム音声)も記録する", isOn: $settings.meetingCapturesSystemAudio)
                 if !SystemAudioCaptureService.isSupported {
                     NoteRow("システム音声の記録には macOS 14.2 以降が必要です。", color: .red)
@@ -406,11 +410,11 @@ struct MeetingSettingsView: View {
                     case .claudeCode:
                         if let path = ClaudeCodeMinutesWriter.locate(configuredPath: env.settings.claudeCodePath) {
                             NoteRow(
-                                "Claude Code(\(path.path))を使い、Claude のサブスクリプションの利用枠で議事録を作成します。API の料金はかかりません。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
+                                "インストール済みの Claude Code(\(path.path))を実行して議事録を作成します。ログイン方法と利用条件は Claude Code の設定に従い、文字起こしは Anthropic に送られます。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。"
                             )
                         } else {
                             NoteRow(
-                                "Claude Code が見つかりません。インストールして claude.ai のアカウントでログインするか、実行ファイルの場所を入力してください。",
+                                "Claude Code が見つかりません。インストールしてログインするか、実行ファイルの場所を入力してください。",
                                 color: .red)
                         }
                     case let engine:
