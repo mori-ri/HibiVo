@@ -92,6 +92,29 @@ import Testing
                 == "# Minutes\n\nBody\n\n---\n\n*Written by Claude from the transcript \"a.md\".*\n")
     }
 
+    @Test func titleAndTagsGoInFrontMatterAndTheHeading() {
+        var t = MeetingTranscript()
+        t.apply([token("始めます", "1", 0, 800)])
+        let start = Date(timeIntervalSince1970: 0)
+        let md = MeetingDocument.markdown(
+            t, startedAt: start, endedAt: nil, metadata: MeetingMetadata(title: "週次定例", tags: ["定例", "開発"]),
+            timeZone: TimeZone(identifier: "UTC")!)
+        #expect(md.hasPrefix("---\ntitle: \"週次定例\"\ntags:\n  - \"定例\"\n  - \"開発\"\n---\n\n# 週次定例\n\n- 開始: 1970-01-01"))
+        #expect(MeetingMetadata.parse(md) == MeetingMetadata(title: "週次定例", tags: ["定例", "開発"]))
+        // Tags alone keep the dated heading.
+        let tagged = MeetingDocument.markdown(
+            t, startedAt: start, endedAt: nil, metadata: MeetingMetadata(tags: ["定例"]),
+            timeZone: TimeZone(identifier: "UTC")!)
+        #expect(tagged.hasPrefix("---\ntags:\n  - \"定例\"\n---\n\n# ミーティング 1970-01-01 00:00\n"))
+    }
+
+    @Test func minutesRepeatTheTitleAndTags() {
+        let md = MeetingDocument.minutes(
+            title: "週次定例", body: "本文", transcriptFileName: "a.md",
+            metadata: MeetingMetadata(title: "週次定例", tags: ["定例"]))
+        #expect(md.hasPrefix("---\ntitle: \"週次定例\"\ntags:\n  - \"定例\"\n---\n\n# 週次定例\n\n本文"))
+    }
+
     @Test func markdownWhileRecordingSaysSo() {
         let md = MeetingDocument.markdown(MeetingTranscript(), startedAt: Date(), endedAt: nil)
         #expect(md.contains("- 記録中"))
@@ -821,6 +844,43 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: directory.appending(path: "Changed").path))
     }
 
+    @Test func resumedRecordingKeepsItsTitleAndTags() async throws {
+        let startedAt = Date(timeIntervalSinceNow: -600)
+        let id = MeetingDocument.fileName(startedAt: startedAt).replacingOccurrences(of: ".md", with: "")
+        let store = MeetingRecordingStore(directory: recordingsDirectory)
+        let info = MeetingRecordingInfo(
+            startedAt: startedAt, endedAt: nil, providerID: provider.id, model: "m1", language: "ja",
+            vocabulary: [], includesSystemAudio: false, notices: [], notes: "", job: nil,
+            metadata: MeetingMetadata(title: "1on1", tags: ["面談"]))
+        #expect(await store.save(info, id: id))
+        #expect(await store.append(Data(count: 960), id: id))
+        await store.closeAudio(id: id)
+
+        let transcriber = MockFileTranscriber([
+            .success([MeetingToken(text: "残っていた", isFinal: true, speaker: "1", startMs: 0, endMs: 500)])
+        ])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.resumeSavedRecordings()
+        await sut.waitUntilIdle()
+
+        let text = try String(contentsOf: directory.appending(path: "\(id).md"), encoding: .utf8)
+        #expect(MeetingMetadata.parse(text) == MeetingMetadata(title: "1on1", tags: ["面談"]))
+        #expect(text.contains("残っていた"))
+    }
+
+    @Test func afterMeetingSavesTheTitleWithTheRecording() async throws {
+        settings.meetingTranscriptionTiming = .afterMeeting
+        let transcriber = MockFileTranscriber([.failure(.network("offline"))])
+        let sut = makeController(fileTranscriber: transcriber)
+        sut.start()
+        state.meetingTitle = "定例"
+        audio.speak()
+        sut.stop()
+        await sut.waitUntilIdle()
+        let id = try #require(savedRecordings().first { $0.hasSuffix(".json") }?.dropLast(5))
+        #expect(try savedInfo(String(id)).metadata == MeetingMetadata(title: "定例"))
+    }
+
     @Test func goneJobIsSubmittedAgain() async throws {
         settings.meetingTranscriptionTiming = .afterMeeting
         let transcriber = MockFileTranscriber(
@@ -1038,6 +1098,60 @@ import Testing
         let text = try String(contentsOf: url, encoding: .utf8)
         #expect(text.contains("途中のメモ"))
         #expect(text.contains("- 記録中"))
+        sut.stop()
+        await sut.waitUntilIdle()
+    }
+
+    @Test func titleAndTagsNameTheMinutesAndAreSavedInBothFiles() async throws {
+        settings.meetingMinutesEnabled = true
+        let writer = MockMinutesWriter(.success("# Claude のタイトル\n\n## 概要\nリリース日を決めた。"))
+        var shown: [URL] = []
+        let sut = makeController(minutesWriter: writer, onSaved: { shown.append($0) })
+        sut.start()
+        state.meetingTitle = "  週次定例: 開発  "
+        state.meetingTags = ["定例", "開発"]
+        let session = try #require(provider.sessions.first)
+        await session.emit(
+            .tokens([MeetingToken(text: "来週リリースします", isFinal: true, speaker: "1", startMs: 0, endMs: 900)]))
+        await settle { state.partialTranscript == "来週リリースします" }
+        sut.stop()
+        // The next meeting starts untitled.
+        #expect(state.meetingTitle.isEmpty)
+        #expect(state.meetingTags.isEmpty)
+        await sut.waitUntilIdle()
+
+        let call = try #require(await writer.calls.first)
+        #expect(
+            call.transcript.hasPrefix("---\ntitle: \"週次定例: 開発\"\ntags:\n  - \"定例\"\n  - \"開発\"\n---\n\n# 週次定例: 開発\n"))
+        // The user's title replaces Claude's, made safe for the file name.
+        let url = try #require(shown.first)
+        #expect(url.lastPathComponent.hasSuffix("_週次定例 開発.md"))
+        let minutes = try String(contentsOf: url, encoding: .utf8)
+        #expect(MeetingMetadata.parse(minutes) == MeetingMetadata(title: "週次定例: 開発", tags: ["定例", "開発"]))
+        #expect(minutes.contains("\n# 週次定例: 開発\n\n## 概要\nリリース日を決めた。"))
+        #expect(!minutes.contains("Claude のタイトル"))
+
+        let archive = MeetingArchive { [directory] }
+        let record = try #require(archive.records.first)
+        #expect(record.title == "週次定例: 開発")
+        #expect(record.metadata.tags == ["定例", "開発"])
+        #expect(archive.recentTags(excluding: ["開発"]) == ["定例"])
+    }
+
+    @Test func titleAndTagsAreAutosavedDuringTheMeeting() async throws {
+        let sut = MeetingController(
+            state: state, audio: audio, systemAudio: systemAudio, settings: settings, secrets: MockSecrets(),
+            transcriber: { [provider] in MeetingTranscriber(provider: provider) }, directory: directory,
+            saveInterval: .milliseconds(10), reconnectDelays: [.zero])
+        sut.start()
+        state.meetingNotes = "途中のメモ"
+        state.meetingTitle = "採用面談"
+        state.meetingTags = ["採用"]
+        let saved = { savedFiles().first.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "" }
+        for _ in 0..<200 where !saved().contains("採用面談") {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(MeetingMetadata.parse(saved()) == MeetingMetadata(title: "採用面談", tags: ["採用"]))
         sut.stop()
         await sut.waitUntilIdle()
     }
@@ -1457,6 +1571,72 @@ import Testing
         #expect(MeetingMinutesTitle.fileNameSafe("..隠し") == "隠し")
         #expect(MeetingMinutesTitle.fileNameSafe(String(repeating: "長", count: 60)).count == 40)
         #expect(MeetingMinutesTitle.split("# ///\n本文").title == nil)
+    }
+}
+
+@Suite struct MeetingMetadataTests {
+    @Test func titlesAreOneTrimmedLine() {
+        #expect(MeetingMetadata(title: "  週次\n定例\t ").title == "週次 定例")
+        #expect(MeetingMetadata(title: String(repeating: "長", count: 150)).title.count == MeetingMetadata.titleLimit)
+        #expect(MeetingMetadata(title: " \n ").isEmpty)
+    }
+
+    @Test func tagsAreCleanedAndDeduplicated() {
+        #expect(MeetingMetadata.normalizedTag("#定例") == "定例")
+        #expect(MeetingMetadata.normalizedTag("a b") == "ab")
+        #expect(MeetingMetadata.normalizedTag(" # ") == nil)
+        #expect(MeetingMetadata(tags: ["Dev", "dev", "ＤＥＶ", "", "#採用"]).tags == ["Dev", "採用"])
+        var tags: [String] = []
+        for index in 0..<30 { tags = MeetingMetadata.adding("t\(index)", to: tags) }
+        #expect(tags.count == MeetingMetadata.tagCountLimit)
+    }
+
+    /// The tags split off, then what stays in the field.
+    private func split(_ input: String, finished: Bool = false) -> [String] {
+        let result = MeetingMetadata.splitTagInput(input, isFinished: finished)
+        return result.tags + [result.remainder]
+    }
+
+    @Test func tagInputSplitsAtCommasAndSpacesWhileTyping() {
+        #expect(split("定例") == ["定例"])
+        #expect(split("定例,開") == ["定例", "開"])
+        #expect(split("定例 #開発　") == ["定例", "開発", ""])
+        // An input method composes 、 with the word before it, so only Return splits there.
+        #expect(split("定例、開発") == ["定例、開発"])
+        #expect(split("定例、開発", finished: true) == ["定例", "開発", ""])
+        #expect(split("", finished: true) == [""])
+    }
+
+    @Test func frontMatterRoundTripsQuotesAndColons() throws {
+        let metadata = MeetingMetadata(title: #"議題: "予算" \ #1"#, tags: ["a-b", "c/d"])
+        let front = try #require(metadata.frontMatter)
+        #expect(front.contains(#"title: "議題: \"予算\" \\ #1""#))
+        #expect(MeetingMetadata.parse(front + "\n\n# 本文") == metadata)
+        #expect(MeetingMetadata().frontMatter == nil)
+    }
+
+    @Test func parsesFrontMatterAsNotesAppsRewriteIt() {
+        #expect(
+            MeetingMetadata.parse("---\ntitle: 週次定例 # memo\ntags: [定例, \"a, b\", '#開発']\nother: x\n---\n")
+                == MeetingMetadata(title: "週次定例", tags: ["定例", "ab", "開発"]))
+        #expect(
+            MeetingMetadata.parse("\u{FEFF}---\r\ntitle: 'It''s'\r\ntags:\r\n  - 定例\r\n  - 開発\r\nx: 1\r\n---")
+                == MeetingMetadata(title: "It's", tags: ["定例", "開発"]))
+        #expect(MeetingMetadata.parse("---\ntags: 定例, 開発\n---") == MeetingMetadata(tags: ["定例", "開発"]))
+        // Not front matter: no opening line, or no closing one.
+        #expect(MeetingMetadata.parse("# 見出し\n---\ntitle: x\n---").isEmpty)
+        #expect(MeetingMetadata.parse("---\ntitle: x\n").isEmpty)
+    }
+
+    @Test func recentTagsComeFromTheNewestMeetingsFirst() {
+        let records = [
+            MeetingRecord(
+                id: "b", startedAt: Date(timeIntervalSince1970: 2), metadata: MeetingMetadata(tags: ["開発", "定例"])),
+            MeetingRecord(
+                id: "a", startedAt: Date(timeIntervalSince1970: 1), metadata: MeetingMetadata(tags: ["定例", "採用"])),
+        ]
+        #expect(MeetingMetadata.recentTags(records) == ["開発", "定例", "採用"])
+        #expect(MeetingMetadata.recentTags(records, excluding: ["開発"], limit: 1) == ["定例"])
     }
 }
 

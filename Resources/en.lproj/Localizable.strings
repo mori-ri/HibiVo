@@ -9,6 +9,7 @@
 "%@ の設定が済んでいないため、議事録を作成できませんでした" = "Couldn't write minutes because %@ isn't set up";
 "%@ を使う" = "Use %@";
 "%@ を削除" = "Remove %@";
+"%@ を外す" = "Remove %@";
 "%@ を押して話し、もう一度押すと、ここに記録されます。" = "Press %@, speak, and press it again. Your dictation will appear here.";
 "%@ を押しながら M で開始し、%@ を素早く 2 回押すと終了します。Markdown で保存します。" = "Hold %@ and press M to start; press %@ twice quickly to stop. Saved as Markdown.";
 "%@ を編集" = "Edit %@";
@@ -46,6 +47,7 @@
 "Claude Code が見つかりません。インストールしてログインするか、実行ファイルの場所を入力してください。" = "Claude Code was not found. Install it and sign in, or enter the location of the executable.";
 "Claude Code で作成した議事録の利用量は、ここには含まれません。" = "Usage from minutes written with Claude Code is not included here.";
 "Claude Code の場所" = "Claude Code Location";
+"このタグを付ける" = "Add This Tag";
 "インストール済みの Claude Code(%@)を実行して議事録を作成します。ログイン方法と利用条件は Claude Code の設定に従い、文字起こしは Anthropic に送られます。会議の内容を表すタイトルを付けて、文字起こしの隣に保存します。" = "Minutes are written by running your installed Claude Code (%@). Sign-in and terms follow your Claude Code setup, and the transcript is sent to Anthropic. Minutes are given a title that describes the meeting and saved next to the transcript.";
 "Claude Code(別途インストール)" = "Claude Code (Installed Separately)";
 "Custom モードの指示" = "Custom Mode Instructions";
@@ -113,6 +115,12 @@
 "システム音声の記録には macOS 14.2 以降が必要です。" = "Recording system audio requires macOS 14.2 or later.";
 "シークレットアクセスキー" = "Secret Access Key";
 "セッショントークン（一時認証情報のみ）" = "Session Token (Temporary Credentials Only)";
+"タイトル" = "Title";
+"タイトル(省略可)" = "Title (optional)";
+"タグ" = "Tags";
+"タグ「%@」を付ける" = "Add the tag “%@”";
+"タグを外す" = "Remove Tag";
+"タグを追加" = "Add tags";
 "チェックリスト" = "Checklist";
 "テキストを修正" = "Correct the Text";
 "デフォルトに戻す" = "Restore Default";
@@ -134,6 +142,7 @@
 "マイクの音と混ぜて 1 本にして文字起こしします。初回はシステムオーディオ録音の許可を求められます。スピーカーで聞くと相手の声がマイクにも入って少しずれて重なり、認識しにくくなることがあるため、イヤホンの使用をおすすめします。" = "Mixed with the microphone into one stream for transcription. You'll be asked for System Audio Recording permission the first time. Headphones are recommended: with speakers, other participants' voices also reach the microphone slightly delayed, which can hurt recognition.";
 "マイクを使用できません" = "The microphone isn't available";
 "ミーティング" = "Meeting";
+"ミーティングのタイトル" = "Meeting Title";
 "ミーティングのメモ" = "Meeting Notes";
 "ミーティングのメモを表示" = "Show Meeting Notes";
 "ミーティングの保存先を開く" = "Open Meeting Folder";
@@ -262,6 +271,7 @@
 "日時" = "Date";
 "日本語" = "Japanese";
 "時間" = "Time";
+"最近のタグ" = "Recent";
 "最近覚えた言葉" = "Recently Learned Words";
 "有効" = "Enabled";
 "期間" = "Period";

@@ -18,6 +18,8 @@ struct MeetingRecordingInfo: Codable, Equatable, Sendable {
     var job: MeetingFileJob?
     /// The folder the transcript is saved in; nil for recordings saved before the folder could be chosen.
     var directory: String? = nil
+    /// The title and tags the user gave; nil when none were given or the recording predates them.
+    var metadata: MeetingMetadata? = nil
 }
 
 /// Keeps the audio of after-meeting meetings on disk until they have been transcribed, so a shutdown,
