@@ -6,6 +6,7 @@
 //   Resources/AppIcon.icns          logo on a white rounded square (macOS app icon grid)
 //   Resources/MenuBarIcon.png/@2x   monochrome template silhouette for the menu bar
 //   Resources/Logo.png/@2x          colour logo cropped to its content, for the main window sidebar
+//   site/assets/logo.png, icon.png  logo and app icon for the landing page
 import AppKit
 
 let root = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().deletingLastPathComponent()
@@ -126,4 +127,16 @@ for scale in [1, 2] {
     writePNG(rep, to: resources.appending(path: scale == 1 ? "Logo.png" : "Logo@2x.png"))
 }
 
-print("Wrote AppIcon.icns, Logo.png and MenuBarIcon.png (\(Int(menuBarWidth))x\(Int(menuBarHeight)) pt)")
+// MARK: Landing page (site/assets, served by GitHub Pages)
+
+let siteAssets = root.appending(path: "site/assets")
+try! FileManager.default.createDirectory(at: siteAssets, withIntermediateDirectories: true)
+let siteLogoHeight: CGFloat = 96
+let siteLogoWidth = (crop.width / crop.height * siteLogoHeight).rounded(.up)
+let siteLogo = render(pixels: NSSize(width: siteLogoWidth, height: siteLogoHeight)) { canvas in
+    drawLogo(fitting: canvas)
+}
+writePNG(siteLogo, to: siteAssets.appending(path: "logo.png"))
+writePNG(appIcon(pixels: 512), to: siteAssets.appending(path: "icon.png"))
+
+print("Wrote AppIcon.icns, Logo.png, site/assets and MenuBarIcon.png (\(Int(menuBarWidth))x\(Int(menuBarHeight)) pt)")

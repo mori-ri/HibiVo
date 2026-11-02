@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<title>HibiVo | Speak, and it’s written. Voice input for Mac</title>
+<meta name="description" content="Press a key and speak. Clean text appears at the cursor in whatever app you’re using. A free, open-source voice input app for Mac, built Japanese-first.">
+<link rel="canonical" href="https://mori-ri.github.io/HibiVo/en/">
+<link rel="alternate" hreflang="ja" href="https://mori-ri.github.io/HibiVo/">
+<link rel="alternate" hreflang="en" href="https://mori-ri.github.io/HibiVo/en/">
+<link rel="alternate" hreflang="x-default" href="https://mori-ri.github.io/HibiVo/">
+<link rel="icon" type="image/png" href="../assets/icon.png">
+<link rel="apple-touch-icon" href="../assets/icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="HibiVo | Speak, and it’s written. Voice input for Mac">
+<meta property="og:description" content="Press a key and speak. Clean text appears at the cursor in whatever app you’re using. A free, open-source voice input app for Mac, built Japanese-first.">
+<meta property="og:url" content="https://mori-ri.github.io/HibiVo/en/">
+<meta property="og:image" content="https://mori-ri.github.io/HibiVo/assets/icon.png">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../style.css">
+<script src="../main.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="wrap site-header">
+  <a class="brand" href="./"><img src="../assets/logo.png" width="49" height="32" alt="">HibiVo</a>
+  <a class="lang" href="../" hreflang="ja" lang="ja">日本語</a>
+  <a href="https://github.com/mori-ri/HibiVo">GitHub</a>
+  <a class="button button-small" href="https://github.com/mori-ri/HibiVo/releases/latest">Download</a>
+</header>
+
+<main id="main">
+<section class="wrap hero">
+  <div class="hero-top">
+    <h1><span class="said">Just speak.</span><span class="written">It’s written.</span></h1>
+    <div class="hero-lead">
+      <p class="lead">HibiVo is a voice input app for Mac. Press a key and speak, and clean text appears at the cursor in whatever app you’re using. It’s built Japanese-first, and handles English too.</p>
+      <div class="actions">
+        <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest">Download for Mac</a>
+        <p class="fine">Free and open source. Runs on Apple Silicon Macs with macOS 14 or later.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" data-phase="done">
+    <div class="streak" aria-hidden="true"></div>
+    <div class="keypad">
+      <button class="key" type="button" aria-label="Start the demo"><span class="key-symbol" aria-hidden="true">⌥</span><span class="key-name" aria-hidden="true">option</span></button>
+      <ol class="steps" aria-label="How it works">
+        <li>Press</li>
+        <li>Speak</li>
+        <li>Press again</li>
+      </ol>
+    </div>
+    <div class="page">
+      <p class="ghost" aria-hidden="true"></p>
+      <p class="demo-text">The design draft I sent yesterday, could you make the heading color a bit brighter and also widen the margins?
+Let me know if you can get it done by Friday.</p>
+    </div>
+    <p class="demo-note">Press the key to try it<span class="desktop-only"> (on a Mac, the right Option key works too)</span>. This is a replay on this page. It doesn’t use your microphone.</p>
+  </div>
+</section>
+
+<section class="wrap section" aria-labelledby="modes">
+  <h2 id="modes">One thought, written for whoever’s reading</h2>
+  <p class="section-lead">AI removes the ums and false starts, and doesn’t add anything you didn’t say. Choose from four ways to clean up text, or write your own with Custom.</p>
+  <div class="mode-compare">
+    <div>
+  <p class="spoken-label">What you said</p>
+  <p class="spoken">Um, so the design draft I sent yesterday, could you make the button color, oh wait, no, the heading color a bit brighter, and also widen the margins. And let me know if you can get it done by Friday</p>
+      <p class="spoken-note">These are examples. Actual output varies with what you say and the model you use.</p>
+    </div>
+    <div>
+  <div class="tabs" role="tablist" aria-label="Cleanup mode" hidden>
+    <button type="button" role="tab" id="tab-raw" aria-controls="panel-raw" aria-selected="false">Raw</button>
+    <button type="button" role="tab" id="tab-natural" aria-controls="panel-natural" aria-selected="true">Natural</button>
+    <button type="button" role="tab" id="tab-business" aria-controls="panel-business" aria-selected="false">Business</button>
+    <button type="button" role="tab" id="tab-prompt" aria-controls="panel-prompt" aria-selected="false">Prompt</button>
+  </div>
+  <div class="mode-panel" id="panel-raw" role="tabpanel" aria-labelledby="tab-raw">
+    <p class="mode-output is-raw">Um, so the design draft I sent yesterday, could you make the button color, oh wait, no, the heading color a bit brighter, and also widen the margins. And let me know if you can get it done by Friday</p>
+    <p class="mode-note">Enters exactly what you said. No AI is involved, so no API key is needed.</p>
+  </div>
+  <div class="mode-panel" id="panel-natural" role="tabpanel" aria-labelledby="tab-natural">
+    <p class="mode-output">The design draft I sent yesterday, could you make the heading color a bit brighter and also widen the margins?
+Let me know if you can get it done by Friday.</p>
+    <p class="mode-note">For chat and notes. Keeps your tone and makes it easy to read.</p>
+  </div>
+  <div class="mode-panel" id="panel-business" role="tabpanel" aria-labelledby="tab-business">
+    <p class="mode-output">The design draft I sent yesterday: could you please make the heading color a bit brighter and also widen the margins?
+
+Please let me know if you can get it done by Friday.</p>
+    <p class="mode-note">For email and chat outside your company. Makes it polite, without adding greetings you didn’t say.</p>
+  </div>
+  <div class="mode-panel" id="panel-prompt" role="tabpanel" aria-labelledby="tab-prompt">
+    <p class="mode-output">The design draft I sent yesterday, could you
+- make the heading color a bit brighter
+- widen the margins
+Let me know if you can get it done by Friday.</p>
+    <p class="mode-note">For instructions to Claude Code or ChatGPT. Turns the items you listed into bullets.</p>
+  </div>
+    </div>
+  </div>
+
+  <div class="mode-facts">
+    <div>
+      <h3>Switches automatically by app</h3>
+      <p>Business in Mail, Prompt in Terminal. You choose which mode each app uses.</p>
+    </div>
+    <div>
+      <h3>AI cleanup needs an API key</h3>
+      <p>Choose from Anthropic, Amazon Bedrock, Google Gemini, or an OpenAI-compatible API. You pay the service you use. If cleanup fails, what you said is entered as is.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section split" aria-labelledby="dictionary">
+  <div>
+    <h2 id="dictionary">Fix a word once, and the dictionary learns it</h2>
+    <p class="section-lead">When you correct a word right after dictating, HibiVo notices and adds it to your dictionary, so company names, product names and technical terms come out right more often. Click the notice to undo. In apps whose text can’t be read, such as Terminal, you can add words from History.</p>
+  </div>
+  <div>
+    <p class="correction">Check the <del>app sink</del> <ins>AppSync</ins> settings</p>
+    <div class="notice">
+      <span class="notice-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M10 3l1.9 5.6a3 3 0 0 0 1.9 1.9L19.4 12.4l-5.6 1.9a3 3 0 0 0-1.9 1.9L10 21.8l-1.9-5.6a3 3 0 0 0-1.9-1.9L.6 12.4l5.6-1.9a3 3 0 0 0 1.9-1.9L10 3zM19 1l.8 2.4a1.2 1.2 0 0 0 .8.8L23 5l-2.4.8a1.2 1.2 0 0 0-.8.8L19 9l-.8-2.4a1.2 1.2 0 0 0-.8-.8L15 5l2.4-.8a1.2 1.2 0 0 0 .8-.8L19 1z"/></svg></span>
+      <p class="notice-text"><small>Added to Dictionary</small><span>app sink</span> → <b>AppSync</b></p>
+      <span class="notice-undo">Undo</span>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section split" aria-labelledby="meetings">
+  <div>
+    <h2 id="meetings">Meetings, written down</h2>
+    <p class="section-lead">Hold <kbd>Right Option</kbd> and press <kbd>M</kbd> to start. HibiVo transcribes your microphone and system audio together, so remote participants are captured too.</p>
+    <ul class="bullets">
+      <li>On macOS 26 or later, built-in transcription needs no API key and costs nothing. To tell speakers apart, use Soniox.</li>
+      <li>HibiVo can also write minutes (summary, decisions, to-dos and more) with your AI cleanup provider or Claude Code. This is off by default.</li>
+      <li>Where recording or transcription requires consent, tell participants first.</li>
+    </ul>
+  </div>
+  <div class="file">
+    <p class="file-name">2026-11-02_14-00-05.md</p>
+    <pre># ミーティング 2026-11-02 14:00
+
+- 開始: 2026-11-02 14:00:05
+- 終了: 2026-11-02 14:32:41(32 分)
+- 音声: マイクとシステム音声(相手の声)
+- 話者は音声から自動で推定しています。番号は実際の人物と一致しないことがあります。
+
+---
+
+[00:00:12] **話者1** Let's start with next week's release.
+
+[00:00:20] **話者2** Testing should be done by Thursday.
+
+[00:00:31] **話者1** Great. Let's ship Friday morning.</pre>
+  </div>
+</section>
+
+<section class="wrap section" aria-labelledby="privacy">
+  <h2 id="privacy">You choose what goes where</h2>
+  <dl class="promises">
+    <div><dt>After transcription, no audio stays on your Mac</dt><dd>Dictation and real-time meetings use audio in memory and never write it to disk. Only After the Meeting transcription stores it on your Mac until the transcript is done, then deletes it. If transcription can’t finish, it’s deleted after 7 days.</dd></div>
+    <div><dt>With macOS transcription, audio stays on your Mac</dt><dd>That’s the default on macOS 26 or later. If you choose Soniox or Gemini, audio goes to that service. If you use AI cleanup, text goes to the provider you chose.</dd></div>
+    <div><dt>API keys live in the Keychain</dt><dd>They’re never written to a settings file. History is kept on your Mac in plain text, up to 200 entries, and you can turn it off.</dd></div>
+    <div><dt>No analytics or telemetry</dt><dd>The app sends no usage data, and this page has no analytics. It does check GitHub for updates, which you can turn off.</dd></div>
+  </dl>
+</section>
+
+<section class="start" aria-labelledby="start">
+  <div class="wrap split">
+    <div>
+      <h2 id="start">Get started</h2>
+      <ol class="start-steps">
+        <li><h3>Download</h3><p>Get the zip from GitHub Releases, unzip it, and move HibiVo.app to Applications.</p></li>
+        <li><h3>Allow two permissions</h3><p>Accessibility, for the hotkey and pasting, and the microphone.</p></li>
+        <li><h3>Press right Option and speak</h3><p>Press again when you’re done, or hold while you speak. You can also use Fn, right Command, or ⌃Space.</p></li>
+      </ol>
+      <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest">Download for Mac</a>
+    </div>
+    <div>
+      <h3>What you need</h3>
+      <dl class="requirements">
+        <div><dt>Mac</dt><dd>macOS 14 or later, Apple Silicon</dd></div>
+        <div><dt>Transcription</dt><dd>On macOS 26 or later, built-in transcription works without an API key. On earlier versions, you need an API key from Soniox or Google Gemini.</dd></div>
+        <div><dt>AI cleanup (optional)</dt><dd>Anthropic, Amazon Bedrock, Google Gemini, or an OpenAI-compatible API. Without one, you can use Raw.</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap site-footer">
+  <div class="footer-links">
+    <a href="https://github.com/mori-ri/HibiVo/blob/main/README.en.md">Documentation</a>
+    <a href="https://github.com/mori-ri/HibiVo/discussions">Feedback</a>
+    <a href="https://github.com/sponsors/mori-ri">Sponsor</a>
+    <a href="https://github.com/mori-ri/HibiVo">GitHub</a>
+  </div>
+  <p>Source code is under the MIT License. The app icon and logo are not covered by it, and the author retains their copyright.</p>
+</footer>
+
+<div class="hud" aria-hidden="true">
+  <span class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
+  <span class="hud-label"></span>
+  <span class="spinner"></span>
+</div>
+
+<script type="application/json" id="demo-data">{"speakMs": 5200, "segments": [{"raw": "Um, so ", "final": ""}, {"raw": "the design draft I sent yesterday, could you make the ", "final": "The design draft I sent yesterday, could you make the "}, {"raw": "button color, oh wait, no, the ", "final": ""}, {"raw": "heading color a bit brighter", "final": "heading color a bit brighter"}, {"raw": ", and also widen the margins", "final": " and also widen the margins"}, {"raw": ". And let me know if you can get it done by Friday", "final": "?\nLet me know if you can get it done by Friday."}], "labels": {"start": "Start the demo", "stop": "Stop the demo"}}</script>
+</body>
+</html>

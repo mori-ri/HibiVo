@@ -6,7 +6,7 @@
 
 # HibiVo
 
-押す → 話す → もう一度押す(または押している間だけ話す)→ 文章が入る。macOS 向けの日本語音声入力アプリです。
+押す → 話す → もう一度押す(または押している間だけ話す)→ 文章が入る。macOS 向けの日本語音声入力アプリです。[紹介ページ](https://mori-ri.github.io/HibiVo/)で動きを試せます。
 
 - Push-to-Talk（既定は右 Option。Fn / 右 Command / ⌃Space も選べます）
 - 話している間にストリーミングで文字起こしするので、録音を終えたらすぐ入力されます。既定は macOS 標準の文字起こし（macOS 26 以降。Mac の中で処理し、API Key 不要・無料）で、Soniox または Google Gemini も選べます
@@ -144,5 +144,5 @@
 
 ソースコードは [MIT License](LICENSE) です。
 
-アプリアイコンとロゴ（`Resources/AppIconSource.png`、`Resources/AppIcon.icns`、`Resources/MenuBarIcon.png`、`Resources/MenuBarIcon@2x.png`）は MIT License の対象外で、著作権は作者に帰属します。
+アプリアイコンとロゴ（`Resources/AppIconSource.png`、`Resources/AppIcon.icns`、`Resources/MenuBarIcon.png`、`Resources/MenuBarIcon@2x.png`、`Resources/Logo.png`、`Resources/Logo@2x.png`、`site/assets/`）は MIT License の対象外で、著作権は作者に帰属します。
 HibiVo のビルドや紹介のために使うのは構いませんが、fork や派生物を配布するときは別のアイコンに差し替えてください。

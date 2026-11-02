@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<title>HibiVo | 話すだけで文章になる Mac の音声入力</title>
+<meta name="description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。日本語を第一に作った、無料でオープンソースの Mac 用音声入力アプリです。">
+<link rel="canonical" href="https://mori-ri.github.io/HibiVo/">
+<link rel="alternate" hreflang="ja" href="https://mori-ri.github.io/HibiVo/">
+<link rel="alternate" hreflang="en" href="https://mori-ri.github.io/HibiVo/en/">
+<link rel="alternate" hreflang="x-default" href="https://mori-ri.github.io/HibiVo/">
+<link rel="icon" type="image/png" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="HibiVo | 話すだけで文章になる Mac の音声入力">
+<meta property="og:description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。日本語を第一に作った、無料でオープンソースの Mac 用音声入力アプリです。">
+<meta property="og:url" content="https://mori-ri.github.io/HibiVo/">
+<meta property="og:image" content="https://mori-ri.github.io/HibiVo/assets/icon.png">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="style.css">
+<script src="main.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">本文へ移動</a>
+
+<header class="wrap site-header">
+  <a class="brand" href="./"><img src="assets/logo.png" width="49" height="32" alt="">HibiVo</a>
+  <a class="lang" href="en/" hreflang="en" lang="en">English</a>
+  <a href="https://github.com/mori-ri/HibiVo">GitHub</a>
+  <a class="button button-small" href="https://github.com/mori-ri/HibiVo/releases/latest">ダウンロード</a>
+</header>
+
+<main id="main">
+<section class="wrap hero">
+  <div class="hero-top">
+    <h1><span class="said">話すだけで、</span><span class="written">文章になる。</span></h1>
+    <div class="hero-lead">
+      <p class="lead">HibiVo は Mac の音声入力アプリです。キーを押して話すと、いま使っているアプリのカーソル位置に、整った文章が入ります。</p>
+      <div class="actions">
+        <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest">Mac 版をダウンロード</a>
+        <p class="fine">無料のオープンソースです。macOS 14 以降の Apple Silicon Mac で動きます。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" data-phase="done">
+    <div class="streak" aria-hidden="true"></div>
+    <div class="keypad">
+      <button class="key" type="button" aria-label="デモを始める"><span class="key-symbol" aria-hidden="true">⌥</span><span class="key-name" aria-hidden="true">option</span></button>
+      <ol class="steps" aria-label="使い方">
+        <li>押す</li>
+        <li>話す</li>
+        <li>もう一度押す</li>
+      </ol>
+    </div>
+    <div class="page">
+      <p class="ghost" aria-hidden="true"></p>
+      <p class="demo-text">昨日送ったデザイン案なんだけど、見出しの色をもうちょっと明るくして、余白も広げてほしい。
+金曜までにできるか教えて。</p>
+    </div>
+    <p class="demo-note">キーを押すと試せます<span class="desktop-only">(Mac なら右 Option キーでも動きます)</span>。これはページ上の再現で、マイクは使いません。</p>
+  </div>
+</section>
+
+<section class="wrap section" aria-labelledby="modes">
+  <h2 id="modes">同じ話でも、<wbr>相手に合う文章に</h2>
+  <p class="section-lead">言いよどみや言い直しを AI が取り除きます。話していないことは足しません。アプリに合わせて 4 つの整え方を使い分けられ、自分で指示を書く Custom もあります。</p>
+  <div class="mode-compare">
+    <div>
+  <p class="spoken-label">話した言葉</p>
+  <p class="spoken">えーと昨日送ったデザイン案なんだけど、ボタンの色を、あ、いや、見出しの色をもうちょっと明るくして、あと余白も広げてほしい。で金曜までにできるか教えて</p>
+      <p class="spoken-note">出力は一例です。話した内容や使うモデルによって少し変わります。</p>
+    </div>
+    <div>
+  <div class="tabs" role="tablist" aria-label="整形モード" hidden>
+    <button type="button" role="tab" id="tab-raw" aria-controls="panel-raw" aria-selected="false">Raw</button>
+    <button type="button" role="tab" id="tab-natural" aria-controls="panel-natural" aria-selected="true">Natural</button>
+    <button type="button" role="tab" id="tab-business" aria-controls="panel-business" aria-selected="false">Business</button>
+    <button type="button" role="tab" id="tab-prompt" aria-controls="panel-prompt" aria-selected="false">Prompt</button>
+  </div>
+  <div class="mode-panel" id="panel-raw" role="tabpanel" aria-labelledby="tab-raw">
+    <p class="mode-output is-raw">えーと昨日送ったデザイン案なんだけど、ボタンの色を、あ、いや、見出しの色をもうちょっと明るくして、あと余白も広げてほしい。で金曜までにできるか教えて</p>
+    <p class="mode-note">話した言葉をそのまま入力します。AI を使わないので、API Key も要りません。</p>
+  </div>
+  <div class="mode-panel" id="panel-natural" role="tabpanel" aria-labelledby="tab-natural">
+    <p class="mode-output">昨日送ったデザイン案なんだけど、見出しの色をもうちょっと明るくして、余白も広げてほしい。
+金曜までにできるか教えて。</p>
+    <p class="mode-note">チャットやメモに。口調は変えず、読みやすく整えます。</p>
+  </div>
+  <div class="mode-panel" id="panel-business" role="tabpanel" aria-labelledby="tab-business">
+    <p class="mode-output">昨日お送りしたデザイン案ですが、見出しの色をもう少し明るくして、余白も広げていただきたいです。
+金曜までにできるか教えていただけますか。</p>
+    <p class="mode-note">メールや社外のチャットに。敬語に直します。話していない挨拶は足しません。</p>
+  </div>
+  <div class="mode-panel" id="panel-prompt" role="tabpanel" aria-labelledby="tab-prompt">
+    <p class="mode-output">昨日送ったデザイン案なんだけど、
+- 見出しの色をもうちょっと明るくする
+- 余白を広げる
+をしてほしい。
+金曜までにできるか教えて。</p>
+    <p class="mode-note">Claude Code や ChatGPT への指示に。挙げた項目を箇条書きにします。</p>
+  </div>
+    </div>
+  </div>
+
+  <div class="mode-facts">
+    <div>
+      <h3>アプリごとに自動で切り替え</h3>
+      <p>Mail では Business、Terminal では Prompt。どのアプリでどのモードを使うかは自由に変えられます。</p>
+    </div>
+    <div>
+      <h3>AI 整形には API Key が必要です</h3>
+      <p>Anthropic、Amazon Bedrock、Google Gemini、OpenAI 互換 API から選べます。料金は使ったサービスに支払います。整形に失敗しても、話した内容はそのまま入力します。</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section split" aria-labelledby="dictionary">
+  <div>
+    <h2 id="dictionary">一度直せば、<wbr>辞書が覚える</h2>
+    <p class="section-lead">入力された言葉を直すと、HibiVo が気づいて辞書に登録します。社名や製品名、専門用語が、次から正しく入りやすくなります。登録はクリックで取り消せます。ターミナルなど内容を読み取れないアプリでは、履歴の「修正」から登録できます。</p>
+  </div>
+  <div>
+    <p class="correction"><del>アップシンク</del><ins>AppSync</ins>の設定を確認します</p>
+    <div class="notice">
+      <span class="notice-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M10 3l1.9 5.6a3 3 0 0 0 1.9 1.9L19.4 12.4l-5.6 1.9a3 3 0 0 0-1.9 1.9L10 21.8l-1.9-5.6a3 3 0 0 0-1.9-1.9L.6 12.4l5.6-1.9a3 3 0 0 0 1.9-1.9L10 3zM19 1l.8 2.4a1.2 1.2 0 0 0 .8.8L23 5l-2.4.8a1.2 1.2 0 0 0-.8.8L19 9l-.8-2.4a1.2 1.2 0 0 0-.8-.8L15 5l2.4-.8a1.2 1.2 0 0 0 .8-.8L19 1z"/></svg></span>
+      <p class="notice-text"><small>辞書に追加しました</small><span>アップシンク</span> → <b>AppSync</b></p>
+      <span class="notice-undo">取り消す</span>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section split" aria-labelledby="meetings">
+  <div>
+    <h2 id="meetings">会議も、<wbr>そのまま文字に</h2>
+    <p class="section-lead"><kbd>右 Option</kbd> を押しながら <kbd>M</kbd> で開始します。マイクとシステム音声をいっしょに文字起こしするので、オンライン参加者の声も残ります。</p>
+    <ul class="bullets">
+      <li>macOS 26 以降なら、標準の文字起こしで API Key も料金も不要です。話者を区別するには Soniox を使います。</li>
+      <li>議事録(概要、決定事項、ToDo など)も作れます。AI 整形と同じプロバイダか Claude Code を選びます。既定はオフです。</li>
+      <li>録音や文字起こしに同意が必要な場面では、参加者に伝えてから使ってください。</li>
+    </ul>
+  </div>
+  <div class="file">
+    <p class="file-name">2026-11-02_14-00-05.md</p>
+    <pre># ミーティング 2026-11-02 14:00
+
+- 開始: 2026-11-02 14:00:05
+- 終了: 2026-11-02 14:32:41(32 分)
+- 音声: マイクとシステム音声(相手の声)
+- 話者は音声から自動で推定しています。番号は実際の人物と一致しないことがあります。
+
+---
+
+[00:00:12] **話者1** では、来週のリリースの確認から始めます。
+
+[00:00:20] **話者2** テストは木曜までに終わる見込みです。
+
+[00:00:31] **話者1** わかりました。金曜の朝に公開しましょう。</pre>
+  </div>
+</section>
+
+<section class="wrap section" aria-labelledby="privacy">
+  <h2 id="privacy">どこに何を送るか、<wbr>自分で選べる</h2>
+  <dl class="promises">
+    <div><dt>文字起こしが終わると、音声は Mac に残りません</dt><dd>音声入力とリアルタイムのミーティングでは、音声をメモリ上で使うだけで、ディスクには保存しません。「終了後にまとめて」のミーティングだけ、文字起こしが終わるまで Mac に一時保存して、終わると削除します。文字起こしできなかった場合も 7 日で削除します。</dd></div>
+    <div><dt>macOS 標準なら、音声は Mac の外に出ません</dt><dd>macOS 26 以降の既定です。Soniox や Gemini を選ぶと音声はそのサービスへ、AI 整形を使うと文章は選んだプロバイダへ送られます。</dd></div>
+    <div><dt>API Key は Keychain に保存します</dt><dd>設定ファイルには書き込みません。履歴は Mac に平文で最大 200 件保存し、保存しない設定にもできます。</dd></div>
+    <div><dt>解析やテレメトリはありません</dt><dd>アプリは利用状況を送信しません。このページにも解析ツールは入れていません。更新の確認で GitHub に問い合わせますが、これもオフにできます。</dd></div>
+  </dl>
+</section>
+
+<section class="start" aria-labelledby="start">
+  <div class="wrap split">
+    <div>
+      <h2 id="start">始め方</h2>
+      <ol class="start-steps">
+        <li><h3>ダウンロードする</h3><p>GitHub の Releases から zip を入手して展開し、HibiVo.app を「アプリケーション」に移します。</p></li>
+        <li><h3>2 つの権限を許可する</h3><p>ホットキーと貼り付けのためのアクセシビリティと、マイクを許可します。</p></li>
+        <li><h3>右 Option を押して話す</h3><p>終わったらもう一度押します。押している間だけ話すこともできます。キーは Fn、右 Command、⌃Space からも選べます。</p></li>
+      </ol>
+      <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest">Mac 版をダウンロード</a>
+    </div>
+    <div>
+      <h3>必要なもの</h3>
+      <dl class="requirements">
+        <div><dt>Mac</dt><dd>macOS 14 以降、Apple Silicon</dd></div>
+        <div><dt>文字起こし</dt><dd>macOS 26 以降は標準の文字起こしを API Key なしで使えます。それより前の macOS では Soniox か Google Gemini の API Key が必要です。</dd></div>
+        <div><dt>AI 整形(任意)</dt><dd>Anthropic、Amazon Bedrock、Google Gemini、OpenAI 互換 API のいずれか。なくても Raw で使えます。</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap site-footer">
+  <div class="footer-links">
+    <a href="https://github.com/mori-ri/HibiVo#readme">ドキュメント</a>
+    <a href="https://github.com/mori-ri/HibiVo/discussions">フィードバック</a>
+    <a href="https://github.com/sponsors/mori-ri">スポンサー</a>
+    <a href="https://github.com/mori-ri/HibiVo">GitHub</a>
+  </div>
+  <p>ソースコードは MIT License です。アプリアイコンとロゴは MIT License の対象外で、著作権は作者に帰属します。</p>
+</footer>
+
+<div class="hud" aria-hidden="true">
+  <span class="bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
+  <span class="hud-label"></span>
+  <span class="spinner"></span>
+</div>
+
+<script type="application/json" id="demo-data">{"speakMs": 4200, "segments": [{"raw": "えーと", "final": ""}, {"raw": "昨日送ったデザイン案なんだけど、", "final": "昨日送ったデザイン案なんだけど、"}, {"raw": "ボタンの色を、あ、いや、", "final": ""}, {"raw": "見出しの色をもうちょっと明るくして、", "final": "見出しの色をもうちょっと明るくして、"}, {"raw": "あと", "final": ""}, {"raw": "余白も広げてほしい。", "final": "余白も広げてほしい。\n"}, {"raw": "で", "final": ""}, {"raw": "金曜までにできるか教えて", "final": "金曜までにできるか教えて。"}], "labels": {"start": "デモを始める", "stop": "デモを止める"}}</script>
+</body>
+</html>

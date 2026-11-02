@@ -12,7 +12,7 @@ HibiVo の画面・HUD・アイコンを作るときの決まりごとです。�
 
 ロゴは音声の波形と「HV」を組み合わせたもので、左から右へ **シアン → 青 → ピンク → オレンジ → 黄** と色が流れます。
 
-- 元データは `Resources/AppIconSource.png`。アプリアイコン、メニューバーアイコン、サイドバーのロゴはすべて `swift scripts/make-icons.swift` で生成します。出力ファイルを直接編集しないでください。
+- 元データは `Resources/AppIconSource.png`。アプリアイコン、メニューバーアイコン、サイドバーのロゴ、LP の画像(`site/assets/`)はすべて `swift scripts/make-icons.swift` で生成します。出力ファイルを直接編集しないでください。
 - メニューバーではモノクロのテンプレート画像を使います（システムが明暗に合わせて色を付けます）。
 - ロゴとアイコンは MIT License の対象外です（README を参照）。
 
