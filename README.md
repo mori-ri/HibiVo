@@ -1,5 +1,9 @@
 [English](README.en.md) | 日本語
 
+<p align="center">
+  <img src="Resources/AppIconSource.png" alt="HibiVo" width="200">
+</p>
+
 # HibiVo
 
 押す → 話す → もう一度押す(または押している間だけ話す)→ 文章が入る。macOS 向けの日本語音声入力アプリです。

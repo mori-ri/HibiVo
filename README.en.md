@@ -1,5 +1,9 @@
 English | [日本語](README.md)
 
+<p align="center">
+  <img src="Resources/AppIconSource.png" alt="HibiVo" width="200">
+</p>
+
 # HibiVo
 
 Press → speak → press again (or hold while you speak) → your text appears. A voice input app for macOS, built Japanese-first.
