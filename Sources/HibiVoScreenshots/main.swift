@@ -32,7 +32,7 @@ else {
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
-// Answered up front so nothing looks in the Keychain.
+// Answered up front so the one-time migrations don't take the sample keys for an existing user's.
 let defaultsDomain = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
 UserDefaults.standard.removePersistentDomain(forName: defaultsDomain)
 UserDefaults.standard.set(true, forKey: "transcriptionDefaultsMigrated")
