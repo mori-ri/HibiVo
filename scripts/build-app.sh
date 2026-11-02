@@ -28,11 +28,16 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns Resources/Logo.png Resources/Logo@2x.png Resources/MenuBarIcon.png Resources/MenuBarIcon@2x.png "$APP/Contents/Resources/"
 # Localized strings. The Japanese text in code is the key, so ja.lproj/Localizable.strings is empty.
 cp -R Resources/ja.lproj Resources/en.lproj "$APP/Contents/Resources/"
-# The app is distributed without the repository, so its license and warranty disclaimer travel with it.
-cp LICENSE "$APP/Contents/Resources/LICENSE.txt"
+# The app is distributed without the repository, so its license, warranty disclaimer and the exception for
+# the icon and logo (see README) travel with it.
+{
+  cat LICENSE
+  printf '\nThe app icon and logo are not covered by the MIT License above; their copyright belongs to the author.\n'
+} >"$APP/Contents/Resources/LICENSE.txt"
 
 # Prefer an explicit identity, then Developer ID, then the certificate from create-signing-cert.sh, then ad-hoc.
-IDENTITIES="$(security find-identity -v -p codesigning)"
+# A failed lookup means ad-hoc signing, not a failed build.
+IDENTITIES="$(security find-identity -v -p codesigning || true)"
 IDENTITY="${HIBIVO_SIGN_IDENTITY:-}"
 if [[ -z "$IDENTITY" ]]; then
   # The hash stays unambiguous when an expired and a renewed certificate share a name.
@@ -45,7 +50,7 @@ IDENTITY="${IDENTITY:--}"
 
 SIGN_ARGS=(--force --sign "$IDENTITY" --identifier io.github.mori-ri.hibivo)
 # No `grep -q` in these pipelines: it exits at the first match, and pipefail then reports the writer's SIGPIPE.
-if [[ "$IDENTITY" != - ]] && grep -F "$IDENTITY" <<<"$IDENTITIES" | grep -F '"Developer ID Application: ' >/dev/null; then
+if [[ "$IDENTITY" != - ]] && grep -iF "$IDENTITY" <<<"$IDENTITIES" | grep -F '"Developer ID Application: ' >/dev/null; then
   # The hardened runtime blocks the microphone unless the entitlement is present.
   SIGN_ARGS+=(--options runtime --entitlements Resources/HibiVo.entitlements)
   if [[ "$CONFIG" == release ]]; then

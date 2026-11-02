@@ -65,7 +65,7 @@ public struct DailyUsage: Codable, Hashable, Sendable {
     /// The part of `transcription` that came from meetings, kept per model so its cost can be told apart.
     public var meetingTranscription: [TranscriptionUsage] = []
     public var cleanup: [CleanupUsage] = []
-    /// Meeting minutes written through an API. Claude Code runs on the user's subscription and isn't counted.
+    /// Meeting minutes written through an API. Claude Code's usage isn't counted.
     public var minutes: [CleanupUsage] = []
 
     public init(day: String) {

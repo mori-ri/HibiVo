@@ -5,6 +5,9 @@ import Foundation
 @Observable
 public final class SettingsStore {
     @ObservationIgnored private let defaults: UserDefaults
+    /// Whether an earlier version already ran here. Every version with meeting minutes set this flag, and `init`
+    /// reads it before setting it for this launch.
+    @ObservationIgnored private let launchedBefore: Bool
 
     public var hotkey: HotkeyTrigger { didSet { save(hotkey, "hotkey") } }
     /// The UI language. macOS reads `AppleLanguages` from the app's domain only at launch.
@@ -109,6 +112,7 @@ public final class SettingsStore {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        launchedBefore = defaults.bool(forKey: "appModeOverridesSeeded")
         hotkey = Self.load("hotkey", from: defaults) ?? .default
         let appLanguage: AppLanguage = Self.load("appLanguage", from: defaults) ?? .system
         self.appLanguage = appLanguage
@@ -170,12 +174,11 @@ public final class SettingsStore {
     }
 
     /// Claude Code used to be the default for minutes, on wherever it was installed. Someone upgrading keeps
-    /// what they had; new installs choose for themselves. Runs once, before `keepSonioxForExistingUsers` sets the
-    /// flag that identifies an earlier launch.
+    /// what they had; new installs choose for themselves. Runs once.
     public func keepClaudeCodeMinutesForExistingUsers(claudeCodeInstalled: () -> Bool) {
         guard !defaults.bool(forKey: "minutesDefaultsMigrated") else { return }
         defaults.set(true, forKey: "minutesDefaultsMigrated")
-        guard defaults.bool(forKey: "transcriptionDefaultsMigrated") else { return }
+        guard launchedBefore else { return }
         if defaults.data(forKey: "meetingMinutesEngine") == nil { meetingMinutesEngine = .claudeCode }
         if defaults.object(forKey: "meetingMinutesEnabled") == nil { meetingMinutesEnabled = claudeCodeInstalled() }
     }

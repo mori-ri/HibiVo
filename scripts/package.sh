@@ -30,9 +30,12 @@ ZIP="build/HibiVo-$VERSION-$ARCH.zip"
 [[ "$NOTARIZE" != 0 ]] || ZIP="build/HibiVo-$VERSION-$ARCH-local.zip"
 
 make_zip() {
-  rm -f "$ZIP"
-  ditto -c -k --keepParent build/HibiVo.app "$ZIP"
+  rm -f "$1"
+  ditto -c -k --keepParent build/HibiVo.app "$1"
 }
+
+# Removed up front: after a failure, nothing with the release name may be left behind.
+rm -f "$ZIP"
 
 codesign --verify --strict build/HibiVo.app
 # Captured first: with pipefail, `codesign | grep -q` fails on SIGPIPE and would look like a missing signature.
@@ -42,14 +45,16 @@ if [[ "$NOTARIZE" != 0 ]] && ! grep -q '^Authority=Developer ID Application: ' <
   echo "error: Developer ID で署名されていません。証明書を確認してください (試すだけなら NOTARIZE=0)。" >&2
   exit 1
 fi
-make_zip
 
 if [[ "$NOTARIZE" == 0 ]]; then
+  make_zip "$ZIP"
   echo "NOTARIZE=0: skipping notarization. This zip is for local testing only."
 else
+  SUBMISSION="build/HibiVo-$VERSION-$ARCH-unnotarized.zip"
+  make_zip "$SUBMISSION"
   echo "Submitting to the Apple notary service…"
   # Decide from the reported status: an Invalid submission is not a failure of the command itself.
-  RESULT="$(xcrun notarytool submit "$ZIP" --keychain-profile "$PROFILE" --wait --output-format json)" || {
+  RESULT="$(xcrun notarytool submit "$SUBMISSION" --keychain-profile "$PROFILE" --wait --output-format json)" || {
     echo "error: 公証の送信に失敗しました。プロファイル $PROFILE は package.sh の先頭の手順で作成できます。" >&2
     exit 1
   }
@@ -60,10 +65,11 @@ else
     exit 1
   fi
   xcrun stapler staple build/HibiVo.app
-  # The ticket lives in the bundle, so the zip has to be rebuilt to carry it.
-  make_zip
   spctl --assess --type execute --verbose build/HibiVo.app
+  # The ticket lives in the bundle, so the zip has to be rebuilt to carry it.
+  make_zip "$ZIP"
+  rm -f "$SUBMISSION"
 fi
 
 echo "Packaged $ZIP"
-codesign -dv build/HibiVo.app 2>&1 | grep -E "^(Authority|Signature)=" || true
+grep -E "^(Authority|Signature)=" <<<"$SIGNATURE" || true

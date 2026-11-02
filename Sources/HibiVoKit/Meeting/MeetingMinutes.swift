@@ -14,7 +14,7 @@ public enum MeetingMinutesError: Error, Equatable, Sendable {
 /// Minutes as written, with the API usage they cost.
 public struct WrittenMinutes: Equatable, Sendable {
     public var text: String
-    /// nil when the writer has no per-token cost to report (Claude Code, on the user's subscription).
+    /// nil when HibiVo doesn't track the writer's usage (Claude Code).
     public var usage: CleanupUsage?
 
     public init(text: String, usage: CleanupUsage? = nil) {
@@ -234,8 +234,7 @@ enum MeetingMinutesTitle {
     }
 }
 
-/// Writes minutes with the Claude Code CLI in headless mode, so they count against the user's Claude
-/// subscription instead of API billing.
+/// Writes minutes with the Claude Code CLI in headless mode.
 ///
 /// Claude Code runs with no tools, no MCP servers and no settings files, in an empty temporary
 /// directory, and keeps no session: it only reads the prompt and prints the minutes.
@@ -329,7 +328,7 @@ public struct ClaudeCodeMinutesWriter: MeetingMinutesWriting {
                 throw MeetingMinutesError.timedOut
             }
             defer { group.cancelAll() }
-            // Claude Code doesn't report usage to HibiVo, so there's nothing to record.
+            // HibiVo doesn't read Claude Code's usage, so there's nothing to record.
             return WrittenMinutes(text: try await group.next() ?? "")
         }
     }

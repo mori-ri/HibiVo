@@ -72,9 +72,10 @@ import Testing
         #expect(settings.checksForUpdates)
     }
 
+    // Versions before 0.5 never set `transcriptionDefaultsMigrated`, so it can't identify an upgrade.
     @Test func existingUsersKeepTheirClaudeCodeMinutes() {
         let defaults = makeDefaults()
-        defaults.set(true, forKey: "transcriptionDefaultsMigrated")
+        defaults.set(true, forKey: "appModeOverridesSeeded")
         let settings = SettingsStore(defaults: defaults)
         settings.keepClaudeCodeMinutesForExistingUsers { true }
         #expect(settings.meetingMinutesEnabled)
@@ -87,7 +88,7 @@ import Testing
 
     @Test func minutesMigrationLeavesChoicesAlone() {
         let defaults = makeDefaults()
-        defaults.set(true, forKey: "transcriptionDefaultsMigrated")
+        defaults.set(true, forKey: "appModeOverridesSeeded")
         let settings = SettingsStore(defaults: defaults)
         settings.meetingMinutesEnabled = false
         settings.meetingMinutesEngine = .gemini

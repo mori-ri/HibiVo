@@ -153,6 +153,12 @@ publish() {
     release_args+=(--prerelease)
   fi
 
+  # Checked before anything is pushed: a tag whose app can't be built is awkward to take back.
+  security find-identity -v -p codesigning | grep -F '"Developer ID Application: ' >/dev/null \
+    || die "Developer ID の証明書が見つかりません。"
+  xcrun notarytool history --keychain-profile "${HIBIVO_NOTARY_PROFILE:-hibivo-notary}" >/dev/null 2>&1 \
+    || die "公証プロファイルを確認できません。scripts/package.sh の先頭の手順で作成してください。"
+
   echo "$branch の ${head:0:7} に $tag (build $build) を打ち、リリースの下書きを作ります (前回: ${prev_tag:-なし})。"
   git log -20 --oneline --no-decorate ${prev_tag:+"$prev_tag..HEAD"}
   confirm "タグを push しますか?" || exit 1
@@ -174,8 +180,9 @@ upload() {
   [[ "$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)" == "$(git rev-parse HEAD)" ]] \
     || die "HEAD がタグ $tag ではありません。"
   # Chained with &&: publish calls this inside `||`, where set -e doesn't apply, and a failed build must
-  # not attach an older zip.
-  scripts/package.sh && gh release upload "$tag" "build/HibiVo-$version-$(uname -m).zip" --clobber
+  # not attach an older zip. NOTARIZE is pinned for the same reason: 0 in the environment would skip the
+  # build of the zip attached below.
+  NOTARIZE=1 scripts/package.sh && gh release upload "$tag" "build/HibiVo-$version-$(uname -m).zip" --clobber
 }
 
 case "${1:-}" in
