@@ -150,6 +150,7 @@ private struct Sidebar: View {
                         title: "新しいバージョン \(version) があります", symbol: "arrow.down.circle",
                         url: ProjectLinks.latestRelease)
                 }
+                SidebarLink(title: "スポンサーになる", symbol: "heart", url: ProjectLinks.sponsors)
                 SidebarLink(title: "フィードバック・要望", symbol: "bubble.left", url: ProjectLinks.newFeedback)
                 SidebarLink(
                     title: "GitHub リポジトリ", symbol: "chevron.left.forwardslash.chevron.right",
