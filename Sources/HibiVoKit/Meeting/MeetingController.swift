@@ -87,6 +87,8 @@ public final class MeetingController {
         var endedAt: Date?
         /// The user's notes (`AppState.meetingNotes`) as of the last save, final once stopping.
         var notes = ""
+        /// The title and tags the user gave (`AppState.meetingTitle`, `meetingTags`), like `notes`.
+        var metadata = MeetingMetadata()
 
         var hasNotes: Bool { MeetingDocument.notesSection(notes) != nil }
         /// Kept even without speech: it records a capture failure or holds the user's notes.
@@ -342,6 +344,8 @@ public final class MeetingController {
         state.audioLevel = 0
         state.partialTranscript = ""
         state.meetingNotes = ""
+        state.meetingTitle = ""
+        state.meetingTags = []
         log.info("Meeting started (system audio: \(system != nil), after meeting: \(afterMeeting))")
     }
 
@@ -351,7 +355,10 @@ public final class MeetingController {
         meeting.endedAt = Date()
         // The notes window closes with the meeting; what was typed so far is final.
         meeting.notes = state.meetingNotes
+        meeting.metadata = currentMetadata()
         state.meetingNotes = ""
+        state.meetingTitle = ""
+        state.meetingTags = []
         watchdog?.cancel()
         saver?.cancel()
         meeting.reconnect?.cancel()
@@ -506,7 +513,8 @@ public final class MeetingController {
                 onSaved(meeting.fileURL)
             } else {
                 didSave(
-                    document, to: meeting.fileURL, vocabulary: meeting.vocabulary, language: meeting.config.language)
+                    document, to: meeting.fileURL, vocabulary: meeting.vocabulary, language: meeting.config.language,
+                    metadata: meeting.metadata)
             }
         }
     }
@@ -628,7 +636,8 @@ public final class MeetingController {
                 onSaved(meeting.fileURL)
             } else {
                 didSave(
-                    document, to: meeting.fileURL, vocabulary: meeting.vocabulary, language: meeting.config.language)
+                    document, to: meeting.fileURL, vocabulary: meeting.vocabulary, language: meeting.config.language,
+                    metadata: meeting.metadata)
             }
         } else {
             // With the recording on disk, the next resume fetches the result again and retries the save.
@@ -659,7 +668,8 @@ public final class MeetingController {
             startedAt: meeting.startedAt, endedAt: meeting.endedAt, providerID: meeting.provider.id,
             model: meeting.config.model, language: meeting.config.language, vocabulary: meeting.vocabulary,
             includesSystemAudio: meeting.includesSystemAudio, notices: notices(meeting, ended: meeting.endedAt != nil),
-            notes: meeting.notes, job: meeting.job, directory: meeting.fileURL.deletingLastPathComponent().path)
+            notes: meeting.notes, job: meeting.job, directory: meeting.fileURL.deletingLastPathComponent().path,
+            metadata: meeting.metadata.isEmpty ? nil : meeting.metadata)
     }
 
     // MARK: - Sleep, shutdown and saved recordings
@@ -747,6 +757,7 @@ public final class MeetingController {
             // A recording the app never got to stop ends where its audio does.
             meeting.endedAt = info.endedAt ?? pending.lastWrittenAt ?? info.startedAt
             meeting.notes = info.notes
+            meeting.metadata = info.metadata ?? MeetingMetadata()
             meeting.includesSystemAudio = info.includesSystemAudio
             meeting.restoredNotices = info.notices
             meeting.microphoneUnavailable = info.notices.contains(.microphoneUnavailable)
@@ -780,7 +791,10 @@ public final class MeetingController {
     /// With minutes, Finder shows the minutes once they exist (or the transcript if they fail), so the
     /// user isn't pulled to Finder twice.
     /// The user's notes reach the minutes through the transcript document, where Claude reads them.
-    private func didSave(_ document: String, to url: URL, vocabulary: [VocabularyEntry], language: String) {
+    /// The user's title, if any, names the minutes in place of Claude's.
+    private func didSave(
+        _ document: String, to url: URL, vocabulary: [VocabularyEntry], language: String, metadata: MeetingMetadata
+    ) {
         guard settings.meetingMinutesEnabled else {
             onSaved(url)
             return
@@ -799,13 +813,13 @@ public final class MeetingController {
             Task {
                 await writeMinutes(
                     from: document, transcriptURL: url, vocabulary: vocabulary.map(\.promptTerm), model: model,
-                    language: PromptLanguage(transcriptionLanguage: language), with: writer)
+                    language: PromptLanguage(transcriptionLanguage: language), metadata: metadata, with: writer)
             })
     }
 
     private func writeMinutes(
         from document: String, transcriptURL: URL, vocabulary: [CleanupPromptBuilder.Term], model: String,
-        language: PromptLanguage, with minutesWriter: any MeetingMinutesWriting
+        language: PromptLanguage, metadata: MeetingMetadata, with minutesWriter: any MeetingMinutesWriting
     ) async {
         defer { state.meetingMinutesInProgress -= 1 }
         var minutes: WrittenMinutes?
@@ -841,10 +855,15 @@ public final class MeetingController {
         }
         // The tokens are spent even if the file can't be written below.
         if let usage, let tokens = minutes.usage { usage.record(UsageEvent(minutes: tokens)) }
-        let (title, body) = MeetingMinutesTitle.split(minutes.text)
-        let url = Self.minutesURL(for: transcriptURL, title: title)
+        let (claudeTitle, body) = MeetingMinutesTitle.split(minutes.text)
+        // The user's title names the file unless nothing of it is usable in a file name.
+        let userFileTitle = MeetingMinutesTitle.fileNameSafe(metadata.title)
+        let fileTitle = userFileTitle.isEmpty ? claudeTitle : userFileTitle
+        let heading = userFileTitle.isEmpty ? claudeTitle : metadata.title
+        let url = Self.minutesURL(for: transcriptURL, title: fileTitle)
         let text = MeetingDocument.minutes(
-            title: title, body: body, transcriptFileName: transcriptURL.lastPathComponent, language: language)
+            title: heading, body: body, transcriptFileName: transcriptURL.lastPathComponent, language: language,
+            metadata: metadata)
         if await writer.write(text, to: url) {
             log.info("Minutes saved")
             onSaved(url)
@@ -888,8 +907,10 @@ public final class MeetingController {
 
     private func saveIfDirty() async {
         guard let meeting, !meeting.isStopping else { return }
-        if meeting.notes != state.meetingNotes {
+        let metadata = currentMetadata()
+        if meeting.notes != state.meetingNotes || meeting.metadata != metadata {
             meeting.notes = state.meetingNotes
+            meeting.metadata = metadata
             meeting.isDirty = true
             await saveRecordingInfo(meeting)
         }
@@ -904,7 +925,13 @@ public final class MeetingController {
         MeetingDocument.markdown(
             meeting.transcript, startedAt: meeting.startedAt, endedAt: ended ? (meeting.endedAt ?? Date()) : nil,
             includesSystemAudio: meeting.includesSystemAudio, identifiesSpeakers: meeting.provider.identifiesSpeakers,
-            notices: notices(meeting, ended: ended), notes: meeting.notes, vocabulary: meeting.vocabulary)
+            notices: notices(meeting, ended: ended), notes: meeting.notes, metadata: meeting.metadata,
+            vocabulary: meeting.vocabulary)
+    }
+
+    /// The title and tags as typed so far, cleaned up.
+    private func currentMetadata() -> MeetingMetadata {
+        MeetingMetadata(title: state.meetingTitle, tags: state.meetingTags)
     }
 
     private func notices(_ meeting: Meeting, ended: Bool) -> [MeetingDocument.Notice] {

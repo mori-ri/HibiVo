@@ -102,7 +102,7 @@ public final class AppEnvironment {
         let dictation = dictation
         let meeting = meeting
         let state = state
-        let meetingNotes = MeetingNotesPanelController(state: state)
+        let meetingNotes = MeetingNotesPanelController(state: state, meetings: meetings)
         self.meetingNotes = meetingNotes
         hud = HUDController(
             state: state, settings: settings,

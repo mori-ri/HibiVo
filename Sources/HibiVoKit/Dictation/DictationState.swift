@@ -33,6 +33,10 @@ public final class AppState {
     /// What the user writes in the notes window during a meeting (Markdown). Saved with the
     /// transcript and put at the top of the minutes.
     public var meetingNotes = ""
+    /// The title the user gives the running meeting in the notes window; empty when none.
+    public var meetingTitle = ""
+    /// The tags the user gives the running meeting in the notes window, in the order added.
+    public var meetingTags: [String] = []
     /// Finished meetings still being transcribed in the background (after-meeting mode).
     public var meetingTranscriptionsInProgress = 0
     /// Saved meetings whose minutes Claude Code is still writing.

@@ -7,9 +7,13 @@ public struct MeetingRecord: Identifiable, Hashable, Sendable {
     public var startedAt: Date
     public var transcriptURL: URL?
     public var minutesURL: URL?
+    /// The title and tags given during the meeting, from the files' front matter.
+    public var metadata = MeetingMetadata()
 
-    /// The title Claude gave the minutes, or nil when there are none or they fell back to `議事録`.
+    /// The title given during the meeting, else the one Claude gave the minutes; nil when there is
+    /// neither or the minutes fell back to `議事録`.
     public var title: String? {
+        if !metadata.title.isEmpty { return metadata.title }
         guard let minutesURL else { return nil }
         let name = minutesURL.deletingPathExtension().lastPathComponent.dropFirst(id.count + 1)
         return name.isEmpty || name == "議事録" ? nil : String(name)  // no-l10n
@@ -27,6 +31,8 @@ public final class MeetingArchive {
     public private(set) var records: [MeetingRecord] = []
     /// The chosen folder first; the built-in one also holds meetings saved before the user chose one.
     @ObservationIgnored private let directories: @MainActor () -> [URL]
+    /// Front matter already read, keyed by file and modification date, so a refresh only reads changed files.
+    @ObservationIgnored private var metadataCache: [URL: (modified: Date?, metadata: MeetingMetadata)] = [:]
 
     public init(directories: @escaping @MainActor () -> [URL] = { [MeetingController.defaultDirectory] }) {
         self.directories = directories
@@ -38,8 +44,29 @@ public final class MeetingArchive {
         let listings = directories().filter { seen.insert($0.standardizedFileURL).inserted }.map {
             (directory: $0, names: (try? FileManager.default.contentsOfDirectory(atPath: $0.path)) ?? [])
         }
-        let records = Self.records(listings)
+        var cache: [URL: (modified: Date?, metadata: MeetingMetadata)] = [:]
+        let records = Self.records(listings).map { record in
+            // The transcript holds the front matter; the minutes repeat it in case the transcript was deleted.
+            guard let url = record.transcriptURL ?? record.minutesURL else { return record }
+            let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+            let metadata: MeetingMetadata
+            if let cached = metadataCache[url], cached.modified == modified, modified != nil {
+                metadata = cached.metadata
+            } else {
+                metadata = MeetingMetadata.read(from: url)
+            }
+            cache[url] = (modified, metadata)
+            var record = record
+            record.metadata = metadata
+            return record
+        }
+        metadataCache = cache
         if records != self.records { self.records = records }
+    }
+
+    /// Tags used in earlier meetings, most recent first, for quick picking.
+    public func recentTags(excluding: [String] = [], limit: Int = 8) -> [String] {
+        MeetingMetadata.recentTags(records, excluding: excluding, limit: limit)
     }
 
     /// Merges several folders; a meeting found in more than one keeps the first folder's files.

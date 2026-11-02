@@ -111,12 +111,19 @@ public enum MeetingDocument {
     ///   - identifiesSpeakers: Whether the STT labelled speakers; macOS's recognizer doesn't.
     ///   - notes: What the user wrote during the meeting, placed before the transcript so the minutes
     ///     are written with it.
+    ///   - metadata: The title and tags the user gave, as front matter; the title also heads the document.
     public static func markdown(
         _ transcript: MeetingTranscript, startedAt: Date, endedAt: Date?, includesSystemAudio: Bool = false,
         identifiesSpeakers: Bool = true, notices: [Notice] = [], notes: String = "",
-        vocabulary: [VocabularyEntry] = [], timeZone: TimeZone = .current
+        metadata: MeetingMetadata = MeetingMetadata(), vocabulary: [VocabularyEntry] = [],
+        timeZone: TimeZone = .current
     ) -> String {
-        var lines = ["# ミーティング \(format(startedAt, "yyyy-MM-dd HH:mm", timeZone))", ""]
+        var lines: [String] = []
+        if let frontMatter = metadata.frontMatter { lines += [frontMatter, ""] }
+        lines += [
+            metadata.title.isEmpty
+                ? "# ミーティング \(format(startedAt, "yyyy-MM-dd HH:mm", timeZone))" : "# \(metadata.title)", "",
+        ]
         lines.append("- 開始: \(format(startedAt, "yyyy-MM-dd HH:mm:ss", timeZone))")
         if let endedAt {
             let minutes = max(0, Int(endedAt.timeIntervalSince(startedAt) / 60))
@@ -171,11 +178,16 @@ public enum MeetingDocument {
         return trimmed.isEmpty ? nil : "\(notesHeading)\n\n\(trimmed)"
     }
 
-    /// The minutes file: Claude's title and minutes, and where they came from. The user's notes are
+    /// The minutes file: the title and minutes, and where they came from. The user's notes are
     /// not copied here; Claude takes what matters from them in the transcript.
-    /// - Parameter language: The meeting's prompt language, so English minutes get an English heading and footer.
+    /// - Parameters:
+    ///   - title: The user's title if they gave one, else Claude's.
+    ///   - language: The meeting's prompt language, so English minutes get an English heading and footer.
+    ///   - metadata: The title and tags the user gave, repeated as front matter so the minutes can be
+    ///     found by them too.
     static func minutes(
-        title: String?, body: String, transcriptFileName: String, language: PromptLanguage = .japanese
+        title: String?, body: String, transcriptFileName: String, language: PromptLanguage = .japanese,
+        metadata: MeetingMetadata = MeetingMetadata()
     ) -> String {
         let heading: String
         let source: String
@@ -187,7 +199,8 @@ public enum MeetingDocument {
             heading = title ?? "Minutes"
             source = "*Written by Claude from the transcript \"\(transcriptFileName)\".*"
         }
-        return ["# \(heading)", body, "---", source + "\n"].joined(separator: "\n\n")
+        let document = ["# \(heading)", body, "---", source + "\n"].joined(separator: "\n\n")
+        return metadata.frontMatter.map { $0 + "\n\n" + document } ?? document
     }
 
     struct SpeakerKey: Hashable {

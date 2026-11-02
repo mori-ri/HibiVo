@@ -1,19 +1,22 @@
 import AppKit
 import SwiftUI
 
-/// A small floating window for notes during a meeting. It opens when a meeting starts and closes when
-/// it ends; the HUD's notes button reopens it.
+/// A small floating window for the meeting's title, tags and notes. It opens when a meeting starts and
+/// closes when it ends; the HUD's notes button reopens it.
 ///
 /// It is a non-activating panel, so it shows up without taking focus from the meeting app and can be
 /// typed in without bringing HibiVo to the front. It becomes key only when the text is clicked.
 @MainActor
 public final class MeetingNotesPanelController {
     private let state: AppState
+    /// Earlier meetings, whose tags are offered for one-click tagging.
+    private let meetings: MeetingArchive
     private var panel: NSPanel?
     private var wasMeeting = false
 
-    public init(state: AppState) {
+    public init(state: AppState, meetings: MeetingArchive) {
         self.state = state
+        self.meetings = meetings
         observe()
     }
 
@@ -24,6 +27,8 @@ public final class MeetingNotesPanelController {
     }
 
     public func show() {
+        // Tags may have been edited in another app since the archive was last read.
+        meetings.refresh()
         let panel = panel ?? makePanel()
         self.panel = panel
         panel.orderFrontRegardless()
@@ -46,7 +51,7 @@ public final class MeetingNotesPanelController {
 
     private func makePanel() -> NSPanel {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 380),
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
             backing: .buffered, defer: true)
         panel.title = String(localized: "ミーティングのメモ")
@@ -56,8 +61,10 @@ public final class MeetingNotesPanelController {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentMinSize = NSSize(width: 280, height: 180)
-        panel.contentView = FirstMouseHostingView(rootView: MeetingNotesView(state: state))
+        panel.contentMinSize = NSSize(width: 280, height: 240)
+        let meetings = meetings
+        panel.contentView = FirstMouseHostingView(
+            rootView: MeetingNotesView(state: state) { meetings.recentTags(excluding: $0) })
         // Top right of the screen, out of the way of the HUD at the bottom; then wherever the user left it.
         if let visible = NSScreen.main?.visibleFrame {
             panel.setFrameTopLeftPoint(NSPoint(x: visible.maxX - panel.frame.width - 24, y: visible.maxY - 24))
@@ -74,10 +81,17 @@ private final class FirstMouseHostingView<Content: View>: NSHostingView<Content>
 
 struct MeetingNotesView: View {
     @Bindable var state: AppState
+    /// Tags of earlier meetings, most recent first, leaving out the given ones.
+    let recentTags: @MainActor ([String]) -> [String]
     @State private var editor = MarkdownEditorProxy()
 
     var body: some View {
         VStack(spacing: 0) {
+            MeetingDetailsFields(state: state, recentTags: recentTags)
+                .padding(.horizontal, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+            Divider()
             HStack(spacing: 2) {
                 button(.heading, "textformat.size", "見出し")
                 button(.bold, "bold", "太字")

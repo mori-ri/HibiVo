@@ -319,6 +319,12 @@ private struct MeetingRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                if !record.metadata.tags.isEmpty {
+                    Text(verbatim: record.metadata.tags.map { "#\($0)" }.joined(separator: " "))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -361,6 +367,12 @@ private struct MeetingDetail: View {
                     Text(verbatim: record.startedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if !record.metadata.tags.isEmpty {
+                        FlowLayout {
+                            ForEach(record.metadata.tags, id: \.self) { MeetingTagChip(tag: $0) }
+                        }
+                        .padding(.top, 4)
+                    }
                 }
 
                 HStack { MeetingActions(env: env, record: record) }
