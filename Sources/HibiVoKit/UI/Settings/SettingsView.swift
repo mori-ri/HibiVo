@@ -28,7 +28,9 @@ struct GeneralSettingsView: View {
                 }
                 ToggleRow("新しいバージョンを確認する", isOn: $settings.checksForUpdates)
                     .onChange(of: settings.checksForUpdates) { Task { await env.updates.check() } }
-                NoteRow("起動時と 1 日に 1 回、GitHub に最新のバージョンを問い合わせます。自動でインストールはしません。")
+                NoteRow(
+                    "起動時と 1 日に 1 回、GitHub に最新のバージョンとお知らせを問い合わせます。ダウンロードはボタンを押したときだけで、自動でインストールはしません。"
+                )
             }
             SettingsSection(title: "操作") {
                 PickerRow("ホットキー（押すと録音開始、もう一度押すと終了）", selection: hotkeyBinding) {

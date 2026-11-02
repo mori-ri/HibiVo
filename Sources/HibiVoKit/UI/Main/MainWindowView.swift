@@ -4,6 +4,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
     case home
     case history
     case usage
+    case news
     case general
     case transcription
     case cleanup
@@ -18,6 +19,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         case .home: "ホーム"
         case .history: "履歴"
         case .usage: "利用状況"
+        case .news: "お知らせ"
         case .general: "一般"
         case .transcription: "文字起こし"
         case .cleanup: "AI 整形"
@@ -32,6 +34,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         case .home: "利用状況のまとめと使い方"
         case .history: "入力したテキストを、この Mac に最大 \(HistoryStore.limit) 件保存します。音声は保存しません"
         case .usage: "利用回数、話した時間、API 料金の目安"
+        case .news: "新しいバージョンと新機能"
         case .general: "起動、ホットキー、マイク、権限"
         case .transcription: "音声をテキストにするサービス"
         case .cleanup: "LLM で文章を読みやすく整える"
@@ -46,6 +49,7 @@ public enum MainSection: String, CaseIterable, Identifiable, Sendable {
         case .home: "house"
         case .history: "clock"
         case .usage: "chart.bar"
+        case .news: "megaphone"
         case .general: "gearshape"
         case .transcription: "waveform"
         case .cleanup: "sparkles"
@@ -97,6 +101,7 @@ public struct MainWindowView: View {
             case .home: HomeView(env: env)
             case .history: HistoryView(env: env)
             case .usage: UsageView(env: env)
+            case .news: NewsView(env: env)
             case .general: GeneralSettingsView(env: env)
             case .transcription: TranscriptionSettingsView(env: env)
             case .cleanup: CleanupSettingsView(env: env)
@@ -134,6 +139,7 @@ private struct Sidebar: View {
                     item(.home)
                     item(.history)
                     item(.usage)
+                    item(.news, badge: env.updates.hasUnreadNotes(lastSeen: env.settings.lastSeenReleaseNotes))
                     Text("設定")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.tertiary)
@@ -152,8 +158,8 @@ private struct Sidebar: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let version = env.updates.availableVersion {
                     SidebarLink(
-                        title: "新しいバージョン \(version) があります", symbol: "arrow.down.circle",
-                        url: ProjectLinks.latestRelease)
+                        title: "バージョン \(version) をダウンロード", symbol: "arrow.down.circle",
+                        url: ProjectLinks.latestDownload)
                 }
                 SidebarLink(title: "スポンサーになる", symbol: "heart", url: ProjectLinks.sponsors)
                 SidebarLink(title: "フィードバック・要望", symbol: "bubble.left", url: ProjectLinks.newFeedback)
@@ -178,8 +184,8 @@ private struct Sidebar: View {
         .frame(maxHeight: .infinity, alignment: .top)
     }
 
-    private func item(_ section: MainSection) -> some View {
-        SidebarItem(section: section, isSelected: env.state.mainSection == section) {
+    private func item(_ section: MainSection, badge: Bool = false) -> some View {
+        SidebarItem(section: section, isSelected: env.state.mainSection == section, badge: badge) {
             env.state.mainSection = section
         }
     }
@@ -188,6 +194,8 @@ private struct Sidebar: View {
 private struct SidebarItem: View {
     let section: MainSection
     let isSelected: Bool
+    /// Marks something new on the page, such as unread release notes.
+    var badge = false
     let action: () -> Void
     @State private var isHovered = false
 
@@ -202,6 +210,12 @@ private struct SidebarItem: View {
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
+                if badge {
+                    Circle()
+                        .fill(.tint)
+                        .frame(width: 7, height: 7)
+                        .accessibilityLabel(Text("新しいお知らせ"))
+                }
             }
             .padding(.horizontal, 10)
             .frame(height: 30)

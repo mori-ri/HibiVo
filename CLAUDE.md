@@ -99,7 +99,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - 350 ms 後、`changeCount` が変わっていない場合のみ復元する。
 - Secure Input、アクセシビリティ権限なし、対象アプリ終了済みの場合は、説明付きでコピーのみにする。
 
-**更新の確認**(`Support/UpdateChecker.swift`): 起動時と 1 日 1 回、GitHub の最新リリースを問い合わせ、新しければサイドバーとメニューに出す(失敗時は 1 時間後に再試行)。通知だけで、ダウンロードもインストールもしない。リンク先は固定の URL で、タグは `AppVersion` の形に合うものだけを使う。設定 › 一般 でオフにできる(`checksForUpdates`)。
+**更新の確認とお知らせ**(`Support/UpdateChecker.swift`、`Support/ReleaseNotes.swift`、`UI/News/NewsView.swift`): 起動時と 1 日 1 回、GitHub のリリース一覧を問い合わせ、新しい版があればサイドバーとメニューに出す(失敗時は 1 時間後に再試行)。下書きとプレリリース、タグが `AppVersion` の形に合わないものは除く。ボタンは固定の URL(`ProjectLinks.latestDownload`、最新リリースの `HibiVo-arm64.zip`)をブラウザで開き、zip を直接ダウンロードさせる(ブラウザ経由なので隔離属性が付き Gatekeeper が確認する)。インストールはしない。「お知らせ」のページ(`MainSection.news`)は最新 5 件のリリースノートを表示する。本文は純粋関数的な `ReleaseNotes` が見出し・段落・箇条書きに分け、インストールの節、コードブロック、Full Changelog の行は捨てる。リンクは https のものだけ押せる。最後に見た版(`SettingsStore.lastSeenReleaseNotes`)より新しいノートがあれば、サイドバーに印を出す。設定 › 一般 でオフにできる(`checksForUpdates`)。オフのときは、お知らせのページでボタンを押したときだけ問い合わせる。
 
 **状態と永続化**:
 - `AppState` は UI 状態のみを保持する。

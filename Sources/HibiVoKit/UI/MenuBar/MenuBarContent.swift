@@ -20,7 +20,8 @@ public struct MenuBarContent: View {
             Button("⚠️ マイク権限を許可…") { Permissions.openMicrophoneSettings() }
         }
         if let version = env.updates.availableVersion {
-            Button("新しいバージョン \(version) があります…") { ProjectLinks.open(ProjectLinks.latestRelease) }
+            Button("新しいバージョン \(version) をダウンロード") { ProjectLinks.open(ProjectLinks.latestDownload) }
+            Button("新機能を見る…") { open(.news) }
         }
 
         if env.state.phase == .meeting {
@@ -52,6 +53,7 @@ public struct MenuBarContent: View {
         Divider()
 
         Button("ホーム…") { open(.home) }
+        Button("お知らせ…") { open(.news) }
         Button("履歴…") { open(.history) }
             .keyboardShortcut("y")
         Button("設定…") { open(.general) }

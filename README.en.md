@@ -30,7 +30,7 @@ Press → speak → press again (or hold while you speak) → your text appears.
 
 Download `HibiVo-arm64.zip` from [Releases](https://github.com/mori-ri/HibiVo/releases/latest), unzip it, move `HibiVo.app` to `/Applications` and open it. The app is signed with Developer ID and notarized by Apple.
 
-The app tells you when a new version is out. Nothing is installed automatically (you can turn this off in Settings › General).
+The app tells you when a new version is out, and its button downloads the zip directly. You can see what is new in each version under News in the sidebar. Nothing is installed automatically (you can turn the check off in Settings › General).
 
 To build it yourself, see [Build from source](docs/en/building.md).
 
