@@ -17,51 +17,16 @@
 ## 必要なもの
 
 - macOS 14 以降、Apple Silicon
-- Command Line Tools（`xcode-select --install`）または Xcode
 - 文字起こし: macOS 26 以降なら macOS 標準の文字起こしで API Key なしで使えます。それ以外の場合や、話者識別・クラウドの認識を使いたい場合は [Soniox](https://soniox.com) または [Google AI Studio](https://aistudio.google.com)（Gemini 3.5 Transcribe）の API Key
 - AI 整形用の LLM（なくても Raw で使えます）: Anthropic API、Amazon Bedrock、Google Gemini API、または OpenAI 互換 API
 
 ## インストール
 
-### ダウンロード（Apple Silicon）
-
 [Releases](https://github.com/mori-ri/HibiVo/releases/latest) から `HibiVo-<バージョン>-arm64.zip` をダウンロードして展開し、`HibiVo.app` を `/Applications` に移動して開きます。Developer ID で署名し、Apple の公証を受けたアプリです。
 
-- 新しいバージョンが出るとアプリ内でお知らせします。自動ではインストールしません（設定 › 一般 でオフにできます）。
-- 自分でビルドした HibiVo から切り替えると、アクセシビリティとマイクの許可、Keychain のアクセス許可を一度だけ許可し直す必要があります。
+新しいバージョンが出るとアプリ内でお知らせします。自動ではインストールしません（設定 › 一般 でオフにできます）。
 
-### ソースからビルド
-
-自分の Mac でビルドすることもできます。
-自分でビルドしたアプリには「ダウンロードしたもの」の印が付かないため、Gatekeeper の警告も出ません。
-
-```sh
-git clone https://github.com/mori-ri/HibiVo.git
-cd HibiVo
-scripts/create-signing-cert.sh          # 任意・推奨（下記）
-CONFIG=release scripts/build-app.sh      # build/HibiVo.app を作成
-mv build/HibiVo.app /Applications/
-open /Applications/HibiVo.app
-```
-
-`/Applications` に置くと「ログイン時に起動」が使えます。
-
-### 署名証明書（推奨）
-
-`scripts/create-signing-cert.sh` はログインキーチェーンに自己署名のコード署名証明書「HibiVo Self-Signed」を作ります（初回のみ。信頼設定のためにパスワードを求められます）。
-以降の `build-app.sh` は自動でこの証明書を使うため、**再ビルドやアップデートのあともアクセシビリティ許可が保たれます**。
-キーチェーンに「Developer ID Application」の証明書がある場合は、そちらを優先して Hardened Runtime で署名します。
-
-証明書がない場合は ad-hoc 署名になり、ビルドのたびにアクセシビリティ許可が外れます。
-その場合は `tccutil reset Accessibility io.github.mori-ri.hibivo` を実行して許可し直してください。
-
-### アップデート
-
-```sh
-git pull
-CONFIG=release scripts/build-app.sh
-rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
-```
+自分でビルドする場合は [ソースからビルド](docs/building.md) を参照してください。
 
 ## 初回セットアップ
 
@@ -153,7 +118,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 - ホットキーはプリセット（右 Option / Fn / 右 Command / ⌃Space）から選択。任意のキーの登録は未対応
 - アプリごとの整形モードは bundle id で判定するため、ブラウザ内の Web アプリ（Gmail など）はブラウザの設定に従う
 - パスワード入力中（Secure Input）は貼り付けず、クリップボードにコピーのみ
-- 配布するアプリは Apple Silicon 向けです。Intel Mac ではソースからビルドしてください
+- 配布するアプリは Apple Silicon 向けです。Intel Mac では [ソースからビルド](docs/building.md) してください
 
 ## フィードバック
 
@@ -169,15 +134,7 @@ rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
 
 ## 開発
 
-```sh
-scripts/run.sh        # デバッグビルドして起動
-scripts/test.sh       # テスト
-```
-
-アイコンを変更したときは `Resources/AppIconSource.png` を差し替えて `swift scripts/make-icons.swift` を実行します。
-
-Xcode プロジェクトはありません。SwiftPM でビルドし、`scripts/build-app.sh` が `.app` を組み立てて署名します。
-Command Line Tools だけの環境では、自動的に macOS 26 SDK でビルドします（macOS 27 SDK では SwiftUI の `@State` がマクロになり、そのプラグインが Xcode にしか含まれていないため）。
+ビルドと開発の手順は [ソースからビルド](docs/building.md) を参照してください。
 
 ## ライセンス
 

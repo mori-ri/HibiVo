@@ -19,51 +19,16 @@ Press → speak → press again (or hold while you speak) → your text appears.
 ## Requirements
 
 - macOS 14 or later, Apple Silicon
-- Command Line Tools (`xcode-select --install`) or Xcode
 - Transcription: on macOS 26 or later, macOS (On-Device) transcription works without an API key. Otherwise, or if you want speaker identification or cloud recognition, an API key from [Soniox](https://soniox.com) or [Google AI Studio](https://aistudio.google.com) (Gemini 3.5 Transcribe)
 - An LLM for AI Cleanup (optional; you can use Raw without one): Anthropic API, Amazon Bedrock, Google Gemini API, or an OpenAI-compatible API
 
 ## Installation
 
-### Download (Apple Silicon)
-
 Download `HibiVo-<version>-arm64.zip` from [Releases](https://github.com/mori-ri/HibiVo/releases/latest), unzip it, move `HibiVo.app` to `/Applications` and open it. The app is signed with Developer ID and notarized by Apple.
 
-- The app tells you when a new version is out. Nothing is installed automatically (you can turn this off in Settings › General).
-- Switching from a HibiVo you built yourself means granting Accessibility, Microphone, and Keychain access once more.
+The app tells you when a new version is out. Nothing is installed automatically (you can turn this off in Settings › General).
 
-### Build from source
-
-You can also build it on your own Mac.
-An app you build yourself is not marked as "downloaded", so Gatekeeper does not warn about it.
-
-```sh
-git clone https://github.com/mori-ri/HibiVo.git
-cd HibiVo
-scripts/create-signing-cert.sh          # optional, recommended (see below)
-CONFIG=release scripts/build-app.sh      # creates build/HibiVo.app
-mv build/HibiVo.app /Applications/
-open /Applications/HibiVo.app
-```
-
-Placing the app in `/Applications` enables "Launch at Login".
-
-### Signing certificate (recommended)
-
-`scripts/create-signing-cert.sh` creates a self-signed code-signing certificate named "HibiVo Self-Signed" in your login keychain (once only; you will be asked for your password to set its trust).
-From then on `build-app.sh` uses this certificate automatically, so **the Accessibility permission survives rebuilds and updates**.
-If your keychain has a "Developer ID Application" certificate, it is used instead, with the hardened runtime.
-
-Without the certificate the app is ad-hoc signed and loses the Accessibility permission on every build.
-In that case run `tccutil reset Accessibility io.github.mori-ri.hibivo` and grant the permission again.
-
-### Updating
-
-```sh
-git pull
-CONFIG=release scripts/build-app.sh
-rm -rf /Applications/HibiVo.app && mv build/HibiVo.app /Applications/
-```
+To build it yourself, see [Build from source](docs/en/building.md).
 
 ## First-time setup
 
@@ -155,7 +120,7 @@ The full flow Push-to-Talk → transcription → cleanup → paste has been veri
 - The hotkey is chosen from presets (right Option / Fn / right Command / ⌃Space). Registering an arbitrary key is not supported
 - Per-app cleanup modes are matched by bundle ID, so web apps in a browser (Gmail and so on) follow the browser's setting
 - During password entry (Secure Input), text is only copied to the clipboard, not pasted
-- The distributed app is for Apple Silicon. On Intel Macs, please build from source
+- The distributed app is for Apple Silicon. On Intel Macs, please [build from source](docs/en/building.md)
 
 ## Feedback
 
@@ -171,17 +136,7 @@ For bugs with clear steps to reproduce, please open an [Issue](https://github.co
 
 ## Development
 
-```sh
-scripts/run.sh        # debug build and launch
-scripts/test.sh       # tests
-```
-
-To change the icon, replace `Resources/AppIconSource.png` and run `swift scripts/make-icons.swift`.
-
-There is no Xcode project. The app is built with SwiftPM, and `scripts/build-app.sh` assembles and signs the `.app`.
-With only the Command Line Tools installed, the build automatically uses the macOS 26 SDK (in the macOS 27 SDK, SwiftUI's `@State` is a macro whose plugin ships only with Xcode).
-
-UI strings are written in Japanese in the code and translated in `Resources/en.lproj/Localizable.strings`. `swift scripts/check-localization.swift` checks that every Japanese UI string has a translation.
+For building and working on HibiVo, see [Build from source](docs/en/building.md).
 
 ## License
 
