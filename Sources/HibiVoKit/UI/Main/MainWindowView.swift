@@ -145,10 +145,18 @@ private struct Sidebar: View {
             Spacer(minLength: 16)
 
             VStack(alignment: .leading, spacing: 2) {
+                if let version = env.updates.availableVersion {
+                    SidebarLink(
+                        title: "新しいバージョン \(version) があります", symbol: "arrow.down.circle",
+                        url: ProjectLinks.latestRelease)
+                }
                 SidebarLink(title: "フィードバック・要望", symbol: "bubble.left", url: ProjectLinks.newFeedback)
                 SidebarLink(
                     title: "GitHub リポジトリ", symbol: "chevron.left.forwardslash.chevron.right",
                     url: ProjectLinks.repository)
+                if let license = ProjectLinks.license {
+                    SidebarLink(title: "ライセンス", symbol: "doc.text", url: license)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.bottom, 12)

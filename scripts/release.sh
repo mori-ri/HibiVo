@@ -5,7 +5,10 @@
 #                                          From main: commits on a new release-v<version> branch and opens a PR.
 #                                          From release/*: commits and pushes on that branch directly.
 #   scripts/release.sh publish             Tag the current Info.plist version at HEAD (main or release/*),
-#                                          push the tag and create a draft GitHub release with generated notes.
+#                                          push the tag, create a draft GitHub release with generated notes
+#                                          and attach the notarized app.
+#   scripts/release.sh upload              Build the notarized app from the checked-out tag and attach it to
+#                                          the release. Reruns the last step of publish after a failure.
 #
 # Typical flow: prepare -> merge the PR -> switch to an up-to-date main -> publish -> edit the draft and publish it.
 # Versions follow SemVer; a pre-release suffix (e.g. 0.4.0-beta.1) marks the GitHub release as a pre-release.
@@ -20,7 +23,7 @@ die() {
 }
 
 usage() {
-  sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -150,6 +153,12 @@ publish() {
     release_args+=(--prerelease)
   fi
 
+  # Checked before anything is pushed: a tag whose app can't be built is awkward to take back.
+  security find-identity -v -p codesigning | grep -F '"Developer ID Application: ' >/dev/null \
+    || die "Developer ID の証明書が見つかりません。"
+  xcrun notarytool history --keychain-profile "${HIBIVO_NOTARY_PROFILE:-hibivo-notary}" >/dev/null 2>&1 \
+    || die "公証プロファイルを確認できません。scripts/package.sh の先頭の手順で作成してください。"
+
   echo "$branch の ${head:0:7} に $tag (build $build) を打ち、リリースの下書きを作ります (前回: ${prev_tag:-なし})。"
   git log -20 --oneline --no-decorate ${prev_tag:+"$prev_tag..HEAD"}
   confirm "タグを push しますか?" || exit 1
@@ -158,11 +167,27 @@ publish() {
   git push -q origin "$tag"
   gh release create "$tag" "${release_args[@]}" "${notes_args[@]}" \
     || die "タグ $tag は push 済みですが、リリースの作成に失敗しました。次のコマンドを手動で実行してください: $(printf "%q " gh release create "$tag" "${release_args[@]}" "${notes_args[@]}")"
+  upload || die "タグ $tag と下書きは作成済みですが、アプリを添付できませんでした。原因を直してから scripts/release.sh upload を実行してください。"
   echo "下書きを作成しました。自動生成されたノートをユーザー向けの日本語に書き直してから公開してください。"
+}
+
+# The attached binary has to be what the tag says, so HEAD must be the tag and the tree clean.
+upload() {
+  local version tag
+  version="$(plist_get CFBundleShortVersionString)"
+  tag="v$version"
+  require_clean_tree
+  [[ "$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)" == "$(git rev-parse HEAD)" ]] \
+    || die "HEAD がタグ $tag ではありません。"
+  # Chained with &&: publish calls this inside `||`, where set -e doesn't apply, and a failed build must
+  # not attach an older zip. NOTARIZE is pinned for the same reason: 0 in the environment would skip the
+  # build of the zip attached below.
+  NOTARIZE=1 scripts/package.sh && gh release upload "$tag" "build/HibiVo-$version-$(uname -m).zip" --clobber
 }
 
 case "${1:-}" in
   prepare) shift; prepare "$@" ;;
   publish) shift; publish "$@" ;;
+  upload) shift; upload "$@" ;;
   *) usage ;;
 esac

@@ -5,6 +5,9 @@ import Foundation
 @Observable
 public final class SettingsStore {
     @ObservationIgnored private let defaults: UserDefaults
+    /// Whether an earlier version already ran here. Every version with meeting minutes set this flag, and `init`
+    /// reads it before setting it for this launch.
+    @ObservationIgnored private let launchedBefore: Bool
 
     public var hotkey: HotkeyTrigger { didSet { save(hotkey, "hotkey") } }
     /// The UI language. macOS reads `AppleLanguages` from the app's domain only at launch.
@@ -65,6 +68,8 @@ public final class SettingsStore {
     public var meetingTranscriptionTiming: MeetingTranscriptionTiming {
         didSet { save(meetingTranscriptionTiming, "meetingTranscriptionTiming") }
     }
+    /// Whether the app asks GitHub for the latest release, once a day.
+    public var checksForUpdates: Bool { didSet { defaults.set(checksForUpdates, forKey: "checksForUpdates") } }
     /// Whether minutes are written from each saved meeting.
     public var meetingMinutesEnabled: Bool {
         didSet { defaults.set(meetingMinutesEnabled, forKey: "meetingMinutesEnabled") }
@@ -107,6 +112,7 @@ public final class SettingsStore {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        launchedBefore = defaults.bool(forKey: "appModeOverridesSeeded")
         hotkey = Self.load("hotkey", from: defaults) ?? .default
         let appLanguage: AppLanguage = Self.load("appLanguage", from: defaults) ?? .system
         self.appLanguage = appLanguage
@@ -133,11 +139,10 @@ public final class SettingsStore {
         showLiveTranscript = defaults.object(forKey: "showLiveTranscript") as? Bool ?? false
         meetingCapturesSystemAudio = defaults.object(forKey: "meetingCapturesSystemAudio") as? Bool ?? true
         meetingTranscriptionTiming = Self.load("meetingTranscriptionTiming", from: defaults) ?? .realtime
-        // On by default only where Claude Code is installed, so nobody else gets an error per meeting.
-        meetingMinutesEnabled =
-            defaults.object(forKey: "meetingMinutesEnabled") as? Bool
-            ?? (ClaudeCodeMinutesWriter.locate(configuredPath: "") != nil)
-        meetingMinutesEngine = Self.load("meetingMinutesEngine", from: defaults) ?? .claudeCode
+        checksForUpdates = defaults.object(forKey: "checksForUpdates") as? Bool ?? true
+        // Opt-in: minutes send the transcript to a provider the user chooses.
+        meetingMinutesEnabled = defaults.object(forKey: "meetingMinutesEnabled") as? Bool ?? false
+        meetingMinutesEngine = Self.load("meetingMinutesEngine", from: defaults) ?? .anthropic
         meetingMinutesModel = Self.load("meetingMinutesModel", from: defaults) ?? .sonnet
         meetingMinutesAPIModel = defaults.string(forKey: "meetingMinutesAPIModel") ?? ""
         meetingMinutesInstructions = defaults.string(forKey: "meetingMinutesInstructions")
@@ -166,6 +171,16 @@ public final class SettingsStore {
         let soniox = SonioxProvider().id
         if unset.contains("transcriptionProviderID") { transcriptionProviderID = soniox }
         if unset.contains("meetingTranscriptionProviderID") { meetingTranscriptionProviderID = soniox }
+    }
+
+    /// Claude Code used to be the default for minutes, on wherever it was installed. Someone upgrading keeps
+    /// what they had; new installs choose for themselves. Runs once.
+    public func keepClaudeCodeMinutesForExistingUsers(claudeCodeInstalled: () -> Bool) {
+        guard !defaults.bool(forKey: "minutesDefaultsMigrated") else { return }
+        defaults.set(true, forKey: "minutesDefaultsMigrated")
+        guard launchedBefore else { return }
+        if defaults.data(forKey: "meetingMinutesEngine") == nil { meetingMinutesEngine = .claudeCode }
+        if defaults.object(forKey: "meetingMinutesEnabled") == nil { meetingMinutesEnabled = claudeCodeInstalled() }
     }
 
     /// Cleanup mode for the app that will receive the text.

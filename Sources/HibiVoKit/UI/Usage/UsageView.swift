@@ -396,7 +396,7 @@ private struct CostBreakdown: View {
                 NoteRow("料金が登録されていないモデルは合計に含めていません。トークン数を各サービスの料金表と照らし合わせてください。")
             }
             if settings.meetingMinutesEnabled, settings.meetingMinutesEngine == .claudeCode {
-                NoteRow("Claude Code で作成した議事録は Claude のサブスクリプションの利用枠を使うため、ここには含まれません。")
+                NoteRow("Claude Code で作成した議事録の利用量は、ここには含まれません。")
             }
         }
     }

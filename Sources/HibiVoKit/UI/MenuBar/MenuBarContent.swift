@@ -19,6 +19,9 @@ public struct MenuBarContent: View {
         if !env.state.hasMicrophonePermission {
             Button("⚠️ マイク権限を許可…") { Permissions.openMicrophoneSettings() }
         }
+        if let version = env.updates.availableVersion {
+            Button("新しいバージョン \(version) があります…") { ProjectLinks.open(ProjectLinks.latestRelease) }
+        }
 
         if env.state.phase == .meeting {
             Button("ミーティングのメモを表示") { env.meetingNotes.show() }
@@ -67,7 +70,8 @@ public struct MenuBarContent: View {
     private var hasStatusItems: Bool {
         let state = env.state
         return !state.hasAccessibilityPermission || !state.hasMicrophonePermission || state.phase == .meeting
-            || state.meetingTranscriptionsInProgress > 0 || state.meetingMinutesInProgress > 0
+            || env.updates.availableVersion != nil || state.meetingTranscriptionsInProgress > 0
+            || state.meetingMinutesInProgress > 0
             || env.history.records.contains { !$0.finalText.isEmpty }
     }
 

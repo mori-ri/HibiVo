@@ -23,9 +23,18 @@ Press → speak → press again (or hold while you speak) → your text appears.
 - Transcription: on macOS 26 or later, macOS (On-Device) transcription works without an API key. Otherwise, or if you want speaker identification or cloud recognition, an API key from [Soniox](https://soniox.com) or [Google AI Studio](https://aistudio.google.com) (Gemini 3.5 Transcribe)
 - An LLM for AI Cleanup (optional; you can use Raw without one): Anthropic API, Amazon Bedrock, Google Gemini API, or an OpenAI-compatible API
 
-## Installation (build from source)
+## Installation
 
-HibiVo does not distribute signed binaries. You build it on your own Mac.
+### Download (Apple Silicon)
+
+Download `HibiVo-<version>-arm64.zip` from [Releases](https://github.com/mori-ri/HibiVo/releases/latest), unzip it, move `HibiVo.app` to `/Applications` and open it. The app is signed with Developer ID and notarized by Apple.
+
+- The app tells you when a new version is out. Nothing is installed automatically (you can turn this off in Settings › General).
+- Switching from a HibiVo you built yourself means granting Accessibility, Microphone, and Keychain access once more.
+
+### Build from source
+
+You can also build it on your own Mac.
 An app you build yourself is not marked as "downloaded", so Gatekeeper does not warn about it.
 
 ```sh
@@ -43,6 +52,7 @@ Placing the app in `/Applications` enables "Launch at Login".
 
 `scripts/create-signing-cert.sh` creates a self-signed code-signing certificate named "HibiVo Self-Signed" in your login keychain (once only; you will be asked for your password to set its trust).
 From then on `build-app.sh` uses this certificate automatically, so **the Accessibility permission survives rebuilds and updates**.
+If your keychain has a "Developer ID Application" certificate, it is used instead, with the hardened runtime.
 
 Without the certificate the app is ad-hoc signed and loses the Accessibility permission on every build.
 In that case run `tccutil reset Accessibility io.github.mori-ri.hibivo` and grant the permission again.
@@ -108,28 +118,35 @@ Register company names and technical terms in the Dictionary so they are entered
 - To avoid losing a recording by mistake, a single press of the hotkey, a long press, Esc during the meeting, or pressing the hotkey together with another key (Fn + ←, Fn + volume keys, and so on) does not end the meeting.
 - With Soniox, recording system audio still sends a single stream, so the cost does not change. If the connection drops, it reconnects automatically. Speaker numbers restart after reconnecting.
 - Meetings end automatically after 4 hours.
-- **Minutes**: if [Claude Code](https://claude.com/claude-code) is installed and signed in with a claude.ai account, Claude writes minutes from the transcript after the meeting (summary, decisions, to-dos, discussion, open issues) and saves them next to it as `<start date and time>_<title describing the meeting>.md` (for example `2026-09-27_14-00-05_新機能リリース計画.md`). Claude picks the title from the content. Your Dictionary is passed to Claude too, so registered spellings are used in the minutes. Minutes are written in Japanese.
-  - Processing uses your Claude subscription's usage limits, so there are no API charges.
-  - The model (Opus / Sonnet / Haiku; Sonnet by default) and the location of Claude Code can be changed in Settings › Meeting. You can also turn minutes off.
-  - Under Settings › Meeting › "Written With" you can instead use an AI Cleanup provider (Anthropic, OpenAI-compatible, Amazon Bedrock, or Google Gemini) with the same credentials. API charges apply, and the cost appears in Usage.
+- **Minutes** (off by default): turn them on in Settings › Meeting to get minutes from the transcript after the meeting (summary, decisions, to-dos, discussion, open issues), saved next to it as `<start date and time>_<title describing the meeting>.md` (for example `2026-09-27_14-00-05_新機能リリース計画.md`). The title comes from the content. Your Dictionary is passed along too, so registered spellings are used in the minutes.
+  - Under Settings › Meeting › "Written With" choose an AI Cleanup provider (Anthropic, OpenAI-compatible, Amazon Bedrock, or Google Gemini) with the same credentials. API charges apply, and the cost appears in Usage.
+  - You can also choose a separately installed [Claude Code](https://claude.com/claude-code). HibiVo only runs it and never reads or writes its credentials. Sign-in and terms follow your Claude Code setup, and its usage is not counted in HibiVo's Usage. The model (Opus / Sonnet / Haiku; Sonnet by default) and the location of the executable can be changed in Settings › Meeting.
   - Claude Code runs in an empty temporary folder with all tools, MCP, and settings files disabled. It does nothing but read the transcript and return the minutes.
+- **Recording consent**: some countries, regions, and organizations require participants' consent to record or transcribe. Tell participants, and follow the applicable laws and your organization's rules. Complying with them is your responsibility.
 
 ## Privacy
 
-- **Audio**: only sent from memory to the STT; never written to disk. With macOS (On-Device) transcription, audio never leaves your Mac.
+- **Audio**: only sent from memory to the STT; not written to disk. The exception is a meeting transcribed After the Meeting: its audio stays on your Mac until the transcript is done (and is deleted after 7 days if it can't be). With macOS (On-Device) transcription, audio never leaves your Mac.
 - **Text**: if you choose Soniox / Google Gemini, audio is sent to that STT provider, and when cleaning up, text is sent to the LLM provider. Each company's data handling policy applies.
 - **History**: raw transcripts and cleaned-up results are saved in plain text to `~/Library/Application Support/HibiVo/history.json`, up to 200 entries. You can turn this off with "Save History" at the top right of the History screen, and delete everything from the same screen.
 - **Dictionary**: saved to `~/Library/Application Support/HibiVo/vocabulary.json`.
-- **Meetings**: transcripts and minutes are saved as plain-text Markdown in `~/Library/Application Support/HibiVo/Meetings/`. Audio is not saved. When writing minutes, the transcript is sent to Anthropic through Claude Code, or to the provider chosen in "Written With".
+- **Meetings**: transcripts and minutes are saved as plain-text Markdown in `~/Library/Application Support/HibiVo/Meetings/`. When writing minutes, the transcript is sent to Anthropic through Claude Code, or to the provider chosen in "Written With".
 - **API keys / AWS credentials**: stored in the macOS Keychain, never in settings files.
   - API keys for Soniox, Gemini, Anthropic, OpenAI-compatible, and Bedrock are stored together in a single HibiVo item. Access permission to that item applies to all saved API keys.
   - Retrieved API keys are kept in the app's memory, so normal use does not retrieve or re-approve each key. If you change a key from outside (for example in Keychain Access), restart HibiVo.
   - AWS IAM access key ID, secret access key, and session token stay stored separately, because the app cannot tell the scope of their permissions.
   - Existing API keys are migrated the first time they are retrieved or saved. Migration may ask for approval for each old item. Old items are deleted only after the combined item is saved successfully. Keys you deny access to are not migrated and are asked about again on the next launch (saving that key again in Settings deletes the old item). If deleting an old item fails, it remains, but the combined item is used from then on.
   - Allowing the eval CLI (`HibiVoEval`) to access the combined item lets it retrieve all saved API keys. Re-approval after signature changes and similar events may still happen after the keys are combined.
+- **Update check**: at launch and once a day, HibiVo asks GitHub for the latest version. This is an ordinary HTTPS request, so GitHub sees your IP address and similar connection details. You can turn it off in Settings › General.
 - No analytics or telemetry are sent.
 
-## Status and limitations (v0.1)
+### Permissions HibiVo asks for
+
+- **Accessibility**: detecting the hotkey, pasting (sending ⌘V), and learning from your corrections (reading the text field right after a paste). What you type and the text in fields are neither saved nor sent.
+- **Microphone**: dictation and meeting recording, only while recording.
+- **System Audio Recording**: recording remote participants in meetings, only during a meeting.
+
+## Status and limitations
 
 The full flow Push-to-Talk → transcription → cleanup → paste has been verified in the developer's environment.
 
@@ -138,7 +155,7 @@ The full flow Push-to-Talk → transcription → cleanup → paste has been veri
 - The hotkey is chosen from presets (right Option / Fn / right Command / ⌃Space). Registering an arbitrary key is not supported
 - Per-app cleanup modes are matched by bundle ID, so web apps in a browser (Gmail and so on) follow the browser's setting
 - During password entry (Secure Input), text is only copied to the clipboard, not pasted
-- No signed binaries are distributed. Please build from source
+- The distributed app is for Apple Silicon. On Intel Macs, please build from source
 
 ## Feedback
 

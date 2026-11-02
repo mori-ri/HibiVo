@@ -938,6 +938,7 @@ import Testing
 
     @Test func savedMeetingIsTurnedIntoMinutes() async throws {
         settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .claudeCode
         settings.meetingMinutesModel = .opus
         // The minutes prompt follows the language the meeting was transcribed in.
         settings.language = "en"
@@ -1077,6 +1078,7 @@ import Testing
 
     @Test func minutesWithoutClaudeCodeExplainWhy() async throws {
         settings.meetingMinutesEnabled = true
+        settings.meetingMinutesEngine = .claudeCode
         var shown: [URL] = []
         let sut = makeController(minutesWriter: nil, onSaved: { shown.append($0) })
         try await recordShortMeeting(sut)
@@ -1366,11 +1368,12 @@ import Testing
         #expect(args.last == MeetingMinutesPrompt.system)
     }
 
-    @Test func apiKeysAreRemovedSoTheSubscriptionIsUsed() {
+    @Test func claudeCodesOwnCredentialsAreLeftAlone() {
         let environment = ClaudeCodeMinutesWriter.environment([
-            "ANTHROPIC_API_KEY": "sk", "ANTHROPIC_AUTH_TOKEN": "t", "CLAUDECODE": "1", "HOME": "/Users/me",
+            "ANTHROPIC_API_KEY": "sk", "ANTHROPIC_AUTH_TOKEN": "t", "CLAUDECODE": "1",
+            "CLAUDE_CODE_ENTRYPOINT": "cli", "HOME": "/Users/me",
         ])
-        #expect(environment == ["HOME": "/Users/me"])
+        #expect(environment == ["ANTHROPIC_API_KEY": "sk", "ANTHROPIC_AUTH_TOKEN": "t", "HOME": "/Users/me"])
     }
 
     @Test func parsesTheResult() throws {
