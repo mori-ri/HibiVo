@@ -126,23 +126,28 @@ private struct Sidebar: View {
             .padding(.horizontal, 16)
             // The hidden title bar puts the traffic lights over the top of the sidebar.
             .padding(.top, 44)
-            .padding(.bottom, 24)
+            .padding(.bottom, 20)
 
-            VStack(alignment: .leading, spacing: 2) {
-                item(.home)
-                item(.history)
-                item(.usage)
-                Text("設定")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 10)
-                    .padding(.top, 20)
-                    .padding(.bottom, 6)
-                ForEach(MainSection.settings) { item($0) }
+            // Scrolls so the links below stay on screen when the window is too short for every row.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    item(.home)
+                    item(.history)
+                    item(.usage)
+                    Text("設定")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 20)
+                        .padding(.bottom, 6)
+                    ForEach(MainSection.settings) { item($0) }
+                }
+                .padding(.horizontal, 10)
+                // Room for the selected row's shadow, which the scroll view would otherwise clip.
+                .padding(.vertical, 4)
             }
-            .padding(.horizontal, 10)
-
-            Spacer(minLength: 16)
+            .scrollBounceBehavior(.basedOnSize)
+            .padding(.bottom, 12)
 
             VStack(alignment: .leading, spacing: 2) {
                 if let version = env.updates.availableVersion {
@@ -150,6 +155,7 @@ private struct Sidebar: View {
                         title: "新しいバージョン \(version) があります", symbol: "arrow.down.circle",
                         url: ProjectLinks.latestRelease)
                 }
+                SidebarLink(title: "スポンサーになる", symbol: "heart", url: ProjectLinks.sponsors)
                 SidebarLink(title: "フィードバック・要望", symbol: "bubble.left", url: ProjectLinks.newFeedback)
                 SidebarLink(
                     title: "GitHub リポジトリ", symbol: "chevron.left.forwardslash.chevron.right",

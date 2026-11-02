@@ -357,4 +357,5 @@
 "新しいバージョンを確認する" = "Check for New Versions";
 "起動時と 1 日に 1 回、GitHub に最新のバージョンを問い合わせます。自動でインストールはしません。" = "Asks GitHub for the latest version at launch and once a day. Nothing is installed automatically.";
 "ライセンス" = "License";
+"スポンサーになる" = "Become a Sponsor";
 "録音や文字起こしに参加者の同意が必要な国や地域、組織があります。参加者に伝えたうえで、法令や所属先のルールに従って使ってください。" = "Some countries, regions, and organizations require participants' consent to record or transcribe. Tell participants, and follow the applicable laws and your organization's rules.";
