@@ -49,7 +49,7 @@ struct SonioxIntegrationTests {
     @Test func asyncTranscriptionRoundTrip() async throws {
         let key = ProcessInfo.processInfo.environment["SONIOX_API_KEY"]
         let config = TranscriptionConfig(
-            apiKey: key ?? "invalid-key", model: "stt-async-v5", language: "ja", speakerDiarization: true)
+            apiKey: key ?? "invalid-key", model: "stt-async-v6", language: "ja", speakerDiarization: true)
         let transcriber = SonioxFileTranscriber(pollInterval: .seconds(1), timeout: .seconds(120))
         let silence = Data(count: 32_000)
         do {

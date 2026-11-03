@@ -59,7 +59,7 @@ public enum MeetingFileJobError: Error, Equatable, Sendable {
 /// The WAV is built in memory.
 public struct SonioxFileTranscriber: MeetingFileTranscriber {
     static let baseURL = URL(string: "https://api.soniox.com/v1")!
-    public let model = "stt-async-v5"
+    public let model = "stt-async-v6"
 
     private let urlSession: URLSession
     private let pollInterval: Duration
