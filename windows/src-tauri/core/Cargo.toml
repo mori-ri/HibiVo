@@ -1,0 +1,9 @@
+[package]
+name = "hibivo-core"
+version = "0.1.0"
+description = "Platform-independent logic for HibiVo on Windows: hotkey interpretation and audio resampling"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]

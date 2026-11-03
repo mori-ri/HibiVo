@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "The main window: settings, and dictation itself (cleanup requests go out through the HTTP plugin).",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "store:default",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://*" }, { "url": "https://*/*" }, { "url": "http://localhost:*/*" }, { "url": "http://127.0.0.1:*/*" }]
+    }
+  ]
+}

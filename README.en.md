@@ -142,6 +142,10 @@ For bugs with clear steps to reproduce, please open an [Issue](https://github.co
 
 For building and working on HibiVo, see [Build from source](docs/en/building.md).
 
+### Windows version (in progress)
+
+`windows/` holds a Windows version built with Tauri 2. For now it covers only basic dictation. See [windows/README.md](windows/README.md) (in Japanese).
+
 ## License
 
 The source code is under the [MIT License](LICENSE).
