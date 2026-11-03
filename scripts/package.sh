@@ -51,7 +51,7 @@ make_dmg() {
   # hdiutil now and then fails with "Resource busy" while Spotlight or another process looks at the volume.
   local attempt
   for attempt in 1 2 3; do
-    if hdiutil create -quiet -volname HibiVo -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$1"; then
+    if hdiutil create -volname HibiVo -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$1"; then
       rm -rf "$STAGE"
       return 0
     fi
