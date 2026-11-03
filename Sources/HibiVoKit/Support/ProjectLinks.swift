@@ -8,9 +8,10 @@ public enum ProjectLinks {
     public static let newFeedback = URL(string: "https://github.com/mori-ri/HibiVo/discussions/new?category=feedback")!
     public static let releases = URL(string: "https://github.com/mori-ri/HibiVo/releases")!
     /// The latest release's app, attached under this unversioned name by `release.sh upload`.
-    /// Opening it in the browser downloads the zip without showing the release page.
+    /// Opening it in the browser downloads the disk image without showing the release page.
+    /// `release.sh upload` also attaches `HibiVo-arm64.zip`, which 0.7.0 and earlier link to; keep it attached.
     public static let latestDownload = URL(
-        string: "https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip")!
+        string: "https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.dmg")!
     public static let sponsors = URL(string: "https://github.com/sponsors/mori-ri")!
     static let releasesAPI = URL(string: "https://api.github.com/repos/mori-ri/HibiVo/releases?per_page=10")!
     /// The license copied into the app bundle by `build-app.sh`; absent under `swift run`.

@@ -16,7 +16,7 @@ struct NewsView: View {
                             .buttonStyle(.borderedProminent)
                     }
                     NoteRow(
-                        "ダウンロードした zip を展開し、HibiVo を終了してから「アプリケーション」フォルダの HibiVo.app を置き換えます。設定や辞書、履歴は引き継がれます。"
+                        "HibiVo を終了してから、ダウンロードしたディスクイメージを開き、HibiVo.app を「アプリケーション」フォルダにドラッグして置き換えます。設定や辞書、履歴は引き継がれます。"
                     )
                 }
             }

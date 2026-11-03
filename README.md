@@ -26,9 +26,9 @@
 
 ## インストール
 
-[Releases](https://github.com/mori-ri/HibiVo/releases/latest) から `HibiVo-arm64.zip` をダウンロードして展開し、`HibiVo.app` を `/Applications` に移動して開きます。Developer ID で署名し、Apple の公証を受けたアプリです。
+[Releases](https://github.com/mori-ri/HibiVo/releases/latest) から `HibiVo-arm64.dmg` をダウンロードして開き、`HibiVo.app` を「アプリケーション」フォルダにドラッグしてから起動します。Developer ID で署名し、Apple の公証を受けたアプリです。
 
-新しいバージョンが出るとアプリ内でお知らせし、ボタンから zip を直接ダウンロードできます。各バージョンの新機能は、サイドバーの「お知らせ」で確認できます。自動ではインストールしません（確認は 設定 › 一般 でオフにできます）。
+新しいバージョンが出るとアプリ内でお知らせし、ボタンからディスクイメージを直接ダウンロードできます。各バージョンの新機能は、サイドバーの「お知らせ」で確認できます。自動ではインストールしません（確認は 設定 › 一般 でオフにできます）。
 
 自分でビルドする場合は [ソースからビルド](docs/building.md) を参照してください。
 
