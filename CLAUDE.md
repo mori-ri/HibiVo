@@ -18,9 +18,9 @@ scripts/eval.sh --variant baseline --provider bedrock --model <id>    # 整形�
 
 scripts/run.sh                          # debug ビルド → build/HibiVo.app → 起動 (起動中のアプリは終了させる)
 CONFIG=release scripts/build-app.sh     # build/HibiVo.app を組み立てて署名
-scripts/package.sh                      # 配布用 zip: コミット済みのソースから Developer ID で署名、公証、staple する。満たせなければエラー (NOTARIZE=0 は試用: 署名不問、-local.zip)
+scripts/package.sh                      # 配布用 dmg と zip: コミット済みのソースから Developer ID で署名、公証、staple する (アプリを公証してから dmg も署名・公証)。満たせなければエラー (NOTARIZE=0 は試用: 署名不問、-local.dmg/.zip)
 scripts/release.sh prepare 0.3.0        # リリース準備: Info.plist のバージョンと build 番号を上げて PR を作る (release/* 上では直接コミット)
-scripts/release.sh publish              # マージ後の main (か release/*) でタグを push し、ノート自動生成付きのリリース下書きを作って公証済みアプリを添付する
+scripts/release.sh publish              # マージ後の main (か release/*) でタグを push し、ノート自動生成付きのリリース下書きを作って公証済みの dmg と zip を添付する
 scripts/release.sh upload               # タグの位置で公証済みアプリを作り直して添付する (publish の最後の手順のやり直し)
 scripts/create-signing-cert.sh          # 初回のみ: ログインキーチェーンに自己署名証明書 "HibiVo Self-Signed" を作成
 npx http-server site -p 8000 -c-1       # LP をローカルで確認 (http://localhost:8000)
@@ -99,7 +99,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - 350 ms 後、`changeCount` が変わっていない場合のみ復元する。
 - Secure Input、アクセシビリティ権限なし、対象アプリ終了済みの場合は、説明付きでコピーのみにする。
 
-**更新の確認とお知らせ**(`Support/UpdateChecker.swift`、`Support/ReleaseNotes.swift`、`UI/News/NewsView.swift`): 起動時と 1 日 1 回、GitHub のリリース一覧を問い合わせ、新しい版があればサイドバーとメニューに出す(失敗時は 1 時間後に再試行)。下書きとプレリリース、タグが `AppVersion` の形に合わないものは除く。ボタンは固定の URL(`ProjectLinks.latestDownload`、最新リリースの `HibiVo-arm64.zip`)をブラウザで開き、zip を直接ダウンロードさせる(ブラウザ経由なので隔離属性が付き Gatekeeper が確認する)。インストールはしない。「お知らせ」のページ(`MainSection.news`)は最新 5 件のリリースノートを表示する。本文は純粋関数的な `ReleaseNotes` が見出し・段落・箇条書きに分け、インストールの節、コードブロック、Full Changelog の行は捨てる。リンクは https のものだけ押せる。最後に見た版(`SettingsStore.lastSeenReleaseNotes`)より新しいノートがあれば、サイドバーに印を出す。設定 › 一般 でオフにできる(`checksForUpdates`)。オフのときは、お知らせのページでボタンを押したときだけ問い合わせる。
+**更新の確認とお知らせ**(`Support/UpdateChecker.swift`、`Support/ReleaseNotes.swift`、`UI/News/NewsView.swift`): 起動時と 1 日 1 回、GitHub のリリース一覧を問い合わせ、新しい版があればサイドバーとメニューに出す(失敗時は 1 時間後に再試行)。下書きとプレリリース、タグが `AppVersion` の形に合わないものは除く。ボタンは固定の URL(`ProjectLinks.latestDownload`、最新リリースの `HibiVo-arm64.dmg`)をブラウザで開き、ディスクイメージを直接ダウンロードさせる(ブラウザ経由なので隔離属性が付き Gatekeeper が確認する)。インストールはしない。「お知らせ」のページ(`MainSection.news`)は最新 5 件のリリースノートを表示する。本文は純粋関数的な `ReleaseNotes` が見出し・段落・箇条書きに分け、インストールの節、コードブロック、Full Changelog の行は捨てる。リンクは https のものだけ押せる。最後に見た版(`SettingsStore.lastSeenReleaseNotes`)より新しいノートがあれば、サイドバーに印を出す。設定 › 一般 でオフにできる(`checksForUpdates`)。オフのときは、お知らせのページでボタンを押したときだけ問い合わせる。
 
 **状態と永続化**:
 - `AppState` は UI 状態のみを保持する。
@@ -122,7 +122,7 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - 画面・HUD・アイコンの色、形、文字、動きは `DESIGN.md` に従う。ブランドの色は `Theme` のトークン(`brandGradient` など)を使い、値を直接書かない。
 - ユーザー向けテキストは日本語で、ステータスコードではなくユーザーに伝わる言い回しにする。エラーは `UserFacingError` を経由させる。コードコメントは英語。
 - UI は日本語と英語に対応する。コードに書いた日本語がそのままキーになり、英訳は `Resources/en.lproj/Localizable.strings` に書く(`build-app.sh` がバンドルにコピーする)。日本語と英語のどちらでもない言語の Mac では英語を出すため、`CFBundleDevelopmentRegion` は `en`。そのままだと日本語でも英訳にフォールバックするので、空の `ja.lproj/Localizable.strings` を置いている(消さないこと)。SwiftUI のリテラル(`Text("…")` など)と、`LocalizedStringKey` を受け取る設定画面の部品は自動で翻訳される。`String` で持つ文言は `String(localized:)` を使う。補間はキーでは `%@`(String)・`%lld`(Int)などになる。モデルに送るプロンプト、議事録などの保存する文書、照合用の文字列は翻訳しない(行末に `// no-l10n`)。`scripts/check-localization.swift`(`lint.sh` から実行)が訳の抜けと使われていない訳を検出する。テストはバンドル外で動くため日本語のまま。表示言語は設定 › 一般で選べる(`SettingsStore.appLanguage`)。アプリのドメインの `AppleLanguages` に書くだけなので、再起動で反映される。
-- LP は `site/` の素の HTML / CSS / JS で、ビルドはない。`main` への push で `.github/workflows/pages.yml` が GitHub Pages に公開する。`index.html`(日本語)と `en/index.html`(英語)は同じ構造に保つ。外部のフォント、スクリプト、解析は入れない(CSP で禁止している)。整形の出力例は `docs/cleanup-modes.md` に合わせ、機能の説明は README と食い違わせない。ダウンロードボタンは最新リリースの `HibiVo-arm64.zip` に直接リンクしている(`release.sh upload` がバージョンなしのこの名前で添付する)。ヒーローやカードの文言を変えたら、シェア用カードも作り直す。画面が変わったら `scripts/make-screenshots.sh` で画面画像も作り直す。画像は実際の SwiftUI の画面を別プロセスで描いたもので、アプリのデータを空の一時ホームに向け、Keychain はダミーに差し替えるので、実行した人のデータは写らない(画面収録の権限も不要)。
+- LP は `site/` の素の HTML / CSS / JS で、ビルドはない。`main` への push で `.github/workflows/pages.yml` が GitHub Pages に公開する。`index.html`(日本語)と `en/index.html`(英語)は同じ構造に保つ。外部のフォント、スクリプト、解析は入れない(CSP で禁止している)。整形の出力例は `docs/cleanup-modes.md` に合わせ、機能の説明は README と食い違わせない。ダウンロードボタンは最新リリースの `HibiVo-arm64.dmg` に直接リンクしている(`release.sh upload` がバージョンなしのこの名前で添付する)。0.7.0 以前のアプリの更新ボタンは `HibiVo-arm64.zip` を指すため、zip も同じ名前で添付し続ける。ヒーローやカードの文言を変えたら、シェア用カードも作り直す。画面が変わったら `scripts/make-screenshots.sh` で画面画像も作り直す。画像は実際の SwiftUI の画面を別プロセスで描いたもので、アプリのデータを空の一時ホームに向け、Keychain はダミーに差し替えるので、実行した人のデータは写らない(画面収録の権限も不要)。
 - テストは Swift Testing(`@Test`、`#expect`)を使う。モックは `Tests/HibiVoKitTests/Mocks.swift` にある。`#require` の中に `#require` をネストしない(マクロ再帰エラーになる)。
 - 自明でない設計判断はローカル専用の `notes/DECISIONS.md`(番号付きの表)に記録する。詳しい設計と macOS 関連のメモは `notes/ARCHITECTURE.md` にある。どちらもクローンには含まれない。
 - リポジトリは公開している。利用者のローカルデータ(辞書、履歴、会議)や本名、チーム ID を、コード、テスト、コミット、PR に書かないこと。

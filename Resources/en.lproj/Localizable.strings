@@ -376,7 +376,7 @@
 "新しいバージョン %@ をダウンロード" = "Download Version %@";
 "新機能を見る…" = "See What's New…";
 "ダウンロード" = "Download";
-"ダウンロードした zip を展開し、HibiVo を終了してから「アプリケーション」フォルダの HibiVo.app を置き換えます。設定や辞書、履歴は引き継がれます。" = "Unzip the download, quit HibiVo, and replace HibiVo.app in the Applications folder. Your settings, dictionary, and history carry over.";
+"HibiVo を終了してから、ダウンロードしたディスクイメージを開き、HibiVo.app を「アプリケーション」フォルダにドラッグして置き換えます。設定や辞書、履歴は引き継がれます。" = "Quit HibiVo, open the downloaded disk image, and drag HibiVo.app to the Applications folder to replace it. Your settings, dictionary, and history carry over.";
 "GitHub のリリースノートを表示しています。" = "Shown from the release notes on GitHub, which are written in Japanese.";
 "すべてのリリースを GitHub で見る" = "See All Releases on GitHub";
 "読み込み中…" = "Loading…";

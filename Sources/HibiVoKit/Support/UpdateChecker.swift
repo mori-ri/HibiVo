@@ -57,7 +57,7 @@ public struct PublishedRelease: Decodable, Sendable {
 }
 
 /// Asks GitHub for the published releases, remembers whether the latest is newer than this build, and keeps their
-/// notes for the News page. Nothing is installed: the download link is a fixed URL to the latest release's zip,
+/// notes for the News page. Nothing is installed: the download link is a fixed URL to the latest release's disk image,
 /// opened in the browser so the file is quarantined and checked by Gatekeeper like any other download.
 @MainActor
 @Observable

@@ -6,7 +6,7 @@
 #                                          From release/*: commits and pushes on that branch directly.
 #   scripts/release.sh publish             Tag the current Info.plist version at HEAD (main or release/*),
 #                                          push the tag, create a draft GitHub release with generated notes
-#                                          and attach the notarized app.
+#                                          and attach the notarized app (dmg, plus a zip for older versions).
 #   scripts/release.sh upload              Build the notarized app from the checked-out tag and attach it to
 #                                          the release. Reruns the last step of publish after a failure.
 #
@@ -180,14 +180,18 @@ upload() {
   [[ "$(git rev-parse -q --verify "refs/tags/$tag^{commit}" || true)" == "$(git rev-parse HEAD)" ]] \
     || die "HEAD がタグ $tag ではありません。"
   # Chained with &&: publish calls this inside `||`, where set -e doesn't apply, and a failed build must
-  # not attach an older zip. NOTARIZE is pinned for the same reason: 0 in the environment would skip the
-  # build of the zip attached below.
-  # The asset name carries no version so https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.zip
-  # always fetches the newest app: the landing page (site/) links straight to it.
-  local asset="build/HibiVo-$(uname -m).zip"
+  # not attach older files. NOTARIZE is pinned for the same reason: 0 in the environment would skip the
+  # notarization of the files attached below.
+  # The asset names carry no version so https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.dmg
+  # always fetches the newest app: the landing page (site/) and the app's update button link straight to it.
+  # The zip stays for the update button of 0.7.0 and earlier, which links to HibiVo-arm64.zip.
+  local arch built
+  arch="$(uname -m)"
+  built="build/HibiVo-$version-$arch"
   NOTARIZE=1 scripts/package.sh \
-    && cp "build/HibiVo-$version-$(uname -m).zip" "$asset" \
-    && gh release upload "$tag" "$asset" --clobber
+    && cp "$built.dmg" "build/HibiVo-$arch.dmg" \
+    && cp "$built.zip" "build/HibiVo-$arch.zip" \
+    && gh release upload "$tag" "build/HibiVo-$arch.dmg" "build/HibiVo-$arch.zip" --clobber
 }
 
 case "${1:-}" in
