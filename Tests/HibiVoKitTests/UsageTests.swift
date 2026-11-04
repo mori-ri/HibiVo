@@ -25,7 +25,7 @@ import Testing
     func dictation(on date: Date, characters: Int = 10, seconds: Double = 5, tokens: TokenUsage? = nil) -> UsageEvent {
         UsageEvent(
             date: date, dictations: 1, characters: characters,
-            transcription: .init(provider: "soniox", model: "stt-rt-v5", seconds: seconds),
+            transcription: .init(provider: "soniox", model: "stt-rt-v6", seconds: seconds),
             cleanup: tokens.map { .init(provider: "anthropic", model: "claude-opus-5", requests: 1, tokens: $0) })
     }
 
@@ -51,7 +51,7 @@ import Testing
         store.record(
             UsageEvent(
                 date: date(2026, 9, 27), meetings: 1,
-                transcription: .init(provider: "soniox", model: "stt-async-v5", seconds: 600)))
+                transcription: .init(provider: "soniox", model: "stt-async-v6", seconds: 600)))
         let day = store.days[0]
         #expect(day.dictations == 1)
         #expect(day.meetings == 1)
@@ -67,11 +67,11 @@ import Testing
         store.record(
             UsageEvent(
                 date: date(2026, 9, 27), meetings: 1, characters: 2_000,
-                transcription: .init(provider: "soniox", model: "stt-rt-v5", seconds: 1_200)))
+                transcription: .init(provider: "soniox", model: "stt-rt-v6", seconds: 1_200)))
         store.record(
             UsageEvent(
                 date: date(2026, 9, 27), meetings: 1, characters: 500,
-                transcription: .init(provider: "soniox", model: "stt-async-v5", seconds: 600)))
+                transcription: .init(provider: "soniox", model: "stt-async-v6", seconds: 600)))
         let day = store.days[0]
         #expect(day.characters == 2_530)
         #expect(day.meetingCharacters == 2_500)
@@ -82,7 +82,7 @@ import Testing
         #expect(meeting.cleanup.isEmpty)
         let dictation = day.dictationPart
         #expect(dictation.characters == 30)
-        #expect(dictation.transcription == [.init(provider: "soniox", model: "stt-rt-v5", seconds: 60)])
+        #expect(dictation.transcription == [.init(provider: "soniox", model: "stt-rt-v6", seconds: 60)])
         #expect(dictation.cleanup == day.cleanup)
 
         let total = UsagePricing.estimate([day]).totalUSD
@@ -159,8 +159,13 @@ import Testing
 
 @Suite struct UsagePricingTests {
     @Test func sonioxIsBilledPerHourOfAudio() {
-        let usd = UsagePricing.transcriptionUSD(.init(provider: "soniox", model: "stt-rt-v5", seconds: 3600))
+        let usd = UsagePricing.transcriptionUSD(.init(provider: "soniox", model: "stt-rt-v6", seconds: 3600))
         #expect(usd == 0.12)
+    }
+
+    @Test func sonioxV5UsageFromEarlierVersionsIsStillPriced() {
+        #expect(UsagePricing.transcriptionUSD(.init(provider: "soniox", model: "stt-rt-v5", seconds: 3600)) == 0.12)
+        #expect(UsagePricing.transcriptionUSD(.init(provider: "soniox", model: "stt-async-v5", seconds: 3600)) == 0.10)
     }
 
     @Test func longPromptsArePricedPerRequest() {
@@ -267,7 +272,7 @@ import Testing
 
     @Test func estimateSumsPricedUsageAndListsTheRest() {
         var day = DailyUsage(day: "2026-09-27")
-        day.transcription = [.init(provider: "soniox", model: "stt-rt-v5", seconds: 1800)]
+        day.transcription = [.init(provider: "soniox", model: "stt-rt-v6", seconds: 1800)]
         day.cleanup = [
             .init(
                 provider: "anthropic", model: "claude-opus-5", requests: 10,

@@ -5,8 +5,8 @@ public struct SonioxProvider: MeetingTranscriptionProvider {
     public let id = "soniox"
     public let displayName = "Soniox"
     public let sampleRate: Double = 16_000
-    public let models = ["stt-rt-v5"]
-    public let defaultModel = "stt-rt-v5"
+    public let models = ["stt-rt-v6"]
+    public let defaultModel = "stt-rt-v6"
 
     private let urlSession: URLSession
 

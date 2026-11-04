@@ -158,7 +158,7 @@ import Testing
     @MainActor @Test func modelSavedForAnotherProviderFallsBackToDefault() throws {
         let settings = SettingsStore(defaults: UserDefaults(suiteName: "GeminiTests-\(UUID())")!)
         settings.transcriptionProviderID = "gemini"
-        settings.transcriptionModel = "stt-rt-v5"
+        settings.transcriptionModel = "stt-rt-v6"
         let context = try DictationContextBuilder(
             settings: settings, secrets: MockSecrets(values: ["gemini": "key"]),
             transcriptionProviders: [SonioxProvider(), GeminiLiveProvider()]

@@ -1409,7 +1409,7 @@ import Testing
 
     @Test func createRequestAsksForDiarizationWithHintsAndTerms() throws {
         let request = try SonioxFileTranscriber.createRequest(
-            fileID: "f1", model: "stt-async-v5",
+            fileID: "f1", model: "stt-async-v6",
             config: TranscriptionConfig(
                 apiKey: "k", model: "m", language: "ja", vocabulary: ["AppSync"], readings: ["アップシンク"]))
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer k")
@@ -1417,7 +1417,7 @@ import Testing
         let body = try #require(request.httpBody)
         let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(object["file_id"] as? String == "f1")
-        #expect(object["model"] as? String == "stt-async-v5")
+        #expect(object["model"] as? String == "stt-async-v6")
         #expect(object["enable_speaker_diarization"] as? Bool == true)
         #expect(object["language_hints"] as? [String] == ["ja", "en"])
         #expect((object["context"] as? [String: Any])?["terms"] as? [String] == ["AppSync", "アップシンク"])
@@ -1453,9 +1453,9 @@ import Testing
 
     @Test func asyncAudioIsPricedLowerThanRealtime() throws {
         let async = try #require(
-            UsagePricing.transcriptionUSD(TranscriptionUsage(provider: "soniox", model: "stt-async-v5", seconds: 3600)))
+            UsagePricing.transcriptionUSD(TranscriptionUsage(provider: "soniox", model: "stt-async-v6", seconds: 3600)))
         let live = try #require(
-            UsagePricing.transcriptionUSD(TranscriptionUsage(provider: "soniox", model: "stt-rt-v5", seconds: 3600)))
+            UsagePricing.transcriptionUSD(TranscriptionUsage(provider: "soniox", model: "stt-rt-v6", seconds: 3600)))
         #expect(abs(async - 0.10) < 1e-9)
         #expect(abs(live - 0.12) < 1e-9)
     }

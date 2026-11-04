@@ -64,7 +64,7 @@ public struct DictationContextBuilder {
         let entries = vocabulary()
         let config = TranscriptionConfig(
             apiKey: apiKey,
-            // A model saved for another provider falls back to this one's default.
+            // A model saved for another provider, or one no longer listed (stt-rt-v5), falls back to the default.
             model: provider.models.contains(settings.transcriptionModel)
                 ? settings.transcriptionModel : provider.defaultModel,
             language: settings.language,

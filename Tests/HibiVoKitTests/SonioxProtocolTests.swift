@@ -14,11 +14,11 @@ import Testing
     @Test func configIncludesJapaneseAndEnglishHintsAndTerms() throws {
         let json = try SonioxProtocol.config(
             for: TranscriptionConfig(
-                apiKey: "k", model: "stt-rt-v5", language: "ja", vocabulary: ["AppSync", "Bedrock"]),
+                apiKey: "k", model: "stt-rt-v6", language: "ja", vocabulary: ["AppSync", "Bedrock"]),
             sampleRate: 16_000)
         let object = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         #expect(object["api_key"] as? String == "k")
-        #expect(object["model"] as? String == "stt-rt-v5")
+        #expect(object["model"] as? String == "stt-rt-v6")
         #expect(object["audio_format"] as? String == "pcm_s16le")
         #expect(object["sample_rate"] as? Int == 16_000)
         #expect(object["num_channels"] as? Int == 1)
@@ -80,5 +80,16 @@ import Testing
         var t = SonioxTranscript()
         t.apply(try JSONDecoder().decode(SonioxProtocol.Response.self, from: data))
         #expect(t.finalText == "今日")
+    }
+
+    @MainActor @Test func savedV5ModelMovesToV6() throws {
+        let settings = SettingsStore(defaults: UserDefaults(suiteName: "SonioxProtocolTests-\(UUID())")!)
+        settings.transcriptionProviderID = "soniox"
+        settings.transcriptionModel = "stt-rt-v5"
+        let context = try DictationContextBuilder(
+            settings: settings, secrets: MockSecrets(values: ["soniox": "key"]),
+            transcriptionProviders: [SonioxProvider()]
+        ).make(target: nil)
+        #expect(context.transcriptionConfig.model == "stt-rt-v6")
     }
 }
