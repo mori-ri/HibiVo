@@ -229,11 +229,35 @@ h1 span {
     margin-top: 20px;
 }
 
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.badges li {
+    padding: 3px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+}
+
 .fine {
     margin-top: 10px;
     color: var(--ink-soft);
     font-size: 0.8125rem;
     line-height: 1.6;
+}
+
+.fine a {
+    white-space: nowrap;
+}
+
+:lang(ja) .fine a {
+    margin-left: 0.5em;
 }
 
 .stage {
@@ -450,6 +474,11 @@ html:not(.js) .demo-note {
     line-height: 1.6;
 }
 
+.demo-note strong {
+    color: var(--ink);
+    font-weight: 700;
+}
+
 /* HUD: mirrors HUDView's capsule, including the seven level bars and their envelope. */
 
 .hud {
@@ -555,7 +584,8 @@ html:not(.js) .demo-note {
 
 /* Japanese phrases stay whole where the browser can tell them apart (Chrome only for now). */
 :lang(ja) .lead,
-:lang(ja) .section-lead {
+:lang(ja) .section-lead,
+:lang(ja) .pains p {
     word-break: auto-phrase;
 }
 
@@ -634,6 +664,34 @@ h3 {
 
 .shot-hud figcaption {
     margin-top: 10px;
+}
+
+/* Problems: what typing gets in the way of, each answered by a section further down, in that order. */
+
+.pains {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(32px, 4vw, 48px) clamp(40px, 7vw, 96px);
+    margin-top: clamp(36px, 5vw, 56px);
+}
+
+.pains li {
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+}
+
+.pains p {
+    color: var(--ink-soft);
+    font-size: 0.9375rem;
+}
+
+.pains .pain {
+    margin-bottom: 8px;
+    color: var(--ink);
+    font-size: clamp(1.1875rem, 2vw, 1.4375rem);
+    font-feature-settings: "palt";
+    font-weight: 700;
+    line-height: 1.5;
 }
 
 /* Modes */
@@ -755,6 +813,60 @@ h3 {
 .correction ins {
     text-decoration: none;
     box-shadow: 0 3px 0 -1px var(--ink);
+}
+
+.learn-label {
+    margin-bottom: 4px;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+}
+
+.learn-next {
+    margin-top: 36px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+}
+
+/* The correction replays once when it comes into view: the word as it was typed, crossed out, the fix
+   typed over it, the notice, and then the next dictation coming out right. Without JavaScript, or with
+   reduced motion, the finished state above is all there is. */
+
+.learn del {
+    transition:
+        color 0.3s,
+        font-weight 0.3s,
+        text-decoration-color 0.3s;
+}
+
+.learn .notice,
+.learn-next {
+    transition:
+        opacity 0.4s ease-out,
+        transform 0.4s var(--spring);
+}
+
+.learn[data-step] del {
+    color: var(--ink);
+    font-weight: 700;
+    text-decoration-color: transparent;
+}
+
+.learn[data-step] .notice,
+.learn[data-step] .learn-next {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.learn[data-step="fix"] del,
+.learn[data-step="notice"] del {
+    color: var(--spoken);
+    font-weight: 200;
+    text-decoration-color: currentColor;
+}
+
+.learn[data-step="notice"] .notice {
+    opacity: 1;
+    transform: none;
 }
 
 .notice {
@@ -958,6 +1070,7 @@ h3 {
     .hero-top,
     .split,
     .mode-compare,
+    .pains,
     .promises {
         grid-template-columns: minmax(0, 1fr);
     }
@@ -1061,6 +1174,9 @@ h3 {
     }
 
     .stage[data-phase] .streak,
+    .learn del,
+    .learn .notice,
+    .learn-next,
     .hud,
     .key,
     .demo-text .drop,

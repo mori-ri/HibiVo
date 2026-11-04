@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
-<title>HibiVo | 話すだけで文章になる Mac の音声入力</title>
-<meta name="description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。日本語を第一に作った無料でオープンソースの Mac 用音声入力アプリです。">
+<title>HibiVo | 考える速さで書く、Mac の音声入力</title>
+<meta name="description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。言い直しは AI が整え、専門用語は直すたびに覚える。日本語を第一に作った、無料でオープンソースの Mac 用音声入力アプリです。">
 <link rel="canonical" href="https://mori-ri.github.io/HibiVo/">
 <link rel="alternate" hreflang="ja" href="https://mori-ri.github.io/HibiVo/">
 <link rel="alternate" hreflang="en" href="https://mori-ri.github.io/HibiVo/en/">
@@ -13,8 +13,8 @@
 <link rel="icon" type="image/png" href="assets/icon.png">
 <link rel="apple-touch-icon" href="assets/icon.png">
 <meta property="og:type" content="website">
-<meta property="og:title" content="HibiVo | 話すだけで文章になる Mac の音声入力">
-<meta property="og:description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。日本語を第一に作った無料でオープンソースの Mac 用音声入力アプリです。">
+<meta property="og:title" content="HibiVo | 考える速さで書く、Mac の音声入力">
+<meta property="og:description" content="キーを押して話すと、いま使っているアプリのカーソル位置に整った文章が入る。言い直しは AI が整え、専門用語は直すたびに覚える。日本語を第一に作った、無料でオープンソースの Mac 用音声入力アプリです。">
 <meta property="og:url" content="https://mori-ri.github.io/HibiVo/">
 <meta property="og:site_name" content="HibiVo">
 <meta property="og:locale" content="ja_JP">
@@ -22,7 +22,7 @@
 <meta property="og:image" content="https://mori-ri.github.io/HibiVo/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="HibiVo: 話すだけで、文章になる。Mac の音声入力、会議の文字起こし">
+<meta property="og:image:alt" content="HibiVo: 考える速さで、書いていく。Mac の音声入力、会議の文字起こし">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="style.css">
 <script src="main.js" defer></script>
@@ -40,12 +40,17 @@
 <main id="main">
 <section class="wrap hero">
   <div class="hero-top">
-    <h1><span class="said">話すだけで、</span><span class="written">文章になる。</span></h1>
+    <h1><span class="said">考える速さで、</span><span class="written">書いていく。</span></h1>
     <div class="hero-lead">
-      <p class="lead">HibiVo は Mac の音声入力アプリです。キーを押して話すと、いま使っているアプリのカーソル位置に、整った文章が入ります。</p>
+      <p class="lead">キーボードでは追いつかない考えも、話せばそのまま文章に。言い直しは AI が整え、専門用語は直すたびに覚えます。使うほどあなたの言葉になじんでいく、Mac の音声入力アプリです。</p>
       <div class="actions">
         <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.dmg">Mac 版をダウンロード</a>
-        <p class="fine">無料のオープンソースです。macOS 14 以降の Apple Silicon Mac で動きます。</p>
+        <ul class="badges">
+          <li>無料・オープンソース</li>
+          <li>macOS 14 以降・Apple Silicon</li>
+          <li>macOS 26 以降は API Key なしで使える</li>
+        </ul>
+        <p class="fine">外部の文字起こしや AI 整形を使うときだけ、その料金を選んだサービスに支払います。<a href="#start">必要なものと料金</a></p>
       </div>
     </div>
   </div>
@@ -65,18 +70,18 @@
       <p class="demo-text">昨日送ったデザイン案なんだけど、見出しの色をもうちょっと明るくして、余白も広げてほしい。
 金曜までにできるか教えて。</p>
     </div>
-    <p class="demo-note">キーを押すと試せます<span class="desktop-only">(Mac なら右 Option キーでも動きます)</span>。これはページ上の再現で、マイクは使いません。</p>
+    <p class="demo-note"><strong>キーを押すと、もう一度試せます</strong><span class="desktop-only">(Mac なら右 Option キーでも動きます)</span>。これはページ上の再現で、マイクは使いません。</p>
   </div>
 </section>
 
-<section class="wrap section" aria-label="アプリの画面">
-  <figure class="shot">
-    <picture>
-      <source srcset="assets/screens/home-ja-dark.png" media="(prefers-color-scheme: dark)">
-      <img src="assets/screens/home-ja.png" width="880" height="652" loading="lazy" alt="HibiVo のホーム画面。直近 7 日の利用回数、話した時間、API 料金の概算とグラフ、ホットキーの一覧、最近覚えた言葉が並んでいる">
-    </picture>
-    <figcaption>ホーム画面。利用状況とホットキーの一覧を確認できます。画面のデータはサンプルです。</figcaption>
-  </figure>
+<section class="wrap section" aria-labelledby="problems">
+  <h2 id="problems">タイピングが、<wbr>考える<wbr>じゃまを<wbr>していませんか</h2>
+  <ul class="pains">
+    <li><p class="pain">長い返信を打っているうちに、言いたいことを見失う</p><p>話せば、考える速さのまま書けます。言いよどみや言い直しは AI が取り除きます。</p></li>
+    <li><p class="pain">AI への長い指示を、毎回キーボードで打っている</p><p>Claude Code や ChatGPT への指示も、話せば項目ごとの箇条書きに。ターミナルでは自動でその書き方になります。</p></li>
+    <li><p class="pain">同じ社名や専門用語を、何度も直している</p><p>一度直せば、辞書が覚えます。次からは正しく入りやすくなります。</p></li>
+    <li><p class="pain">会議でメモを取っていると、話に集中できない</p><p>自分の声も相手の声も、まとめて文字にします。記録は HibiVo に任せられます。</p></li>
+  </ul>
 </section>
 
 <section class="wrap section" aria-labelledby="modes">
@@ -136,14 +141,19 @@
   <div class="split">
   <div>
     <h2 id="dictionary">一度直せば、<wbr>辞書が覚える</h2>
-    <p class="section-lead">入力された言葉を直すと、HibiVo が気づいて辞書に登録します。社名や製品名、専門用語が、次から正しく入りやすくなります。登録はクリックで取り消せます。ターミナルなど内容を読み取れないアプリでは、履歴の「修正」から登録できます。</p>
+    <p class="section-lead">社名や製品名、専門用語を、何度も教えなくていい。入力された言葉を直すと、HibiVo が気づいて辞書に登録し、次から正しく入りやすくなります。登録は通知をクリックすれば取り消せます。ターミナルなど内容を読み取れないアプリでは、履歴の「修正」から登録できます。</p>
   </div>
-  <div>
+  <div class="learn">
+    <p class="learn-label">いま入った文章を直すと</p>
     <p class="correction"><del>アップシンク</del><ins>AppSync</ins>の設定を確認します</p>
     <div class="notice">
       <span class="notice-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M10 3l1.9 5.6a3 3 0 0 0 1.9 1.9L19.4 12.4l-5.6 1.9a3 3 0 0 0-1.9 1.9L10 21.8l-1.9-5.6a3 3 0 0 0-1.9-1.9L.6 12.4l5.6-1.9a3 3 0 0 0 1.9-1.9L10 3zM19 1l.8 2.4a1.2 1.2 0 0 0 .8.8L23 5l-2.4.8a1.2 1.2 0 0 0-.8.8L19 9l-.8-2.4a1.2 1.2 0 0 0-.8-.8L15 5l2.4-.8a1.2 1.2 0 0 0 .8-.8L19 1z"/></svg></span>
       <p class="notice-text"><small>辞書に追加しました</small><span>アップシンク</span> → <b>AppSync</b></p>
       <span class="notice-undo">取り消す</span>
+    </div>
+    <div class="learn-next">
+      <p class="learn-label">次からは</p>
+      <p class="correction">AppSyncの設定を確認します</p>
     </div>
   </div>
   </div>
@@ -158,7 +168,7 @@
 
 <section class="wrap section split" aria-labelledby="meetings">
   <div>
-    <h2 id="meetings">会議も、<wbr>そのまま文字に</h2>
+    <h2 id="meetings">会議に集中しよう。<wbr>記録は HibiVo に</h2>
     <p class="section-lead"><kbd>右 Option</kbd> を押しながら <kbd>M</kbd> で開始します。マイクとシステム音声をいっしょに文字起こしするので、オンライン参加者の声も残ります。</p>
     <ul class="bullets">
       <li>macOS 26 以降なら、標準の文字起こしで API Key も料金も不要です。話者を区別するには Soniox を使います。</li>
@@ -191,22 +201,33 @@
   </div>
 </section>
 
+<section class="wrap section" aria-label="アプリの画面">
+  <figure class="shot">
+    <picture>
+      <source srcset="assets/screens/home-ja-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="assets/screens/home-ja.png" width="880" height="652" loading="lazy" alt="HibiVo のホーム画面。直近 7 日の利用回数、話した時間、API 料金の概算とグラフ、ホットキーの一覧、最近覚えた言葉が並んでいる">
+    </picture>
+    <figcaption>ホーム画面。利用状況とホットキーの一覧を確認できます。画面のデータはサンプルです。</figcaption>
+  </figure>
+</section>
+
 <section class="wrap section" aria-labelledby="privacy">
   <h2 id="privacy">どこに何を送るか、<wbr>自分で選べる</h2>
   <dl class="promises">
     <div><dt>文字起こしが終わると、音声は Mac に残りません</dt><dd>音声入力とリアルタイムのミーティングでは、音声をメモリ上で使うだけで、ディスクには保存しません。「終了後にまとめて」のミーティングだけ、文字起こしが終わるまで Mac に一時保存して、終わると削除します。文字起こしできなかった場合も 7 日で削除します。</dd></div>
     <div><dt>macOS 標準なら、音声は Mac の外に出ません</dt><dd>macOS 26 以降の既定です。Soniox や Gemini を選ぶと音声はそのサービスへ、AI 整形を使うと文章は選んだプロバイダへ送られます。</dd></div>
     <div><dt>API Key は Keychain に保存します</dt><dd>設定ファイルには書き込みません。履歴は Mac に平文で最大 200 件保存し、保存しない設定にもできます。</dd></div>
-    <div><dt>解析やテレメトリはありません</dt><dd>アプリは利用状況を送信しません。このページにも解析ツールは入れていません。更新の確認で GitHub に問い合わせますが、これもオフにできます。</dd></div>
+    <div><dt>解析やテレメトリはありません</dt><dd>アプリは利用状況を送信しません。このページにも解析ツールは入れていません。更新の確認で GitHub に問い合わせますが、これもオフにできます。ソースコードはすべて公開しているので、中身を確かめられます。</dd></div>
   </dl>
 </section>
 
 <section class="start" aria-labelledby="start">
   <div class="wrap split">
     <div>
-      <h2 id="start">始め方</h2>
-      <ol class="start-steps">
-        <li><h3>ダウンロードする</h3><p>ディスクイメージ(.dmg)を開き、HibiVo.app を「アプリケーション」にドラッグします。</p></li>
+      <h2 id="start">その文章、<wbr>次は話してみよう</h2>
+      <p class="section-lead">HibiVo は無料です。3 つの手順で始められます。</p>
+      <ol class="start-steps" aria-label="始め方">
+        <li><h3>ダウンロードする</h3><p>ディスクイメージ(.dmg)を開き、HibiVo.app を「アプリケーション」にドラッグします。Apple の公証を受けたアプリです。</p></li>
         <li><h3>2 つの権限を許可する</h3><p>ホットキーと貼り付けのためのアクセシビリティと、マイクを許可します。</p></li>
         <li><h3>右 Option を押して話す</h3><p>終わったらもう一度押します。押している間だけ話すこともできます。キーは Fn、右 Command、⌃Space からも選べます。</p></li>
       </ol>
@@ -218,6 +239,7 @@
         <div><dt>Mac</dt><dd>macOS 14 以降、Apple Silicon</dd></div>
         <div><dt>文字起こし</dt><dd>macOS 26 以降は標準の文字起こしを API Key なしで使えます。それより前の macOS では Soniox か Google Gemini の API Key が必要です。</dd></div>
         <div><dt>AI 整形(任意)</dt><dd>Anthropic、Amazon Bedrock、Google Gemini、OpenAI 互換 API のいずれか。なくても Raw で使えます。</dd></div>
+        <div><dt>料金</dt><dd>アプリは無料です。外部の文字起こしや AI 整形を使うときだけ、その料金を選んだサービスに直接支払います。HibiVo が料金を受け取ることはありません。</dd></div>
       </dl>
     </div>
   </div>

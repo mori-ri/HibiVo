@@ -1,10 +1,11 @@
-// The hero demo and the cleanup mode tabs. No microphone, no network: everything here is a scripted
-// replay of a sample from docs/cleanup-modes.md, and the page reads fine without this file.
+// The hero demo, the cleanup mode tabs and the dictionary replay. No microphone, no network: everything
+// here is a scripted replay of a sample from docs/cleanup-modes.md, and the page reads fine without this file.
 
 (() => {
     document.documentElement.classList.add("js");
     setUpDemo();
     setUpTabs();
+    setUpLearning();
 })();
 
 function setUpDemo() {
@@ -221,4 +222,43 @@ function setUpTabs() {
 
     document.querySelector(".tabs").hidden = false;
     select(tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true"), false);
+}
+
+/** Replays the correction in the dictionary section once, the first time it scrolls into view. */
+function setUpLearning() {
+    const learn = document.querySelector(".learn");
+    const fix = learn?.querySelector("ins");
+    if (!fix || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Already on screen when the page opens (a link to #dictionary): replaying it would only flicker.
+    const box = learn.getBoundingClientRect();
+    if (box.top < innerHeight && box.bottom > 0) return;
+
+    const word = fix.textContent;
+    const after = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    async function play() {
+        await after(600);
+        learn.dataset.step = "fix";
+        await after(400);
+        for (let count = 1; count <= word.length; count++) {
+            fix.textContent = word.slice(0, count);
+            await after(90);
+        }
+        await after(500);
+        learn.dataset.step = "notice";
+        await after(1400);
+        delete learn.dataset.step;
+    }
+
+    learn.dataset.step = "typed";
+    fix.textContent = "";
+    const observer = new IntersectionObserver(
+        (entries) => {
+            if (!entries.some((entry) => entry.isIntersecting)) return;
+            observer.disconnect();
+            play();
+        },
+        { threshold: 0.6 },
+    );
+    observer.observe(learn);
 }

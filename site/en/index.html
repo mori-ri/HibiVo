@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
-<title>HibiVo | Speak, and it’s written. Voice input for Mac</title>
-<meta name="description" content="Press a key and speak. Clean text appears at the cursor in whatever app you’re using. A free, open-source voice input app for Mac, built Japanese-first.">
+<title>HibiVo | Write as fast as you think. Voice input for Mac</title>
+<meta name="description" content="Press a key and speak. Clean text appears at the cursor in whatever app you’re using. AI smooths out false starts, and the dictionary learns your terms as you correct them. A free, open-source voice input app for Mac, built Japanese-first.">
 <link rel="canonical" href="https://mori-ri.github.io/HibiVo/en/">
 <link rel="alternate" hreflang="ja" href="https://mori-ri.github.io/HibiVo/">
 <link rel="alternate" hreflang="en" href="https://mori-ri.github.io/HibiVo/en/">
@@ -13,8 +13,8 @@
 <link rel="icon" type="image/png" href="../assets/icon.png">
 <link rel="apple-touch-icon" href="../assets/icon.png">
 <meta property="og:type" content="website">
-<meta property="og:title" content="HibiVo | Speak, and it’s written. Voice input for Mac">
-<meta property="og:description" content="Press a key and speak. Clean text appears at the cursor in whatever app you’re using. A free, open-source voice input app for Mac, built Japanese-first.">
+<meta property="og:title" content="HibiVo | Write as fast as you think. Voice input for Mac">
+<meta property="og:description" content="Press a key and speak. Clean text appears at the cursor in whatever app you’re using. AI smooths out false starts, and the dictionary learns your terms as you correct them. A free, open-source voice input app for Mac, built Japanese-first.">
 <meta property="og:url" content="https://mori-ri.github.io/HibiVo/en/">
 <meta property="og:site_name" content="HibiVo">
 <meta property="og:locale" content="en_US">
@@ -22,7 +22,7 @@
 <meta property="og:image" content="https://mori-ri.github.io/HibiVo/assets/og-en.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="HibiVo: Just speak. It’s written. Voice input for Mac, plus meeting transcripts">
+<meta property="og:image:alt" content="HibiVo: Write as fast as you think. Voice input for Mac, plus meeting transcripts">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="../style.css">
 <script src="../main.js" defer></script>
@@ -40,12 +40,17 @@
 <main id="main">
 <section class="wrap hero">
   <div class="hero-top">
-    <h1><span class="said">Just speak.</span><span class="written">It’s written.</span></h1>
+    <h1><span class="said">Write as fast</span><span class="written">as you think.</span></h1>
     <div class="hero-lead">
-      <p class="lead">HibiVo is a voice input app for Mac. Press a key and speak, and clean text appears at the cursor in whatever app you’re using. It’s built Japanese-first, and handles English too.</p>
+      <p class="lead">Ideas your keyboard can’t keep up with, just say them. AI smooths out the false starts, and HibiVo learns your terms each time you correct them. Voice input for Mac that adapts to the way you write. Built Japanese-first, and handles English too.</p>
       <div class="actions">
         <a class="button" href="https://github.com/mori-ri/HibiVo/releases/latest/download/HibiVo-arm64.dmg">Download for Mac</a>
-        <p class="fine">Free and open source. Runs on Apple Silicon Macs with macOS 14 or later.</p>
+        <ul class="badges">
+          <li>Free and open source</li>
+          <li>macOS 14 or later, Apple Silicon</li>
+          <li>No API key needed on macOS 26 or later</li>
+        </ul>
+        <p class="fine">You only pay if you use third-party transcription or AI cleanup, and you pay that service directly. <a href="#start">What you need and costs</a></p>
       </div>
     </div>
   </div>
@@ -65,18 +70,18 @@
       <p class="demo-text">The design draft I sent yesterday, could you make the heading color a bit brighter and also widen the margins?
 Let me know if you can get it done by Friday.</p>
     </div>
-    <p class="demo-note">Press the key to try it<span class="desktop-only"> (on a Mac, the right Option key works too)</span>. This is a replay on this page. It doesn’t use your microphone.</p>
+    <p class="demo-note"><strong>Press the key to try it again</strong><span class="desktop-only"> (on a Mac, the right Option key works too)</span>. This is a replay on this page. It doesn’t use your microphone.</p>
   </div>
 </section>
 
-<section class="wrap section" aria-label="The app">
-  <figure class="shot">
-    <picture>
-      <source srcset="../assets/screens/home-en-dark.png" media="(prefers-color-scheme: dark)">
-      <img src="../assets/screens/home-en.png" width="880" height="652" loading="lazy" alt="The HibiVo Home page, showing uses, speaking time and estimated API cost for the last 7 days with a chart, a list of hotkeys, and recently learned words">
-    </picture>
-    <figcaption>The Home page shows your usage and hotkeys. The data here is sample data.</figcaption>
-  </figure>
+<section class="wrap section" aria-labelledby="problems">
+  <h2 id="problems">Is typing getting in the way of your thinking?</h2>
+  <ul class="pains">
+    <li><p class="pain">By the time you’ve typed a long reply, you’ve lost the thought</p><p>Speak, and it’s written as fast as you think. AI removes the ums and false starts.</p></li>
+    <li><p class="pain">You type out every long instruction to AI by hand</p><p>Say what you want from Claude Code or ChatGPT, and it comes out as a bulleted list. In Terminal, that style switches on automatically.</p></li>
+    <li><p class="pain">You keep fixing the same names and terms</p><p>Fix a word once and the dictionary learns it, so it comes out right more often next time.</p></li>
+    <li><p class="pain">Taking notes in meetings pulls you out of the conversation</p><p>Your voice and everyone else’s are transcribed together. Leave the record to HibiVo.</p></li>
+  </ul>
 </section>
 
 <section class="wrap section" aria-labelledby="modes">
@@ -136,14 +141,19 @@ Let me know if you can get it done by Friday.</p>
   <div class="split">
   <div>
     <h2 id="dictionary">Fix a word once, and the dictionary learns it</h2>
-    <p class="section-lead">When you correct a word right after dictating, HibiVo notices and adds it to your dictionary, so company names, product names and technical terms come out right more often. Click the notice to undo. In apps whose text can’t be read, such as Terminal, you can add words from History.</p>
+    <p class="section-lead">No more teaching it your company names, product names and technical terms over and over. When you correct a word right after dictating, HibiVo notices and adds it to your dictionary, so it comes out right more often next time. Click the notice to undo. In apps whose text can’t be read, such as Terminal, you can add words from History.</p>
   </div>
-  <div>
+  <div class="learn">
+    <p class="learn-label">Correct what was just typed</p>
     <p class="correction">Check the <del>app sink</del> <ins>AppSync</ins> settings</p>
     <div class="notice">
       <span class="notice-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M10 3l1.9 5.6a3 3 0 0 0 1.9 1.9L19.4 12.4l-5.6 1.9a3 3 0 0 0-1.9 1.9L10 21.8l-1.9-5.6a3 3 0 0 0-1.9-1.9L.6 12.4l5.6-1.9a3 3 0 0 0 1.9-1.9L10 3zM19 1l.8 2.4a1.2 1.2 0 0 0 .8.8L23 5l-2.4.8a1.2 1.2 0 0 0-.8.8L19 9l-.8-2.4a1.2 1.2 0 0 0-.8-.8L15 5l2.4-.8a1.2 1.2 0 0 0 .8-.8L19 1z"/></svg></span>
       <p class="notice-text"><small>Added to Dictionary</small><span>app sink</span> → <b>AppSync</b></p>
       <span class="notice-undo">Undo</span>
+    </div>
+    <div class="learn-next">
+      <p class="learn-label">Next time</p>
+      <p class="correction">Check the AppSync settings</p>
     </div>
   </div>
   </div>
@@ -158,7 +168,7 @@ Let me know if you can get it done by Friday.</p>
 
 <section class="wrap section split" aria-labelledby="meetings">
   <div>
-    <h2 id="meetings">Meetings, written down</h2>
+    <h2 id="meetings">Stay in the meeting. HibiVo keeps the record</h2>
     <p class="section-lead">Hold <kbd>Right Option</kbd> and press <kbd>M</kbd> to start. HibiVo transcribes your microphone and system audio together, so remote participants are captured too.</p>
     <ul class="bullets">
       <li>On macOS 26 or later, built-in transcription needs no API key and costs nothing. To tell speakers apart, use Soniox.</li>
@@ -191,22 +201,33 @@ Let me know if you can get it done by Friday.</p>
   </div>
 </section>
 
+<section class="wrap section" aria-label="The app">
+  <figure class="shot">
+    <picture>
+      <source srcset="../assets/screens/home-en-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="../assets/screens/home-en.png" width="880" height="652" loading="lazy" alt="The HibiVo Home page, showing uses, speaking time and estimated API cost for the last 7 days with a chart, a list of hotkeys, and recently learned words">
+    </picture>
+    <figcaption>The Home page shows your usage and hotkeys. The data here is sample data.</figcaption>
+  </figure>
+</section>
+
 <section class="wrap section" aria-labelledby="privacy">
   <h2 id="privacy">You choose what goes where</h2>
   <dl class="promises">
     <div><dt>After transcription, no audio stays on your Mac</dt><dd>Dictation and real-time meetings use audio in memory and never write it to disk. Only After the Meeting transcription stores it on your Mac until the transcript is done, then deletes it. If transcription can’t finish, it’s deleted after 7 days.</dd></div>
     <div><dt>With macOS transcription, audio stays on your Mac</dt><dd>That’s the default on macOS 26 or later. If you choose Soniox or Gemini, audio goes to that service. If you use AI cleanup, text goes to the provider you chose.</dd></div>
     <div><dt>API keys live in the Keychain</dt><dd>They’re never written to a settings file. History is kept on your Mac in plain text, up to 200 entries, and you can turn it off.</dd></div>
-    <div><dt>No analytics or telemetry</dt><dd>The app sends no usage data, and this page has no analytics. It does check GitHub for updates, which you can turn off.</dd></div>
+    <div><dt>No analytics or telemetry</dt><dd>The app sends no usage data, and this page has no analytics. It does check GitHub for updates, which you can turn off. All the source code is public, so you can see for yourself.</dd></div>
   </dl>
 </section>
 
 <section class="start" aria-labelledby="start">
   <div class="wrap split">
     <div>
-      <h2 id="start">Get started</h2>
-      <ol class="start-steps">
-        <li><h3>Download</h3><p>Open the disk image (.dmg) and drag HibiVo.app to Applications.</p></li>
+      <h2 id="start">Next time, just say it</h2>
+      <p class="section-lead">HibiVo is free. Get started in three steps.</p>
+      <ol class="start-steps" aria-label="Get started">
+        <li><h3>Download</h3><p>Open the disk image (.dmg) and drag HibiVo.app to Applications. The app is notarized by Apple.</p></li>
         <li><h3>Allow two permissions</h3><p>Accessibility, for the hotkey and pasting, and the microphone.</p></li>
         <li><h3>Press right Option and speak</h3><p>Press again when you’re done, or hold while you speak. You can also use Fn, right Command, or ⌃Space.</p></li>
       </ol>
@@ -218,6 +239,7 @@ Let me know if you can get it done by Friday.</p>
         <div><dt>Mac</dt><dd>macOS 14 or later, Apple Silicon</dd></div>
         <div><dt>Transcription</dt><dd>On macOS 26 or later, built-in transcription works without an API key. On earlier versions, you need an API key from Soniox or Google Gemini.</dd></div>
         <div><dt>AI cleanup (optional)</dt><dd>Anthropic, Amazon Bedrock, Google Gemini, or an OpenAI-compatible API. Without one, you can use Raw.</dd></div>
+        <div><dt>Cost</dt><dd>The app is free. If you use third-party transcription or AI cleanup, you pay that service directly. HibiVo never charges you anything.</dd></div>
       </dl>
     </div>
   </div>
