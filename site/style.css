@@ -47,6 +47,8 @@
 html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    /* Keeps anchor targets clear of the sticky header. */
+    scroll-padding-top: 112px;
 }
 
 body {
@@ -154,11 +156,44 @@ kbd {
 
 /* Header */
 
+/* The header stays at the top while scrolling. It spans the full width so the page doesn't show through
+   at the sides, but its padding lines the content up with .wrap. The hairline only appears once the
+   page has scrolled, so the header reads as part of the hero at the top. */
+
 .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 8;
     display: flex;
     align-items: center;
     gap: clamp(16px, 3vw, 32px);
-    padding-block: 20px;
+    max-width: none;
+    padding-block: clamp(12px, 2vw, 20px);
+    padding-inline: max(var(--gutter), calc((100% - 1180px) / 2));
+    box-shadow: 0 1px 0 transparent;
+    background: var(--paper);
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .site-header {
+        background: color-mix(in srgb, var(--paper) 82%, transparent);
+        -webkit-backdrop-filter: saturate(1.8) blur(16px);
+        backdrop-filter: saturate(1.8) blur(16px);
+    }
+}
+
+@supports (animation-timeline: scroll()) {
+    .site-header {
+        animation: header-line linear both;
+        animation-timeline: scroll();
+        animation-range: 0 48px;
+    }
+}
+
+@keyframes header-line {
+    to {
+        box-shadow: 0 1px 0 var(--line);
+    }
 }
 
 .brand {
@@ -1114,14 +1149,6 @@ h3 {
         right: 17px;
         bottom: 15px;
         font-size: 0.8125rem;
-    }
-
-    /* On a phone the key is at the bottom of the screen, where the HUD would cover it.
-       Opaque, because up here it passes over the header. */
-    .hud {
-        top: calc(12px + env(safe-area-inset-top));
-        bottom: auto;
-        background: #2b2c30;
     }
 
     .demo-note {
