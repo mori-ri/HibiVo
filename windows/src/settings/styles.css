@@ -1,0 +1,290 @@
+/* Settings window. Quiet surfaces, system font and controls (see DESIGN.md); the brand colours stay out of it. */
+
+:root {
+  color-scheme: light dark;
+  --text: #1f1f1f;
+  --secondary: rgba(0, 0, 0, 0.6);
+  --background: #f3f3f3;
+  --card-fill: rgba(255, 255, 255, 0.85);
+  --card-stroke: rgba(0, 0, 0, 0.06);
+  --separator: rgba(0, 0, 0, 0.08);
+  --field: #ffffff;
+  --field-stroke: rgba(0, 0, 0, 0.14);
+  --accent: #0067c0;
+  --accent-text: #ffffff;
+  --selection: rgba(0, 103, 192, 0.08);
+  --red: #c42b1c;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--background);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #ffffff;
+    --secondary: rgba(255, 255, 255, 0.62);
+    --background: #202020;
+    --card-fill: rgba(255, 255, 255, 0.05);
+    --card-stroke: rgba(255, 255, 255, 0.08);
+    --separator: rgba(255, 255, 255, 0.1);
+    --field: rgba(255, 255, 255, 0.06);
+    --field-stroke: rgba(255, 255, 255, 0.14);
+    --accent: #4cc2ff;
+    --accent-text: #000000;
+    --selection: rgba(76, 194, 255, 0.12);
+    --red: #ff99a4;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+h2 {
+  margin: 28px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.lead {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--secondary);
+}
+
+kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--field-stroke);
+  border-radius: 5px;
+  background: var(--field);
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.notice {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: var(--selection);
+}
+
+.card {
+  border: 1px solid var(--card-stroke);
+  border-radius: 12px;
+  background: var(--card-fill);
+}
+
+.row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--separator);
+}
+
+.card > :first-child {
+  border-top: none;
+}
+
+.row.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+small {
+  font-size: 12px;
+  color: var(--secondary);
+  line-height: 1.5;
+}
+
+small.over {
+  color: var(--red);
+}
+
+.control {
+  flex: 0 0 auto;
+}
+
+input[type="text"],
+input[type="url"],
+input[type="password"],
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--field);
+  border: 1px solid var(--field-stroke);
+  border-radius: 7px;
+  padding: 6px 10px;
+}
+
+input[type="text"],
+input[type="url"] {
+  width: 280px;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.secret {
+  display: flex;
+  gap: 6px;
+}
+
+.secret input {
+  width: 220px;
+}
+
+button {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button.secondary {
+  background: var(--field);
+  border-color: var(--field-stroke);
+  color: var(--text);
+}
+
+button.small {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+.switch {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.modes {
+  margin: 0;
+  padding: 6px 8px 10px;
+  border: none;
+  border-top: 1px solid var(--separator);
+  display: grid;
+  gap: 2px;
+}
+
+.modes:disabled {
+  opacity: 0.45;
+}
+
+.mode {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.mode.selected {
+  background: var(--selection);
+}
+
+.mode input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.mode span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode strong {
+  font-weight: 600;
+}
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.history li {
+  padding: 12px 16px;
+  border-top: 1px solid var(--separator);
+}
+
+.history li:first-child {
+  border-top: none;
+}
+
+.history p {
+  margin: 4px 0 8px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.meta {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.status.failed {
+  color: var(--red);
+}
+
+.empty {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--secondary);
+}
+
+.fatal {
+  padding: 24px;
+  color: var(--red);
+}

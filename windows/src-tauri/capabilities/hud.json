@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "hud",
+  "description": "The HUD only listens for the dictation state the main window sends it.",
+  "windows": ["hud"],
+  "permissions": ["core:event:default"]
+}

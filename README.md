@@ -140,6 +140,10 @@
 
 ビルドと開発の手順は [ソースからビルド](docs/building.md) を参照してください。
 
+### Windows 版（開発中）
+
+`windows/` に Tauri 2 で作っている Windows 版があります。いまは音声入力の最小構成だけです。詳しくは [windows/README.md](windows/README.md) を参照してください。
+
 ## ライセンス
 
 ソースコードは [MIT License](LICENSE) です。
