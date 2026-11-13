@@ -14,7 +14,7 @@ public struct KeychainService: SecretStore {
     static let bundleAccount = "hibivo-api-key-bundle-v1"
     static let bundledAccounts = [
         "soniox", SecretAccount.gemini, SecretAccount.anthropic,
-        SecretAccount.openAICompatible, SecretAccount.bedrockAPIKey,
+        SecretAccount.openAICompatible, SecretAccount.bedrockAPIKey, "elevenlabs",
     ]
 
     private let state: State

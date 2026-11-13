@@ -10,7 +10,9 @@ public final class AppEnvironment {
     public let hotkey: HotkeyMonitor
     public let secrets: any SecretStore
     public let transcriptionProviders: [any TranscriptionProvider] =
-        (AppleSpeechProvider.isSupported ? [AppleSpeechProvider()] : []) + [SonioxProvider(), GeminiLiveProvider()]
+        (AppleSpeechProvider.isSupported ? [AppleSpeechProvider()] : []) + [
+            SonioxProvider(), GeminiLiveProvider(), ElevenLabsProvider(),
+        ]
     /// The providers that can transcribe a meeting, each with its after-meeting transcriber if it has one.
     public let meetingTranscribers: [MeetingTranscriber] =
         (AppleSpeechProvider.isSupported ? [MeetingTranscriber(provider: AppleSpeechProvider())] : []) + [
