@@ -9,7 +9,7 @@
 押す → 話す → もう一度押す(または押している間だけ話す)→ 文章が入る。macOS 向けの日本語音声入力アプリです。[紹介ページ](https://mori-ri.github.io/HibiVo/)で動きを試せます。
 
 - Push-to-Talk（既定は右 Option。Fn / 右 Command / ⌃Space も選べます）
-- 話している間にストリーミングで文字起こしするので、録音を終えたらすぐ入力されます。既定は macOS 標準の文字起こし（macOS 26 以降。Mac の中で処理し、API Key 不要・無料）で、Soniox または Google Gemini も選べます
+- 話している間にストリーミングで文字起こしするので、録音を終えたらすぐ入力されます。既定は macOS 標準の文字起こし（macOS 26 以降。Mac の中で処理し、API Key 不要・無料）で、Soniox、Google Gemini、ElevenLabs も選べます
 - LLM で整形（Raw / Natural / Business / Prompt / Custom）。アプリごとにモードを自動で切り替えます
 - 元のアプリのカーソル位置へ貼り付け、クリップボードは元に戻します
 - ユーザー辞書（表記と聞き取り例を登録。聞き取り例は平仮名・片仮名、全角・半角を区別せずに置き換え、STT のヒントにも使います）、履歴（コピー / もう一度入力 / 整形やり直し）
@@ -21,7 +21,7 @@
 ## 必要なもの
 
 - macOS 14 以降、Apple Silicon
-- 文字起こし: macOS 26 以降なら macOS 標準の文字起こしで API Key なしで使えます。それ以外の場合や、話者識別・クラウドの認識を使いたい場合は [Soniox](https://soniox.com) または [Google AI Studio](https://aistudio.google.com)（Gemini 3.5 Transcribe）の API Key
+- 文字起こし: macOS 26 以降なら macOS 標準の文字起こしで API Key なしで使えます。それ以外の場合や、話者識別・クラウドの認識を使いたい場合は [Soniox](https://soniox.com)、[Google AI Studio](https://aistudio.google.com)（Gemini 3.5 Transcribe）、[ElevenLabs](https://elevenlabs.io)（Scribe v3 Live）のいずれかの API Key
 - AI 整形用の LLM（なくても Raw で使えます）: Anthropic API、Amazon Bedrock、Google Gemini API、または OpenAI 互換 API
 
 ## インストール
@@ -37,7 +37,7 @@
 1. 起動するとメニューバーに HibiVo のアイコンが出ます。
 2. **アクセシビリティ** を許可します（システム設定 › プライバシーとセキュリティ › アクセシビリティ）。ホットキーと貼り付けに必要です。
 3. **マイク** を許可します。
-4. メニュー › 設定… › 文字起こし で STT Provider を選びます。既定の「macOS 標準」は設定不要です（初回は音声認識モデルを自動でダウンロードします）。Soniox / Google Gemini を使う場合は API Key を保存します。Gemini の API Key は AI 整形の Google Gemini と共通です。
+4. メニュー › 設定… › 文字起こし で STT Provider を選びます。既定の「macOS 標準」は設定不要です（初回は音声認識モデルを自動でダウンロードします）。Soniox / Google Gemini / ElevenLabs を使う場合は API Key を保存します。Gemini の API Key は AI 整形の Google Gemini と共通です。
 5. AI 整形 タブで LLM の Provider と認証情報を設定します（既定は Anthropic `claude-haiku-4-5`。短い文の整形は応答速度を優先し、各プロバイダの既定も軽量モデル）。
    Amazon Bedrock の場合はリージョン・モデル ID（または推論プロファイル ID）と、Bedrock API キーか IAM アクセスキー（`bedrock:InvokeModel` 権限）を設定します。
    Claude のほか `zai.glm-4.7-flash`、`zai.glm-4.7`、`minimax.minimax-m2.5`、`global.openai.gpt-6-luna` なども指定できます（設定画面の「候補」から選択可）。
@@ -94,12 +94,12 @@
 ## プライバシー
 
 - **音声**: メモリ上で STT へ送るだけで、ディスクには保存しません。例外は「終了後にまとめて」のミーティングで、文字起こしが終わるまで Mac に一時保存します（できなかった場合も 7 日で削除します）。macOS 標準の文字起こしでは、音声は Mac の外に出ません。
-- **テキスト**: Soniox / Google Gemini を選んだ場合、音声はその STT Provider へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
+- **テキスト**: Soniox / Google Gemini / ElevenLabs を選んだ場合、音声はその STT Provider へ、整形する場合は LLM Provider へ送信されます。各社のデータ取り扱いポリシーに従います。
 - **履歴**: 文字起こし原文と整形結果を `~/Library/Application Support/HibiVo/history.json` に平文で最大 200 件保存します。履歴画面の右上の「履歴を保存」で無効にでき、同じ画面から全件削除できます。
 - **辞書**: `~/Library/Application Support/HibiVo/vocabulary.json` に保存します。
 - **ミーティング**: 文字起こしと議事録を `~/Library/Application Support/HibiVo/Meetings/` に Markdown で平文保存します。議事録を作る場合、文字起こしは Claude Code 経由で Anthropic に、または「作成方法」で選んだプロバイダに送信されます。
 - **API Key / AWS 認証情報**: macOS の Keychain に保存します。設定ファイルには書き込みません。
-  - Soniox・Gemini・Anthropic・OpenAI 互換・Bedrock の API キーは、HibiVo 用の 1 つの項目にまとめて保存します。この項目へのアクセス許可は、保存した API キー全体に適用されます。
+  - Soniox・Gemini・ElevenLabs・Anthropic・OpenAI 互換・Bedrock の API キーは、HibiVo 用の 1 つの項目にまとめて保存します。この項目へのアクセス許可は、保存した API キー全体に適用されます。
   - 取得した API キーはアプリ内のメモリに保持し、通常の利用でキーごとの再取得・再承認を行いません。キーチェーンアクセスなどで外部からキーを変更した場合は、HibiVo を再起動してください。
   - AWS IAM のアクセスキー ID・シークレットアクセスキー・セッショントークンは、権限範囲をアプリから判断できないため個別保存を維持します。
   - 既存の API キーは初回取得・保存時に移行します。移行時には旧項目ごとの承認が必要になる場合があります。旧項目は、一括保存に成功してから削除します。アクセスを拒否したキーは移行せずに残し、次回の起動時にもう一度確認します（そのキーを設定画面で保存し直すと、旧項目は削除します）。旧項目の削除に失敗した場合は旧項目も残りますが、以後は一括保存した項目を参照します。
@@ -117,7 +117,7 @@
 
 開発者の環境で、Push-to-Talk → 文字起こし → 整形 → 貼り付けの一連の流れを確認済みです。
 
-- STT は macOS 標準（`SpeechAnalyzer`、macOS 26 以降）、Soniox、Google Gemini（`gemini-3.5-transcribe-live`、Live API でストリーミング）
+- STT は macOS 標準（`SpeechAnalyzer`、macOS 26 以降）、Soniox、Google Gemini（`gemini-3.5-transcribe-live`、Live API でストリーミング）、ElevenLabs（`scribe_v3_live`、リアルタイム API でストリーミング）
 - Amazon Bedrock は Claude（InvokeModel）と、GLM・MiniMax・GPT など Converse API 対応モデルに対応。AWS プロファイル / SSO の認証情報の自動読み込みは未対応
 - ホットキーはプリセット（右 Option / Fn / 右 Command / ⌃Space）から選択。任意のキーの登録は未対応
 - アプリごとの整形モードは bundle id で判定するため、ブラウザ内の Web アプリ（Gmail など）はブラウザの設定に従う

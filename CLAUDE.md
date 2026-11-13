@@ -14,6 +14,7 @@ scripts/test.sh --filter HotkeyInterpreterTests        # 1 スイートのみ
 scripts/test.sh --filter "DictationControllerTests/shortTapIsCancelled"   # 1 テストのみ
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter SonioxIntegration           # 実際の Soniox エンドポイントに接続 (オプトイン)
 HIBIVO_INTEGRATION=1 scripts/test.sh --filter GeminiIntegration           # 実際の Gemini エンドポイントに接続 (オプトイン、GEMINI_API_KEY)
+HIBIVO_INTEGRATION=1 scripts/test.sh --filter ElevenLabsIntegration       # 実際の ElevenLabs エンドポイントに接続 (オプトイン、ELEVENLABS_API_KEY)
 scripts/eval.sh --variant baseline --provider bedrock --model <id>    # 整形の品質評価 (実際の API と Claude の判定、有料)。結果は .claude/hillclimb/cleanup/
 
 scripts/run.sh                          # debug ビルド → build/HibiVo.app → 起動 (起動中のアプリは終了させる)
@@ -74,10 +75,11 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 **修正からの辞書学習**: 貼り付けに成功したら、`CorrectionWatcher` が対象アプリのフォーカス中の入力欄を AX で 0.5 秒ごとに読み、ユーザーが直した結果を追う(`AXManualAccessibility` で Electron にもツリーを作らせる)。`InsertedTextTracker` は、貼り付け直後のキャレット位置から挿入の前後のテキストを覚え、それが変わらない間はその間を挿入部分とみなす。フォーカスの移動、アプリの切り替え、欄が空になったとき、次の音声入力の開始、45 秒のいずれかで終わり、`CorrectionLearner` に渡す。`CorrectionExtractor`(純粋関数的)は文字単位の差分を取り、変更箇所を前後の英字・片仮名・漢字の連続まで広げて語にする(平仮名は助詞や送り仮名なので広げない)。書き直し、数字、句読点、送り仮名、名詞以外(動詞・形容詞の語幹。システムのトークナイザーが送り仮名ごと 1 語にするかで判定する)、表記だけの違い、短い仮名、音が似ていない組(システムの形態素解析のローマ字読みの子音で比べる。略語は除く)は捨てる。登録は `VocabularyStore.learn`(同じ表記があれば別名に追加、ほかの項目と取り合う形は登録しない)で、HUD に専用のカード(`LearnedNotice`)を 10 秒表示し、ポインタを重ねている間は消さない。クリックで取り消せる。AX で読めないアプリ向けに、履歴の「修正」でも同じ抽出を行い、候補をボタンで追加できる。入力欄のテキストは保存しない。
 
-**STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションは準備(ソケット接続など)が済む前の `send` を受け付けてバッファする。実装は 3 つ。いずれもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
+**STT 抽象化**(`Transcription/`): `TranscriptionProvider` はステートレスで、発話ごとに `TranscriptionSession`(actor)を 1 つ作るだけ。そのため連続した音声入力でストリームが混線しない。セッションは準備(ソケット接続など)が済む前の `send` を受け付けてバッファする。実装は 4 つ。いずれもタイムアウトや切断時は例外を投げずに途中までのテキストを返す。
 - macOS 標準(`AppleSpeechProvider`、`SpeechAnalyzer` + `SpeechTranscriber`、macOS 26 以降): 対応する Mac では音声入力・ミーティングとも既定。API キー不要(`requiresAPIKey == false`)、話者識別なし(`identifiesSpeakers == false`)。音声は端末内で処理する。辞書の表記は `AnalysisContext.contextualStrings` に渡す。モデルが未インストールのとき、音声入力は裏でダウンロードを始めて `modelUnavailable` で失敗する。ミーティングはやり直せないので、`isReady(language:)` が false(モデルの準備ができていない)なら開始しない。起動時と設定変更時に `AppEnvironment.prepareSpeechModel` で先にダウンロードしておく。既定が Soniox だった頃からの利用者で Soniox のキーがある人は、`SettingsStore.keepSonioxForExistingUsers` が一度だけ Soniox のままにする。
 - Soniox(`stt-rt-v6`): `finalize` → `<fin>` トークンを待つ。
 - Gemini(`gemini-3.5-transcribe-live`、Live API): 手動 VAD。`setupComplete` まで音声をバッファし、`activityStart` → 音声 → `activityEnd` を送る。確定した `inputTranscription` のセグメントを連結し、`turnComplete` と最後のセグメント(順序は保証されない)が揃うか、少し待って終了する。不正なキーはソケットの close 理由で届く。API キー(Keychain の `gemini`)は整形の Gemini と共通。
+- ElevenLabs(`scribe_v3_live`、リアルタイム API): 音声入力のみ(ミーティングには使わない)。設定はクエリ(`commit_strategy=manual`、辞書は `keyterms` に表記 → 読みの順で 50 語・各 20 文字まで)、キーは `xi-api-key` ヘッダー。`session_started` まで音声をバッファし、終了時に `commit: true` の空チャンクを送って `committed_transcript` を待つ。無音なら `insufficient_audio_activity` が届く。
 
 **整形 (Cleanup)**(`Cleanup/`):
 - `TextCleanupProvider.complete(system:user:model:)`。Bedrock はキーペアが必要なため、各プロバイダは自身の認証情報を持って生成される。

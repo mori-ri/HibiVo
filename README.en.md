@@ -13,7 +13,7 @@ Press → speak → press again (or hold while you speak) → your text appears.
 > - To dictate in English, set Settings… › Transcription › Language to English. AI Cleanup and meeting minutes then use English prompts too, so text is cleaned up and minutes are written in English.
 
 - Push-to-Talk (right Option by default; Fn / right Command / ⌃Space are also available)
-- Transcribes while you speak, so your text is entered right after you stop recording. The default is macOS's built-in transcription (macOS 26 or later; runs on your Mac, no API key, free). Soniox or Google Gemini can also be chosen
+- Transcribes while you speak, so your text is entered right after you stop recording. The default is macOS's built-in transcription (macOS 26 or later; runs on your Mac, no API key, free). Soniox, Google Gemini, or ElevenLabs can also be chosen
 - Cleans up text with an LLM (Raw / Natural / Business / Prompt / Custom), switching modes automatically per app
 - Pastes at the cursor in the original app, then restores your clipboard
 - Dictionary (register a spelling and how it sounds; "sounds like" forms are matched regardless of hiragana/katakana and full-/half-width, and are also used as hints for speech recognition), History (copy / insert again / redo cleanup)
@@ -23,7 +23,7 @@ Press → speak → press again (or hold while you speak) → your text appears.
 ## Requirements
 
 - macOS 14 or later, Apple Silicon
-- Transcription: on macOS 26 or later, macOS (On-Device) transcription works without an API key. Otherwise, or if you want speaker identification or cloud recognition, an API key from [Soniox](https://soniox.com) or [Google AI Studio](https://aistudio.google.com) (Gemini 3.5 Transcribe)
+- Transcription: on macOS 26 or later, macOS (On-Device) transcription works without an API key. Otherwise, or if you want speaker identification or cloud recognition, an API key from [Soniox](https://soniox.com), [Google AI Studio](https://aistudio.google.com) (Gemini 3.5 Transcribe), or [ElevenLabs](https://elevenlabs.io) (Scribe v3 Live)
 - An LLM for AI Cleanup (optional; you can use Raw without one): Anthropic API, Amazon Bedrock, Google Gemini API, or an OpenAI-compatible API
 
 ## Installation
@@ -39,7 +39,7 @@ To build it yourself, see [Build from source](docs/en/building.md).
 1. When launched, the HibiVo icon appears in the menu bar.
 2. Allow **Accessibility** (System Settings › Privacy & Security › Accessibility). It is needed for the hotkey and for pasting.
 3. Allow the **Microphone**.
-4. In the menu › Settings… › Transcription, choose the STT Provider. The default, "macOS (On-Device)", needs no setup (the speech model is downloaded automatically the first time). To use Soniox / Google Gemini, save an API key. The Gemini API key is shared with Google Gemini in AI Cleanup.
+4. In the menu › Settings… › Transcription, choose the STT Provider. The default, "macOS (On-Device)", needs no setup (the speech model is downloaded automatically the first time). To use Soniox / Google Gemini / ElevenLabs, save an API key. The Gemini API key is shared with Google Gemini in AI Cleanup.
 5. In the AI Cleanup tab, set the LLM provider and its credentials (the default is Anthropic `claude-haiku-4-5`; cleaning up short text favors response speed, so each provider's default is a lightweight model).
    For Amazon Bedrock, set the region, the model ID (or inference profile ID), and either a Bedrock API key or IAM access keys (with the `bedrock:InvokeModel` permission).
    Besides Claude you can specify `zai.glm-4.7-flash`, `zai.glm-4.7`, `minimax.minimax-m2.5`, `global.openai.gpt-6-luna` and others (selectable from "Suggestions" in Settings).
@@ -96,12 +96,12 @@ Register company names and technical terms in the Dictionary so they are entered
 ## Privacy
 
 - **Audio**: only sent from memory to the STT; not written to disk. The exception is a meeting transcribed After the Meeting: its audio stays on your Mac until the transcript is done (and is deleted after 7 days if it can't be). With macOS (On-Device) transcription, audio never leaves your Mac.
-- **Text**: if you choose Soniox / Google Gemini, audio is sent to that STT provider, and when cleaning up, text is sent to the LLM provider. Each company's data handling policy applies.
+- **Text**: if you choose Soniox / Google Gemini / ElevenLabs, audio is sent to that STT provider, and when cleaning up, text is sent to the LLM provider. Each company's data handling policy applies.
 - **History**: raw transcripts and cleaned-up results are saved in plain text to `~/Library/Application Support/HibiVo/history.json`, up to 200 entries. You can turn this off with "Save History" at the top right of the History screen, and delete everything from the same screen.
 - **Dictionary**: saved to `~/Library/Application Support/HibiVo/vocabulary.json`.
 - **Meetings**: transcripts and minutes are saved as plain-text Markdown in `~/Library/Application Support/HibiVo/Meetings/`. When writing minutes, the transcript is sent to Anthropic through Claude Code, or to the provider chosen in "Written With".
 - **API keys / AWS credentials**: stored in the macOS Keychain, never in settings files.
-  - API keys for Soniox, Gemini, Anthropic, OpenAI-compatible, and Bedrock are stored together in a single HibiVo item. Access permission to that item applies to all saved API keys.
+  - API keys for Soniox, Gemini, ElevenLabs, Anthropic, OpenAI-compatible, and Bedrock are stored together in a single HibiVo item. Access permission to that item applies to all saved API keys.
   - Retrieved API keys are kept in the app's memory, so normal use does not retrieve or re-approve each key. If you change a key from outside (for example in Keychain Access), restart HibiVo.
   - AWS IAM access key ID, secret access key, and session token stay stored separately, because the app cannot tell the scope of their permissions.
   - Existing API keys are migrated the first time they are retrieved or saved. Migration may ask for approval for each old item. Old items are deleted only after the combined item is saved successfully. Keys you deny access to are not migrated and are asked about again on the next launch (saving that key again in Settings deletes the old item). If deleting an old item fails, it remains, but the combined item is used from then on.
@@ -119,7 +119,7 @@ Register company names and technical terms in the Dictionary so they are entered
 
 The full flow Push-to-Talk → transcription → cleanup → paste has been verified in the developer's environment.
 
-- STT: macOS (On-Device) (`SpeechAnalyzer`, macOS 26 or later), Soniox, Google Gemini (`gemini-3.5-transcribe-live`, streamed over the Live API)
+- STT: macOS (On-Device) (`SpeechAnalyzer`, macOS 26 or later), Soniox, Google Gemini (`gemini-3.5-transcribe-live`, streamed over the Live API), ElevenLabs (`scribe_v3_live`, streamed over the realtime API)
 - Amazon Bedrock supports Claude (InvokeModel) and Converse API models such as GLM, MiniMax, and GPT. Loading credentials automatically from AWS profiles / SSO is not supported
 - The hotkey is chosen from presets (right Option / Fn / right Command / ⌃Space). Registering an arbitrary key is not supported
 - Per-app cleanup modes are matched by bundle ID, so web apps in a browser (Gmail and so on) follow the browser's setting
