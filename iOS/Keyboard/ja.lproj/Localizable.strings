@@ -1,0 +1,2 @@
+/* Left empty on purpose: the Japanese text in the code is the key, so Japanese needs no entries. The file has to
+   exist, or a Mac or iPhone set to Japanese would fall back to the development language (English). */

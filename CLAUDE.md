@@ -29,6 +29,7 @@ scripts/make-screenshots.sh             # LP の画面画像 site/assets/screens
 swift scripts/make-icons.swift          # Resources/AppIconSource.png から AppIcon.icns、Logo*.png、MenuBarIcon*.png、site/assets/ を再生成
 scripts/format.sh                       # swift-format で整形 (その場で書き換え)
 scripts/lint.sh                         # swift-format lint --strict (CI でも実行)
+scripts/ios-project.sh                  # iPhone 版: XcodeGen で iOS/HibiVo.xcodeproj を作る (Xcode と xcodegen が必要。env.sh は読まない)
 ```
 
 フォーマッタ・リンタは toolchain 同梱の swift-format(`swift format`)のみ。設定は `.swift-format`(4 スペース・120 桁)。Swift ファイルを変更したら `scripts/format.sh` をかけ、`scripts/lint.sh` が通ることを確認する。
@@ -100,6 +101,15 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 - Secure Input、アクセシビリティ権限なし、対象アプリ終了済みの場合は、説明付きでコピーのみにする。
 
 **更新の確認とお知らせ**(`Support/UpdateChecker.swift`、`Support/ReleaseNotes.swift`、`UI/News/NewsView.swift`): 起動時と 1 日 1 回、GitHub のリリース一覧を問い合わせ、新しい版があればサイドバーとメニューに出す(失敗時は 1 時間後に再試行)。下書きとプレリリース、タグが `AppVersion` の形に合わないものは除く。ボタンは固定の URL(`ProjectLinks.latestDownload`、最新リリースの `HibiVo-arm64.dmg`)をブラウザで開き、ディスクイメージを直接ダウンロードさせる(ブラウザ経由なので隔離属性が付き Gatekeeper が確認する)。インストールはしない。「お知らせ」のページ(`MainSection.news`)は最新 5 件のリリースノートを表示する。本文は純粋関数的な `ReleaseNotes` が見出し・段落・箇条書きに分け、インストールの節、コードブロック、Full Changelog の行は捨てる。リンクは https のものだけ押せる。最後に見た版(`SettingsStore.lastSeenReleaseNotes`)より新しいノートがあれば、サイドバーに印を出す。設定 › 一般 でオフにできる(`checksForUpdates`)。オフのときは、お知らせのページでボタンを押したときだけ問い合わせる。
+
+**iPhone 版**(`iOS/`、開発中。使い方とビルドは `docs/ios.md`): HibiVo をキーボード拡張として使う別アプリ。ミーティングモード、アプリ別モード、修正からの辞書学習、利用状況はない。
+- iOS はキーボード拡張にマイクを使わせないので、録音と文字起こしはアプリが行う。アプリはフォアグラウンドで一度マイクをオンにし(`MicrophoneSession`、`UIBackgroundModes` の `audio`)、バックグラウンドでエンジンを動かしたまま待つ。待機中の音声は捨て、`beginCapture` から `endCapture` の間だけ流す。使わないまま設定の時間(既定 5 分)が過ぎるか、割り込み(電話など)が入るとオフにする。
+- キーボードとアプリは App Group のコンテナのファイルと Darwin 通知でやり取りする(`iOS/Core/Bridge/KeyboardBridge.swift`)。通知はどのアプリでも送れるので「見に来て」の合図にだけ使い、何をするかは必ずコンテナのファイル(`BridgeCommand`、`BridgeState`)から読む。コマンドは ID で 1 回だけ、送ってから数秒以内のものだけ実行する。URL(`hibivo://dictate`)で開かれたときも、キーボードが書いた `activate` コマンドがなければマイクをオンにしない。
+- キーボード(`iOS/Keyboard/`、状態は `iOS/Core/Keyboard/KeyboardModel.swift`)は、アプリが応答するまで状態ファイルを信用しない(アプリが止められた後の残りかもしれないため)。コマンドに 1.5 秒応答がなければ「オフ」とみなし、次に押したときにアプリを開く。結果は 60 秒以内のものを 1 回だけ `insertText` する。フルアクセスが必要(コンテナに書くため)。入力欄の内容は読まず、ネットワークも使わない。
+- 流れは `MobileDictationController`(inactive → ready → recording → processing → ready)。文字起こし、整形、辞書、履歴は `Sources/HibiVoKit/` のうち Mac 専用の部分がないファイルを iOS のターゲットでもそのままコンパイルする(対象は `iOS/project.yml` の `includes`)。これらのファイルに AppKit など Mac 専用の API を足すと iPhone 版が壊れる。ブランドの色はそのため `ThemeBrand.swift`(SwiftUI のみ)に分けてある。
+- `iOS/Core/` は Foundation だけで書き、SwiftPM のターゲット `HibiVoKeyboardBridge` として `scripts/test.sh` でテストする。それ以外の iOS のコードは Mac の `swift build` では確認できず、CI の `ios` ジョブ(署名なしの `xcodebuild`)でコンパイルだけ確認する。
+- Xcode プロジェクトは `iOS/project.yml` から作り、コミットしない。チーム ID は `iOS/Config/Signing.xcconfig`(git の対象外)に書く。英訳は `iOS/App/en.lproj` と `iOS/Keyboard/en.lproj`(`check-localization.swift` の対象外)。共有ファイルの文言の訳は `Resources/en.lproj` から写す。
+- iOS のアイコンも `make-icons.swift` が作る(白地の正方形、透明なし)。
 
 **状態と永続化**:
 - `AppState` は UI 状態のみを保持する。

@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "話した内容を文字起こしするためにマイクを使用します。音声は設定した文字起こしの方法で処理し、保存しません。";
+"NSSpeechRecognitionUsageDescription" = "話した内容を iPhone の中で文字起こしするために音声認識を使用します。";

@@ -1,0 +1,5 @@
+// Build settings shared by the app and the keyboard extension.
+//
+// Signing is personal, so it lives in Signing.xcconfig, which is not committed. Copy
+// Signing.xcconfig.example to Signing.xcconfig and put your team ID in it.
+#include? "Signing.xcconfig"
