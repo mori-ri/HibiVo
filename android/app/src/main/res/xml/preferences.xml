@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/category_setup">
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="setup_enable"
+            app:title="@string/setup_enable" />
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="setup_select"
+            app:title="@string/setup_select" />
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="setup_microphone"
+            app:title="@string/setup_microphone" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/category_transcription">
+        <ListPreference
+            app:defaultValue="android"
+            app:entries="@array/stt_provider_names"
+            app:entryValues="@array/stt_provider_values"
+            app:iconSpaceReserved="false"
+            app:key="stt_provider"
+            app:title="@string/stt_provider"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dialogMessage="@string/soniox_key_message"
+            app:iconSpaceReserved="false"
+            app:key="secret.soniox"
+            app:title="@string/soniox_key" />
+        <ListPreference
+            app:defaultValue="ja"
+            app:entries="@array/language_names"
+            app:entryValues="@array/language_values"
+            app:iconSpaceReserved="false"
+            app:key="language"
+            app:title="@string/language"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/category_cleanup">
+        <ListPreference
+            app:defaultValue="natural"
+            app:entries="@array/mode_names"
+            app:entryValues="@array/mode_values"
+            app:iconSpaceReserved="false"
+            app:key="cleanup_mode"
+            app:title="@string/cleanup_mode"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            app:defaultValue="anthropic"
+            app:entries="@array/cleanup_provider_names"
+            app:entryValues="@array/cleanup_provider_values"
+            app:iconSpaceReserved="false"
+            app:key="cleanup_provider"
+            app:title="@string/cleanup_provider"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="secret.anthropic"
+            app:title="@string/api_key" />
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="secret.openai-compatible"
+            app:title="@string/api_key" />
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="secret.gemini"
+            app:title="@string/api_key" />
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="openai_base_url"
+            app:title="@string/openai_base_url" />
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="cleanup_model_anthropic"
+            app:title="@string/cleanup_model" />
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="cleanup_model_openai-compatible"
+            app:title="@string/cleanup_model" />
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="cleanup_model_gemini"
+            app:title="@string/cleanup_model" />
+        <EditTextPreference
+            app:dialogMessage="@string/custom_instructions_message"
+            app:iconSpaceReserved="false"
+            app:key="custom_instructions"
+            app:title="@string/custom_instructions" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/category_other">
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="vocabulary"
+            app:summary="@string/vocabulary_summary"
+            app:title="@string/vocabulary_title" />
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:iconSpaceReserved="false"
+            app:key="haptics"
+            app:title="@string/haptics" />
+    </PreferenceCategory>
+</PreferenceScreen>

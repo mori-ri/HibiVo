@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="stt_provider_values" translatable="false">
+        <item>android</item>
+        <item>soniox</item>
+    </string-array>
+    <string-array name="stt_provider_names">
+        <item>@string/stt_android</item>
+        <item>@string/stt_soniox</item>
+    </string-array>
+    <string-array name="language_values" translatable="false">
+        <item>ja</item>
+        <item>en</item>
+    </string-array>
+    <string-array name="language_names" translatable="false">
+        <item>日本語</item>
+        <item>English</item>
+    </string-array>
+    <string-array name="mode_values" translatable="false">
+        <item>raw</item>
+        <item>natural</item>
+        <item>business</item>
+        <item>prompt</item>
+        <item>custom</item>
+    </string-array>
+    <string-array name="mode_names">
+        <item>@string/mode_raw_long</item>
+        <item>@string/mode_natural_long</item>
+        <item>@string/mode_business_long</item>
+        <item>@string/mode_prompt_long</item>
+        <item>@string/mode_custom_long</item>
+    </string-array>
+    <string-array name="cleanup_provider_values" translatable="false">
+        <item>anthropic</item>
+        <item>openai-compatible</item>
+        <item>gemini</item>
+    </string-array>
+    <string-array name="cleanup_provider_names">
+        <item>@string/provider_anthropic</item>
+        <item>@string/provider_openai</item>
+        <item>@string/provider_gemini</item>
+    </string-array>
+</resources>
