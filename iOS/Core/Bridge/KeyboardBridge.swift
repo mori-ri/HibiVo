@@ -168,9 +168,11 @@ final class DarwinNotificationObserver {
         CFNotificationCenterAddObserver(
             CFNotificationCenterGetDarwinNotifyCenter(), Unmanaged.passUnretained(self).toOpaque(),
             { _, observer, _, _, _ in
-                guard let observer else { return }
+                // The pointer is copied to a Sendable value before entering the main actor.
+                let address = UInt(bitPattern: observer)
                 MainActor.assumeIsolated {
-                    Unmanaged<DarwinNotificationObserver>.fromOpaque(observer).takeUnretainedValue().handler()
+                    guard let pointer = UnsafeRawPointer(bitPattern: address) else { return }
+                    Unmanaged<DarwinNotificationObserver>.fromOpaque(pointer).takeUnretainedValue().handler()
                 }
             }, name as CFString, nil, .deliverImmediately)
     }
