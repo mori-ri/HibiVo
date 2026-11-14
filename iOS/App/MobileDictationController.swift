@@ -181,10 +181,12 @@ final class MobileDictationController {
 
     private func commandSent() {
         guard let command = store?.command(), command.isCurrent(lastHandled: lastCommand) else { return }
+        // Only acted on when the app is opened through the URL; see `openedFromKeyboard`. It must stay
+        // unhandled here: a notification queued while the app was suspended can arrive before the URL.
+        guard command.kind != .activate else { return }
         lastCommand = command.id
         switch command.kind {
         case .ping: publish()
-        // Only acted on when the app is opened through the URL; see `openedFromKeyboard`.
         case .activate: break
         case .start: begin()
         case .stop: end()
