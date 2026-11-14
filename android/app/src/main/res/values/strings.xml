@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English is the default so any language other than Japanese gets English, as in the macOS app. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name" translatable="false">HibiVo</string>
+    <string name="subtype_voice">Voice</string>
+
+    <!-- Keyboard -->
+    <string name="status_idle">Tap to speak, or hold while you speak</string>
+    <string name="status_listening">Listening…</string>
+    <string name="status_transcribing">Transcribing…</string>
+    <string name="status_cleaning_up">Cleaning up…</string>
+    <string name="action_start">Start dictation</string>
+    <string name="action_stop">Stop and enter the text</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_cycle_mode">Change cleanup mode</string>
+    <string name="action_undo">Undo the last dictation</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_switch_keyboard">Switch to your regular keyboard</string>
+    <string name="action_space">Space</string>
+    <string name="action_cursor_left">Move cursor left</string>
+    <string name="action_cursor_right">Move cursor right</string>
+    <string name="action_backspace">Delete</string>
+    <string name="action_enter">Enter</string>
+    <string name="key_comma" tools:ignore="Typos">,</string>
+    <string name="key_period">.</string>
+    <string name="key_cursor_left" translatable="false">←</string>
+    <string name="key_cursor_right" translatable="false">→</string>
+    <string name="mode_raw" translatable="false">Raw</string>
+    <string name="mode_natural" translatable="false">Natural</string>
+    <string name="mode_business" translatable="false">Business</string>
+    <string name="mode_prompt" translatable="false">Prompt</string>
+    <string name="mode_custom" translatable="false">Custom</string>
+
+    <!-- Notices on the keyboard -->
+    <string name="notice_nothing_heard">Couldn\'t hear anything. Try again.</string>
+    <string name="notice_password_field">Dictation is off in password fields.</string>
+    <string name="notice_cannot_undo">Couldn\'t undo: the text has changed since.</string>
+    <string name="notice_copied_instead">Couldn\'t enter the text, so it was copied to the clipboard.</string>
+    <string name="notice_microphone_unavailable">Couldn\'t use the microphone. Another app may be using it.</string>
+    <string name="notice_recognition_unavailable">This device has no speech recognition. Choose Soniox in Settings.</string>
+    <string name="notice_recognition_permission">Speech recognition isn\'t allowed to use the microphone. Check the permissions of the Google app (or your device\'s speech service).</string>
+    <string name="notice_recognition_failed">Transcription failed. Try again.</string>
+    <string name="notice_soniox_key_missing">No Soniox API key is saved. Add one in Settings.</string>
+    <string name="notice_soniox_key_invalid">The Soniox API key was rejected. Check it in Settings.</string>
+    <string name="notice_network">Couldn\'t connect. Check your network.</string>
+    <string name="notice_transcription_timed_out">Transcription took too long. Try again.</string>
+    <string name="notice_cleanup_key_missing">Entered as spoken: no API key for AI cleanup is saved.</string>
+    <string name="notice_cleanup_model_missing">Entered as spoken: no model for AI cleanup is set.</string>
+    <string name="notice_cleanup_key_invalid">Entered as spoken: the API key for AI cleanup was rejected.</string>
+    <string name="notice_cleanup_timed_out">Entered as spoken: AI cleanup took too long.</string>
+    <string name="notice_cleanup_network">Entered as spoken: couldn\'t reach AI cleanup.</string>
+    <string name="notice_cleanup_failed">Entered as spoken: AI cleanup failed.</string>
+
+    <!-- Settings -->
+    <string name="try_it_hint">Try it here</string>
+    <string name="try_it_help">Tap, switch to the HibiVo keyboard, and speak.</string>
+    <string name="category_setup">Setup</string>
+    <string name="setup_enable">1. Turn on the HibiVo keyboard</string>
+    <string name="setup_enable_done">On</string>
+    <string name="setup_enable_todo">Off. Tap to open the system keyboard settings.</string>
+    <string name="setup_select">2. Switch to HibiVo</string>
+    <string name="setup_select_done">HibiVo is the current keyboard</string>
+    <string name="setup_select_todo">Tap to choose a keyboard. Your regular keyboard\'s switch key works too.</string>
+    <string name="setup_microphone">3. Allow the microphone</string>
+    <string name="setup_microphone_done">Allowed</string>
+    <string name="setup_microphone_todo">Not allowed. Tap to allow.</string>
+    <string name="category_transcription">Transcription</string>
+    <string name="stt_provider">Speech recognition</string>
+    <string name="stt_android">Android built-in (no API key)</string>
+    <string name="stt_soniox">Soniox (streaming, needs an API key)</string>
+    <string name="soniox_key">Soniox API key</string>
+    <string name="soniox_key_message">Stored encrypted on this device. Leave empty to remove it.</string>
+    <string name="language">Language</string>
+    <string name="category_cleanup">AI cleanup</string>
+    <string name="cleanup_mode">Mode</string>
+    <string name="mode_raw_long">Raw (as spoken, no AI)</string>
+    <string name="mode_natural_long">Natural (readable, your tone)</string>
+    <string name="mode_business_long">Business (polite)</string>
+    <string name="mode_prompt_long">Prompt (instructions for an AI)</string>
+    <string name="mode_custom_long">Custom (your instructions)</string>
+    <string name="cleanup_provider">Provider</string>
+    <string name="provider_anthropic" translatable="false">Anthropic (Claude)</string>
+    <string name="provider_openai">OpenAI compatible</string>
+    <string name="provider_gemini" translatable="false">Google Gemini</string>
+    <string name="api_key">API key</string>
+    <string name="secret_saved">Saved</string>
+    <string name="secret_missing">Not set</string>
+    <string name="openai_base_url">Base URL</string>
+    <string name="cleanup_model">Model</string>
+    <string name="cleanup_model_default">%1$s (default)</string>
+    <string name="cleanup_model_missing">Not set. Enter a model name.</string>
+    <string name="custom_instructions">Custom instructions</string>
+    <string name="custom_instructions_message">Used by the Custom mode, on top of the basic cleanup. Up to 500 characters.</string>
+    <string name="custom_instructions_empty">None</string>
+    <string name="category_other">Other</string>
+    <string name="haptics">Vibrate on key press</string>
+
+    <!-- Dictionary -->
+    <string name="vocabulary_title">Dictionary</string>
+    <string name="vocabulary_summary">Names and terms to spell your way</string>
+    <string name="vocabulary_empty">Add company names and technical terms so they are entered the way you spell them.</string>
+    <string name="vocabulary_add">Add a word</string>
+    <string name="vocabulary_edit">Edit word</string>
+    <string name="vocabulary_preferred">Spelling</string>
+    <string name="vocabulary_spoken">Heard as</string>
+    <string name="vocabulary_spoken_help">How speech recognition writes it by mistake. Separate several with commas. Optional.</string>
+    <string name="vocabulary_save">Save</string>
+    <string name="vocabulary_delete">Delete</string>
+</resources>

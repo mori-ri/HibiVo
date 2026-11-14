@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.HibiVo" parent="Theme.Material3.DayNight">
+        <item name="colorPrimary">@color/microphone_idle</item>
+    </style>
+
+    <style name="Key">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">2dp</item>
+        <item name="android:layout_marginEnd">2dp</item>
+        <item name="android:background">@drawable/key_background</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/key_foreground</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:tint">@color/key_foreground</item>
+        <item name="android:scaleType">center</item>
+    </style>
+
+    <style name="BarButton">
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:background">?android:attr/selectableItemBackgroundBorderless</item>
+        <item name="android:tint">@color/keyboard_secondary_text</item>
+        <item name="android:scaleType">center</item>
+    </style>
+</resources>

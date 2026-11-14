@@ -34,6 +34,8 @@ The app tells you when a new version is out, and its button downloads the disk i
 
 To build it yourself, see [Build from source](docs/en/building.md).
 
+On Android, you can build and try an app that works as a keyboard. See [Android keyboard](docs/en/android.md).
+
 ## First-time setup
 
 1. When launched, the HibiVo icon appears in the menu bar.

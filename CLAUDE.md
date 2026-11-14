@@ -33,6 +33,24 @@ scripts/lint.sh                         # swift-format lint --strict (CI でも�
 
 フォーマッタ・リンタは toolchain 同梱の swift-format(`swift format`)のみ。設定は `.swift-format`(4 スペース・120 桁)。Swift ファイルを変更したら `scripts/format.sh` をかけ、`scripts/lint.sh` が通ることを確認する。
 
+## Android キーボード (`android/`)
+
+macOS 版とは別の Gradle プロジェクト(Kotlin)。マイクのボタンで音声入力する IME で、ミーティングモードはない。使い方は `docs/android.md`。
+
+```sh
+cd android
+./gradlew :core:test :app:testDebugUnitTest :app:lintDebug   # テスト (core は JVM、app は Robolectric) と lint。警告もエラー扱い
+./gradlew :app:assembleDebug                                 # app/build/outputs/apk/debug/app-debug.apk
+```
+
+- `core` は Android に依存しない JVM モジュール。整形のプロンプト・出力の検査・辞書の置き換え・Soniox・整形プロバイダを Swift から移したもの。プロンプトの文面と辞書の規則は macOS 版と同じに保ち、テストのケースも Swift 側と揃える。片方を変えたらもう片方も直す。
+- `app` は `HibiVoInputMethodService`(キーの操作と入力)、`DictationController`(idle → recording → transcribing → cleaningUp)、`Recognizer`(Soniox は `AudioRecord` の PCM を送る。Android 標準は `SpeechRecognizer` で、間で終わるたびに再開してつなぐ)。
+- キーボードのレイアウトはサービスが inflate するので AppCompat の属性(`app:tint` など)は効かない。
+- `KeyboardViewTest` は画面を `app/build/keyboard-snapshots/` に PNG で書き出す。レイアウトを変えたら見て確かめる。
+- API Key は `SecretStore`(Android Keystore の鍵で暗号化)にだけ保存する。
+- アイコンはビルド時に `Resources/AppIconSource.png` を取り込む。コピーを置かない。
+- UI の文言は `values/strings.xml` が英語、`values-ja/` が日本語。
+
 ## この環境特有の注意点
 
 - **CLT のみの環境では macOS 26 SDK が必要。** macOS 27 SDK では SwiftUI の `@State` がマクロになっており、そのプラグインは Xcode にしか同梱されていない。`xcode-select -p` が CommandLineTools を指している場合、`scripts/env.sh` が `SDKROOT` を 26 SDK に設定する。素の `swift build` は "plugin for module 'SwiftUIMacros' not found" で失敗する。コードでは通常どおり `@State` を使い続けること。

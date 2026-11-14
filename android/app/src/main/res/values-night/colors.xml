@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="keyboard_background">#1B1D21</color>
+    <color name="key_background">#34373D</color>
+    <color name="key_pressed">#4A4E56</color>
+    <color name="key_foreground">#F1F2F4</color>
+    <color name="keyboard_secondary_text">#A9AEB7</color>
+    <color name="microphone_idle">#3D8BFF</color>
+    <color name="microphone_recording">#F2555A</color>
+    <color name="microphone_halo">#553D8BFF</color>
+</resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colour sampled from the logo. Same token as the macOS app's Theme; see DESIGN.md. -->
+    <color name="brand_blue">#006AEC</color>
+
+    <color name="launcher_background">#FFFFFF</color>
+
+    <!-- The keyboard. Neutral surfaces; colour only says what is happening. -->
+    <color name="keyboard_background">#ECEEF2</color>
+    <color name="key_background">#FFFFFF</color>
+    <color name="key_pressed">#D5D9E0</color>
+    <color name="key_foreground">#1B1D21</color>
+    <color name="keyboard_secondary_text">#5B616B</color>
+    <color name="microphone_idle">@color/brand_blue</color>
+    <color name="microphone_recording">#E5484D</color>
+    <!-- Theme.glowBlue, translucent: the level halo behind the microphone while recording. -->
+    <color name="microphone_halo">#401F73FF</color>
+</resources>
