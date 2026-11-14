@@ -3,6 +3,10 @@
 .swiftpm/
 build/
 *.xcodeproj/xcuserdata/
+
+# iOS: the project is generated from iOS/project.yml (scripts/ios-project.sh); signing is personal
+iOS/HibiVo.xcodeproj/
+iOS/Config/Signing.xcconfig
 .env
 .env.*
 *.secret

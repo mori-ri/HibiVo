@@ -142,6 +142,8 @@ For bugs with clear steps to reproduce, please open an [Issue](https://github.co
 
 For building and working on HibiVo, see [Build from source](docs/en/building.md).
 
+A version for iPhone, used as a keyboard, is in development (not distributed yet). See [iPhone (Keyboard)](docs/en/ios.md).
+
 ## License
 
 The source code is under the [MIT License](LICENSE).

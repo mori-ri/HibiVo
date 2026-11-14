@@ -7,6 +7,7 @@
 //   Resources/MenuBarIcon.png/@2x   monochrome template silhouette for the menu bar
 //   Resources/Logo.png/@2x          colour logo cropped to its content, for the main window sidebar
 //   site/assets/logo.png, icon.png  logo and app icon for the landing page
+//   iOS/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png  iOS app icon (opaque, full-bleed white square)
 import AppKit
 
 let root = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().deletingLastPathComponent()
@@ -138,5 +139,21 @@ let siteLogo = render(pixels: NSSize(width: siteLogoWidth, height: siteLogoHeigh
 }
 writePNG(siteLogo, to: siteAssets.appending(path: "logo.png"))
 writePNG(appIcon(pixels: 512), to: siteAssets.appending(path: "icon.png"))
+
+// MARK: iOS app icon (iOS rounds the corners itself, and the App Store rejects an alpha channel)
+
+let iosIcon = render(pixels: NSSize(width: 1024, height: 1024)) { canvas in
+    NSColor.white.setFill()
+    canvas.fill()
+    drawLogo(fitting: canvas.insetBy(dx: canvas.width * 0.18, dy: canvas.height * 0.18))
+}
+let opaque = CGContext(
+    data: nil, width: iosIcon.pixelsWide, height: iosIcon.pixelsHigh, bitsPerComponent: 8, bytesPerRow: 0,
+    space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+opaque.draw(iosIcon.cgImage!, in: CGRect(x: 0, y: 0, width: iosIcon.pixelsWide, height: iosIcon.pixelsHigh))
+let iosIconURL = root.appending(path: "iOS/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png")
+let iosIconFile = CGImageDestinationCreateWithURL(iosIconURL as CFURL, "public.png" as CFString, 1, nil)!
+CGImageDestinationAddImage(iosIconFile, opaque.makeImage()!, nil)
+precondition(CGImageDestinationFinalize(iosIconFile), "Could not write the iOS app icon")
 
 print("Wrote AppIcon.icns, Logo.png, site/assets and MenuBarIcon.png (\(Int(menuBarWidth))x\(Int(menuBarHeight)) pt)")

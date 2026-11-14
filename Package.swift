@@ -27,9 +27,20 @@ let package = Package(
             name: "HibiVoScreenshots",
             dependencies: ["HibiVoKit"]
         ),
+        // The parts of the iOS app and its keyboard extension that need only Foundation (see docs/ios.md).
+        // The Xcode project compiles these files itself; this target exists so `scripts/test.sh` can test
+        // them on a Mac.
+        .target(
+            name: "HibiVoKeyboardBridge",
+            path: "iOS/Core"
+        ),
         .testTarget(
             name: "HibiVoKitTests",
             dependencies: ["HibiVoKit"]
+        ),
+        .testTarget(
+            name: "HibiVoKeyboardBridgeTests",
+            dependencies: ["HibiVoKeyboardBridge"]
         ),
     ],
     swiftLanguageModes: [.v6]

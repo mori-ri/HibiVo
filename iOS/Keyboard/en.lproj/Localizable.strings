@@ -1,0 +1,13 @@
+/* English for the keyboard extension. The Japanese text in the code is the key. */
+"「設定」›「一般」›「キーボード」›「キーボード」›「HibiVo」で「フルアクセスを許可」をオンにしてください" = "Turn on Allow Full Access in Settings › General › Keyboard › Keyboards › HibiVo";
+"キャンセル" = "Cancel";
+"マイクを押して話す" = "Tap the microphone and speak";
+"マイクを押すと HibiVo が開きます。開いたら、この画面に戻ってください" = "Tap the microphone to open HibiVo, then come back to this screen";
+"入力しています…" = "Working…";
+"削除" = "Delete";
+"改行" = "Return";
+"次のキーボード" = "Next Keyboard";
+"空白" = "space";
+"聞いています…" = "Listening…";
+"録音を終了" = "Stop Recording";
+"音声入力" = "Dictate";

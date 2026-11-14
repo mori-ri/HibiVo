@@ -71,6 +71,7 @@
 "Sonnet(標準)" = "Sonnet (Standard)";
 "macOS の音声認識モデルを準備しています。少し待ってからもう一度お試しください" = "macOS is getting its speech recognition model ready. Wait a moment and try again";
 "macOS 標準" = "macOS (On-Device)";
+"iPhone 標準" = "iPhone (On-Device)";
 "…（続きはファイルを開いてください）" = "… (Open the file to read the rest)";
 "⚠️ アクセシビリティ権限を許可…" = "⚠️ Allow Accessibility Access…";
 "⚠️ マイク権限を許可…" = "⚠️ Allow Microphone Access…";

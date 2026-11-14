@@ -1,0 +1,74 @@
+# The Xcode project for the iOS app and its keyboard extension, generated with XcodeGen:
+#   scripts/ios-project.sh        (runs `xcodegen generate` here and prints what to do next)
+# HibiVo.xcodeproj is not committed; change this file instead.
+name: HibiVo
+options:
+  bundleIdPrefix: io.github.mori-ri
+  deploymentTarget:
+    # iOS 26 is where SpeechAnalyzer, the on-device recognizer, starts.
+    iOS: "26.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Automatic
+    GENERATE_INFOPLIST_FILE: NO
+targets:
+  HibiVo:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Core/Bridge
+      # The Mac app's code that has nothing Mac-only in it, compiled as is. See iOS/README.md.
+      - path: ../Sources/HibiVoKit
+        name: HibiVoKit
+        includes:
+          - Audio/PCMConverter.swift
+          - "Cleanup/*.swift"
+          - History/HistoryStore.swift
+          - Meeting/MeetingTranscription.swift
+          - Settings/KeychainService.swift
+          - Support/JSONFileStore.swift
+          - Support/UserFacingError.swift
+          - "Transcription/*.swift"
+          - "Transcription/*/*.swift"
+          - UI/Main/ThemeBrand.swift
+          - Vocabulary/CorrectionExtractor.swift
+          - Vocabulary/VocabularyEntry.swift
+          - Vocabulary/VocabularyReplacer.swift
+          - Vocabulary/VocabularyStore.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.mori-ri.hibivo.ios
+        PRODUCT_NAME: HibiVo
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/HibiVo.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: HibiVoKeyboard
+    # A shared scheme, so `xcodebuild -scheme HibiVo` works on a fresh checkout (CI).
+    scheme: {}
+  HibiVoKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Keyboard
+      # The bridge and the keyboard's own logic, which `scripts/test.sh` tests on a Mac.
+      - path: Core
+      - path: ../Sources/HibiVoKit
+        name: HibiVoKit
+        includes:
+          - UI/Main/ThemeBrand.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.mori-ri.hibivo.ios.keyboard
+        INFOPLIST_FILE: Keyboard/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Keyboard/HibiVoKeyboard.entitlements

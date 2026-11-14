@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "HibiVo uses the microphone to transcribe what you say. Audio is processed by the transcription method you set up and is never stored.";
+"NSSpeechRecognitionUsageDescription" = "HibiVo uses speech recognition to transcribe what you say on this iPhone.";
