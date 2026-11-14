@@ -137,9 +137,16 @@ class SonioxSessionTests {
         serve { message, socket ->
             if (message.contains("api_key")) socket.send("""{"error_code":401,"error_message":"Invalid API key"}""")
         }
-        val session = session()
+        val reported = kotlinx.coroutines.CompletableDeferred<TranscriptionError>()
+        val session = SonioxSession(
+            TranscriptionConfig("key", language = "ja"), client, server.url("/").toString().replaceFirst("http", "ws"),
+            onFailure = { reported.complete(it) },
+        )
         session.start()
+        // Reported while still recording, so the keyboard can stop instead of listening to nobody.
+        assertEquals(TranscriptionError.Unauthorized, reported.await())
         assertFailsWith<TranscriptionError.Unauthorized> { session.finish() }
+        session.cancel()
         Unit
     }
 

@@ -26,8 +26,8 @@ import okhttp3.OkHttpClient
  * The dictation state machine: idle → recording → processing → idle.
  *
  * Starting fixes what the utterance needs (provider, language, dictionary, the app being typed into), so a
- * settings change mid-utterance can't mix in. Only the cleanup mode is read when recording stops, because
- * the keyboard shows it and lets the user change it while speaking. Main thread only.
+ * settings change mid-utterance can't mix in. Cleanup settings are read when recording stops: the keyboard
+ * shows the mode and lets the user change it while speaking. Main thread only.
  */
 class DictationController(
     private val context: Context,
@@ -94,6 +94,8 @@ class DictationController(
                 state = State.IDLE
                 listener.onNotice(context.getString(failure.notice))
             }
+
+            override fun onEndedEarly() = stop(endedEarly = true)
         })
         if (!started) return
         utterance = Utterance(recognizer, SystemClock.elapsedRealtime(), language, vocabulary, appName)
@@ -106,12 +108,15 @@ class DictationController(
     }
 
     /** Ends recording and enters the result. */
-    fun stop() {
+    fun stop() = stop(endedEarly = false)
+
+    /** @param endedEarly The recognizer stopped by itself, so its error must be reported, not dropped. */
+    private fun stop(endedEarly: Boolean) {
         val utterance = utterance ?: return
         if (state != State.RECORDING) return
         limit?.cancel()
         // An accidental double tap.
-        if (SystemClock.elapsedRealtime() - utterance.startedAt < MINIMUM_DURATION_MS) {
+        if (!endedEarly && SystemClock.elapsedRealtime() - utterance.startedAt < MINIMUM_DURATION_MS) {
             cancel()
             return
         }

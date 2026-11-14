@@ -29,6 +29,9 @@ class HibiVoInputMethodService : InputMethodService(), KeyboardView.Actions, Dic
     /** What the last dictation entered, so it can be taken back with one key. */
     private var lastEntered: String? = null
 
+    /** Whether the notice on screen is the password one, which only applies to the field it was shown for. */
+    private var showsPasswordNotice = false
+
     override fun onCreate() {
         super.onCreate()
         settings = Settings(this)
@@ -49,7 +52,14 @@ class HibiVoInputMethodService : InputMethodService(), KeyboardView.Actions, Dic
             setHaptics(settings.haptics)
             setState(controller.state)
             if (controller.state == DictationController.State.IDLE) {
-                showNotice(if (isPasswordField(info)) getString(R.string.notice_password_field) else null)
+                // Any other notice (cleanup failed, copied instead…) stays until the next dictation: apps restart
+                // input right after text is entered, and the user must still get to read it.
+                if (isPasswordField(info)) {
+                    showPasswordNotice()
+                } else if (showsPasswordNotice) {
+                    showsPasswordNotice = false
+                    showNotice(null)
+                }
             }
         }
     }
@@ -75,9 +85,10 @@ class HibiVoInputMethodService : InputMethodService(), KeyboardView.Actions, Dic
         when (controller.state) {
             DictationController.State.IDLE -> {
                 if (isPasswordField(currentInputEditorInfo)) {
-                    keyboard?.showNotice(getString(R.string.notice_password_field))
+                    showPasswordNotice()
                     return
                 }
+                showsPasswordNotice = false
                 keyboard?.showNotice(null)
                 controller.start(targetAppName())
             }
@@ -153,6 +164,7 @@ class HibiVoInputMethodService : InputMethodService(), KeyboardView.Actions, Dic
     }
 
     override fun onNotice(message: String) {
+        showsPasswordNotice = false
         keyboard?.showNotice(message)
     }
 
@@ -175,6 +187,11 @@ class HibiVoInputMethodService : InputMethodService(), KeyboardView.Actions, Dic
     }
 
     // MARK: Private
+
+    private fun showPasswordNotice() {
+        showsPasswordNotice = true
+        keyboard?.showNotice(getString(R.string.notice_password_field))
+    }
 
     private fun openSettings(requestMicrophone: Boolean) {
         startActivity(

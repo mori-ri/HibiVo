@@ -43,6 +43,12 @@ interface Recognizer {
 
         /** Recognition stopped by itself; nothing more will arrive. */
         fun onFailure(failure: RecognizerFailure)
+
+        /**
+         * Listening can't go on (the connection dropped, the service keeps failing), but [finish] may still
+         * have text to return or a precise error to report. The owner should finish now.
+         */
+        fun onEndedEarly()
     }
 
     /** False when listening couldn't start; [Listener.onFailure] has then already said why. */
@@ -128,8 +134,20 @@ class SonioxRecognizer(
     client: OkHttpClient,
     private val scope: CoroutineScope,
 ) : Recognizer {
-    private val session = SonioxSession(config, client)
     private val main = Handler(Looper.getMainLooper())
+
+    // A rejected key or a dropped connection ends the recording at once, rather than letting the user
+    // keep talking to nobody; `finish` then reports why, or returns what was heard until then.
+    private val session = SonioxSession(
+        config, client,
+        onFailure = {
+            main.post {
+                failed = true
+                listener?.onEndedEarly()
+            }
+        },
+    )
+    private var failed = false
     private var listener: Recognizer.Listener? = null
     private var partials: Job? = null
     @Volatile private var peak = 0f
@@ -159,7 +177,8 @@ class SonioxRecognizer(
     override suspend fun finish(): String {
         stopListening()
         // Nobody spoke: don't wait for (or pay for) a transcript of silence.
-        if (peak < SILENCE_THRESHOLD) {
+        // After a failure the session has the reason to report, so ask it even if nobody spoke.
+        if (peak < SILENCE_THRESHOLD && !failed) {
             session.cancel()
             return ""
         }
@@ -208,6 +227,8 @@ class SystemRecognizer(
     private var stopping = false
     private var consecutiveErrors = 0
     private val finished = CompletableDeferred<Unit>()
+    private val main = Handler(Looper.getMainLooper())
+    private val restart = Runnable { if (!stopping) recognizer?.startListening(intent()) }
 
     override fun start(listener: Recognizer.Listener): Boolean {
         this.listener = listener
@@ -240,6 +261,7 @@ class SystemRecognizer(
     }
 
     private fun release() {
+        main.removeCallbacks(restart)
         recognizer?.destroy()
         recognizer = null
     }
@@ -285,18 +307,25 @@ class SystemRecognizer(
         override fun onError(error: Int) {
             when (error) {
                 // A pause with nothing said. Keep listening until the user stops.
-                SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> continueOrFinish()
+                SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> continueOrFinish(RESTART_DELAY_MS)
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
                     finished.complete(Unit)
                     fail(RecognizerFailure.PERMISSION_DENIED)
                 }
                 else -> {
                     consecutiveErrors += 1
-                    // What was heard so far is still worth entering, so a late failure just ends listening.
-                    if (stopping || consecutiveErrors <= MAX_CONSECUTIVE_ERRORS) continueOrFinish()
-                    else {
-                        finished.complete(Unit)
-                        fail(RecognizerFailure.RECOGNITION_FAILED)
+                    when {
+                        stopping || consecutiveErrors <= MAX_CONSECUTIVE_ERRORS -> continueOrFinish(RESTART_DELAY_MS)
+                        // What was heard so far is still worth entering.
+                        text().isNotBlank() -> {
+                            stopping = true
+                            finished.complete(Unit)
+                            listener?.onEndedEarly()
+                        }
+                        else -> {
+                            finished.complete(Unit)
+                            fail(RecognizerFailure.RECOGNITION_FAILED)
+                        }
                     }
                 }
             }
@@ -313,14 +342,20 @@ class SystemRecognizer(
         override fun onEndOfSpeech() = Unit
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
 
-        private fun continueOrFinish() {
-            if (stopping) finished.complete(Unit) else recognizer?.startListening(intent())
+        /** @param delayMs Services answer "busy" when restarted from inside an error callback. */
+        private fun continueOrFinish(delayMs: Long = 0) {
+            when {
+                stopping -> finished.complete(Unit)
+                delayMs > 0 -> main.postDelayed(restart, delayMs)
+                else -> recognizer?.startListening(intent())
+            }
         }
     }
 
     private companion object {
         const val FINISH_TIMEOUT_MS = 3_000L
         const val MAX_CONSECUTIVE_ERRORS = 3
+        const val RESTART_DELAY_MS = 150L
         const val MAX_BIASING_STRINGS = 100
     }
 }

@@ -149,6 +149,8 @@ class AnthropicCleanupProvider(
         internal fun parse(response: JsonObject): String {
             with(HttpJson) {
                 if (response.string("stop_reason") == "refusal") throw CleanupError.Refused
+                // Cut off at the output cap: entering it would silently drop the end of the utterance.
+                if (response.string("stop_reason") == "max_tokens") throw CleanupError.InvalidResponse
                 val text = response.array("content").orEmpty()
                     .filter { it.string("type") == "text" }
                     .mapNotNull { it.string("text") }
@@ -189,7 +191,10 @@ class OpenAICompatibleCleanupProvider(
     companion object {
         internal fun parse(response: JsonObject): String {
             with(HttpJson) {
-                val text = response.array("choices")?.firstOrNull().obj("message").string("content")
+                val choice = response.array("choices")?.firstOrNull()
+                // Cut off at the output cap: entering it would silently drop the end of the utterance.
+                if (choice.string("finish_reason") == "length") throw CleanupError.InvalidResponse
+                val text = choice.obj("message").string("content")
                 if (text.isNullOrEmpty()) throw CleanupError.InvalidResponse
                 return text
             }

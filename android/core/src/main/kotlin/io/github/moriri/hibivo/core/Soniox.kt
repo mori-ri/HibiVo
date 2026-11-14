@@ -145,6 +145,8 @@ class SonioxSession(
     private val client: OkHttpClient,
     private val endpoint: String = SonioxProtocol.ENDPOINT,
     private val finalizeTimeout: Duration = 4.seconds,
+    /** Called once, on an OkHttp thread, when the session fails by itself (not when cancelled). */
+    private val onFailure: (TranscriptionError) -> Unit = {},
 ) {
     private val lock = Any()
     private val transcript = SonioxTranscript()
@@ -208,8 +210,9 @@ class SonioxSession(
     }
 
     private fun fail(error: TranscriptionError) {
-        synchronized(lock) { if (failure == null) failure = error }
+        val first = synchronized(lock) { (failure == null).also { if (it) failure = error } }
         finalized.complete(Unit)
+        if (first && error != TranscriptionError.Cancelled) onFailure(error)
     }
 
     private fun close() {
